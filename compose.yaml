@@ -21,6 +21,7 @@ services:
       - letsencrypt:/letsencrypt
     restart: unless-stopped
 
+  # hackamonth.io placeholder — replace with real app
   site:
     image: traefik/whoami:v1.11.0
     labels:
@@ -37,6 +38,19 @@ services:
       - traefik.http.middlewares.security-headers.headers.frameDeny=true
       - traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true
       - traefik.http.services.site.loadbalancer.server.port=80
+    restart: unless-stopped
+
+  # getrafty.org — image tag updated automatically by CI (getrafty-org/site workflow)
+  getrafty:
+    image: ghcr.io/getrafty-org/site:latest  # renovated by CI
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.getrafty.rule=Host(`getrafty.org`) || Host(`www.getrafty.org`)
+      - traefik.http.routers.getrafty.entrypoints=websecure
+      - traefik.http.routers.getrafty.tls=true
+      - traefik.http.routers.getrafty.tls.certresolver=le
+      - traefik.http.routers.getrafty.middlewares=security-headers
+      - traefik.http.services.getrafty.loadbalancer.server.port=80
     restart: unless-stopped
 
 volumes:

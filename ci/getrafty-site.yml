@@ -1,0 +1,86 @@
+# Place this file at:
+#   getrafty-org/site/.github/workflows/deploy.yml
+#
+# Required setup (one-time):
+#   1. In getrafty-org GitHub org → Settings → Actions → General:
+#      set "Workflow permissions" to "Read and write permissions"
+#   2. Create a fine-grained PAT on your account with:
+#        - Repository access: sidosera/hackamonth-gitops
+#        - Permissions: Contents = Read & Write
+#      Save it as secret GITOPS_PAT in getrafty-org/site repo.
+#   3. Make the ghcr.io/getrafty-org/site package public:
+#      GitHub → getrafty-org → Packages → site → Package settings → Public
+#      (so the server can pull without auth)
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/getrafty-org/site
+
+jobs:
+  build:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image tag
+        id: tag
+        run: echo "tag=$IMAGE:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.tag.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Update gitops repo
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: sidosera/hackamonth-gitops
+          token: ${{ secrets.GITOPS_PAT }}
+
+      - name: Pin image tag in compose.yaml
+        run: |
+          sed -i "s|image: ghcr.io/getrafty-org/site:.*|image: ${{ needs.build.outputs.tag }}|" compose.yaml
+          grep "getrafty" compose.yaml
+
+      - name: Commit & push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add compose.yaml
+          git diff --staged --quiet && echo "no change" && exit 0
+          git commit -m "chore(getrafty): deploy sha-${GITHUB_SHA::7}"
+          git push
