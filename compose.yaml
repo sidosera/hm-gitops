@@ -1,0 +1,22 @@
+services:
+
+  traefik:
+    image: traefik:v3.0
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  site:
+    image: traefik/whoami:v1.10
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.site.rule=Host(`hackamonth.io`) || HostRegexp(`{subdomain:[a-z0-9-]+}.hackamonth.io`)
+      - traefik.http.routers.site.entrypoints=web
+      - traefik.http.services.site.loadbalancer.server.port=80
+    restart: unless-stopped
