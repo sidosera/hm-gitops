@@ -1,7 +1,7 @@
 services:
 
   traefik:
-    image: traefik:v3.3
+    image: traefik:v3.6.9
     command:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
@@ -13,7 +13,7 @@ services:
     restart: unless-stopped
 
   site:
-    image: traefik/whoami:v1.10
+    image: traefik/whoami:v1.11.0
     labels:
       - traefik.enable=true
       - traefik.http.routers.site.rule=Host(`hackamonth.io`) || HostRegexp(`^[a-z0-9-]+\.hackamonth\.io$`)
