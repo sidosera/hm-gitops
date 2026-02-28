@@ -6,6 +6,8 @@ services:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
+    environment:
+      - DOCKER_API_VERSION=1.44
     ports:
       - "80:80"
     volumes:
@@ -16,7 +18,7 @@ services:
     image: traefik/whoami:v1.10
     labels:
       - traefik.enable=true
-      - traefik.http.routers.site.rule=Host(`hackamonth.io`) || HostRegexp(`{subdomain:[a-z0-9-]+}.hackamonth.io`)
+      - traefik.http.routers.site.rule=Host(`hackamonth.io`) || HostRegexp(`^[a-z0-9-]+\.hackamonth\.io$`)
       - traefik.http.routers.site.entrypoints=web
       - traefik.http.services.site.loadbalancer.server.port=80
     restart: unless-stopped
