@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: getrafty
+  namespace: hackamonth
+  labels:
+    app: getrafty
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: getrafty
+  template:
+    metadata:
+      labels:
+        app: getrafty
+    spec:
+      containers:
+        - name: getrafty
+          image: ghcr.io/getrafty-org/site:latest  # pinned by CI
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: getrafty
+  namespace: hackamonth
+spec:
+  selector:
+    app: getrafty
+  ports:
+    - port: 80
+      targetPort: 80

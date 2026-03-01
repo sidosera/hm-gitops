@@ -13,7 +13,7 @@ need curl
 # Configuration
 
 GH_USER="${GH_USER:-sidosera}"
-REPO="${REPO:-hackamonth-gitops}"
+REPO="${REPO:-machine-gitops}"
 REPO_URL="${REPO_URL:-https://github.com/${GH_USER}/${REPO}.git}"
 
 REF="${REF:-main}"
@@ -31,7 +31,6 @@ AUTO_FIREWALL="${AUTO_FIREWALL:-1}"
 AUTO_FAIL2BAN="${AUTO_FAIL2BAN:-1}"
 AUTO_UNATTENDED_UPGRADES="${AUTO_UNATTENDED_UPGRADES:-1}"
 AUTO_SSH_HARDEN="${AUTO_SSH_HARDEN:-1}"
-AUTO_DOCKER_HARDEN="${AUTO_DOCKER_HARDEN:-1}"
 
 PURGE="${PURGE:-0}"
 
@@ -66,26 +65,46 @@ sudo apt-get install -y \
   gnupg
 
 
-# Docker preflight
+# k3s install
 
-if ! command -v docker >/dev/null 2>&1; then
-  die "Docker is not installed. Install Docker from your approved source, then rerun."
+if ! command -v k3s >/dev/null 2>&1; then
+  log "Installing k3s"
+  curl -sfL https://get.k3s.io | sh -s - \
+    --disable=servicelb \
+    --write-kubeconfig-mode=644
+else
+  log "k3s already installed"
 fi
-sudo systemctl enable --now docker
 
-if ! docker compose version >/dev/null 2>&1; then
-  log "Installing docker compose plugin"
-  sudo apt-get install -y docker-compose-plugin
+# Wait for k3s to be ready
+log "Waiting for k3s node to be ready"
+for i in $(seq 1 30); do
+  if k3s kubectl get nodes | grep -q ' Ready'; then
+    break
+  fi
+  sleep 2
+done
+k3s kubectl get nodes | grep -q ' Ready' || die "k3s node not ready after 60s"
+
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+# Install cert-manager for Let's Encrypt
+if ! k3s kubectl get namespace cert-manager >/dev/null 2>&1; then
+  log "Installing cert-manager"
+  k3s kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+  log "Waiting for cert-manager to be ready"
+  k3s kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=120s
 fi
 
 
 # Security
 
 if [ "$AUTO_FIREWALL" = "1" ]; then
-  log "Configuring firewall (OpenSSH, 80, 443)."
+  log "Configuring firewall (OpenSSH, 80, 443, 6443)"
   sudo ufw allow OpenSSH >/dev/null || true
   sudo ufw allow 80/tcp >/dev/null || true
   sudo ufw allow 443/tcp >/dev/null || true
+  sudo ufw allow 6443/tcp >/dev/null || true  # k3s API server
   sudo ufw --force enable >/dev/null || true
 fi
 
@@ -112,22 +131,6 @@ EOF
   sudo systemctl reload ssh
 fi
 
-if [ "$AUTO_DOCKER_HARDEN" = "1" ]; then
-  log "Writing Docker daemon hardening config"
-  if [ ! -f /etc/docker/daemon.json ]; then
-    sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
-{
-  "live-restore": true,
-  "no-new-privileges": true,
-  "userland-proxy": false,
-  "log-driver": "local",
-  "log-opts": { "max-size": "10m", "max-file": "3" }
-}
-EOF
-    sudo systemctl reload docker
-  fi
-fi
-
 
 # Filesystem
 
@@ -138,12 +141,9 @@ sudo chmod 0750 "$CFG_DIR"
 sudo chmod 0700 "$STATE_DIR"
 sudo chown -R root:root "$INSTALL_DIR" "$CFG_DIR" "$STATE_DIR"
 
-# If purge requested, be explicit and destructive.
 if [ "$PURGE" = "1" ]; then
-  log "PURGE=1 set. Stopping and removing any existing stack, clearing $INSTALL_DIR."
-  if [ -f "$INSTALL_DIR/compose.yaml" ]; then
-    (cd "$INSTALL_DIR" && sudo docker compose down --remove-orphans) || true
-  fi
+  log "PURGE=1 set. Deleting k8s resources and clearing $INSTALL_DIR."
+  k3s kubectl delete namespace hackamonth --ignore-not-found || true
   sudo rm -rf "${INSTALL_DIR:?}/"*
 fi
 
@@ -153,7 +153,6 @@ fi
 log "Syncing git repo (root-owned checkout)"
 
 if [ -d "$INSTALL_DIR/.git" ]; then
-  # Ensure origin is correct
   CURRENT_ORIGIN="$(sudo git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null || true)"
   if [ "$CURRENT_ORIGIN" != "$REPO_URL" ]; then
     log "Resetting origin from '$CURRENT_ORIGIN' to '$REPO_URL'"
@@ -172,13 +171,13 @@ else
 fi
 
 # Validate required files
-sudo test -f "$INSTALL_DIR/compose.yaml" || die "Missing compose.yaml in $INSTALL_DIR"
+sudo test -d "$INSTALL_DIR/k8s" || die "Missing k8s/ directory in $INSTALL_DIR"
 sudo test -f "$INSTALL_DIR/deploy/deploy.sh" || die "Missing deploy/deploy.sh in $INSTALL_DIR"
 sudo test -f "$INSTALL_DIR/deploy/systemd/hackamonth-deploy.service" || die "Missing systemd service in repo"
 sudo test -f "$INSTALL_DIR/deploy/systemd/hackamonth-deploy.timer" || die "Missing systemd timer in repo"
 
 
-# Install deploy runner into standard admin bin dir
+# Install deploy runner
 
 log "Symlinking deploy runner $BIN_PATH -> $INSTALL_DIR/deploy/deploy.sh"
 sudo chmod 0755 "$INSTALL_DIR/deploy/deploy.sh"
@@ -193,11 +192,11 @@ INSTALL_DIR=$INSTALL_DIR
 STATE_DIR=$STATE_DIR
 BRANCH=$BRANCH
 DOMAIN=$DOMAIN
+KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 EOF
 sudo chmod 0644 "$CFG_DIR/deploy.env"
 sudo chown root:root "$CFG_DIR/deploy.env"
 
-# Also provide /etc/default for systemd EnvironmentFile compatibility
 sudo ln -sf "$CFG_DIR/deploy.env" /etc/default/hackamonth-deploy
 
 
@@ -215,7 +214,6 @@ sudo ln -s "$INSTALL_DIR/deploy/systemd/hackamonth-deploy.timer"   /etc/systemd/
 
 sudo systemctl daemon-reload
 
-# Verify units match expectations (fail fast)
 sudo systemctl cat hackamonth-deploy.service | grep -q "ExecStart=${BIN_PATH}" \
   || die "Unit mismatch: ExecStart must be ${BIN_PATH}"
 sudo systemctl cat hackamonth-deploy.service | grep -q "EnvironmentFile=/etc/default/hackamonth-deploy" \
@@ -231,5 +229,6 @@ log "Enabling periodic reconcile timer"
 sudo systemctl enable --now hackamonth-deploy.timer
 
 log "Bootstrap complete"
-log "Timer: systemctl status hackamonth-deploy.timer"
-log "Logs : journalctl -u hackamonth-deploy.service -n 200 --no-pager"
+log "Timer : systemctl status hackamonth-deploy.timer"
+log "Logs  : journalctl -u hackamonth-deploy.service -n 200 --no-pager"
+log "Cluster: k3s kubectl get all -n hackamonth"

@@ -1,8 +1,8 @@
 [Unit]
 Description=GitOps Deploy
 Wants=network-online.target
-After=network-online.target docker.service
-Requires=docker.service
+After=network-online.target k3s.service
+Requires=k3s.service
 
 [Service]
 Type=oneshot
@@ -16,7 +16,6 @@ StandardError=journal
 
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
 ProtectHome=true
 ProtectControlGroups=true
 ProtectKernelTunables=true
@@ -24,13 +23,11 @@ ProtectKernelModules=true
 ProtectKernelLogs=true
 RestrictRealtime=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
 RestrictSUIDSGID=true
-PrivateDevices=true
 SystemCallArchitectures=native
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
-ReadWritePaths=/srv/hackamonth /var/lib/hackamonth /var/lock /var/run/docker.sock
+ReadWritePaths=/srv/hackamonth /var/lib/hackamonth /var/lock
 
 [Install]
 WantedBy=multi-user.target

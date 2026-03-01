@@ -19,6 +19,9 @@ fi
 : "${INSTALL_DIR:?missing INSTALL_DIR}"
 : "${BRANCH:?missing BRANCH}"
 : "${DOMAIN:?missing DOMAIN}"
+: "${KUBECONFIG:?missing KUBECONFIG}"
+
+export KUBECONFIG
 
 cd "$INSTALL_DIR"
 
@@ -37,18 +40,17 @@ else
   log "Already at desired revision $CURRENT_SHA"
 fi
 
-log "Validating compose config"
-docker compose config >/dev/null
+log "Applying k8s manifests"
+k3s kubectl apply -f k8s/base/namespace.yaml
+k3s kubectl apply -f k8s/ingress/
+k3s kubectl apply -f k8s/base/
 
-if [ "$CHANGED" = "1" ]; then
-  log "Pulling images"
-  docker compose pull
-fi
+# Wait for deployments to roll out
+log "Waiting for deployments to be ready"
+k3s kubectl rollout status deployment/site -n hackamonth --timeout=120s
+k3s kubectl rollout status deployment/getrafty -n hackamonth --timeout=120s
 
-log "Applying compose"
-docker compose up -d --remove-orphans
-
-# Health probe: accept 2xx (plain HTTP) or 3xx (HTTPS redirect) as healthy.
+# Health probe: accept 2xx or 3xx as healthy.
 # Traefik needs a moment to register routes after start, so retry up to 5 times.
 probe() {
   local code
@@ -75,9 +77,11 @@ else
     GOOD_SHA="$(cat "$LAST_GOOD")"
     log "Rolling back to $GOOD_SHA"
     git reset --hard "$GOOD_SHA"
-    docker compose config >/dev/null
-    docker compose pull
-    docker compose up -d --remove-orphans
+    k3s kubectl apply -f k8s/base/namespace.yaml
+    k3s kubectl apply -f k8s/ingress/
+    k3s kubectl apply -f k8s/base/
+    k3s kubectl rollout status deployment/site -n hackamonth --timeout=120s
+    k3s kubectl rollout status deployment/getrafty -n hackamonth --timeout=120s
     sleep 5
     probe || die "Rollback failed health probe"
     log "Rollback succeeded"

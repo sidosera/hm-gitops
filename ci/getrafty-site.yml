@@ -5,7 +5,7 @@
 #   1. In getrafty-org GitHub org → Settings → Actions → General:
 #      set "Workflow permissions" to "Read and write permissions"
 #   2. Create a fine-grained PAT on your account with:
-#        - Repository access: sidosera/hackamonth-gitops
+#        - Repository access: sidosera/machine-gitops
 #        - Permissions: Contents = Read & Write
 #      Save it as secret GITOPS_PAT in getrafty-org/site repo.
 #   3. Make the ghcr.io/getrafty-org/site package public:
@@ -68,19 +68,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: sidosera/hackamonth-gitops
+          repository: sidosera/machine-gitops
           token: ${{ secrets.GITOPS_PAT }}
 
-      - name: Pin image tag in compose.yaml
+      - name: Pin image tag in k8s manifest
         run: |
-          sed -i "s|image: ghcr.io/getrafty-org/site:.*|image: ${{ needs.build.outputs.tag }}|" compose.yaml
-          grep "getrafty" compose.yaml
+          sed -i "s|image: ghcr.io/getrafty-org/site:.*|image: ${{ needs.build.outputs.tag }}|" k8s/base/getrafty.yaml
+          grep "image:" k8s/base/getrafty.yaml
 
       - name: Commit & push
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add compose.yaml
+          git add k8s/base/getrafty.yaml
           git diff --staged --quiet && echo "no change" && exit 0
           git commit -m "chore(getrafty): deploy sha-${GITHUB_SHA::7}"
           git push
