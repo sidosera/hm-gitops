@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: site
-          image: traefik/whoami:v1.11.0
+          image: hub.hackamonth.io/getrafty-org/site:latest
           ports:
             - containerPort: 80
           resources:
