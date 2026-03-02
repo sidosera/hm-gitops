@@ -121,6 +121,25 @@ if [[ -n "$GITHUB_USER" ]]; then
   chown -R "${REAL_USER}:${REAL_USER}" "${REAL_HOME}/.ssh"
 fi
 
+# --------------------------------------------------------------------
+# Wait for TLS certificates
+# --------------------------------------------------------------------
+log "Waiting for TLS certificates"
+for _ in $(seq 1 60); do
+  ready=$(k3s kubectl get certificates -n "${APP_NAME}" \
+    -o jsonpath='{range .items[*]}{.status.conditions[0].status}{"\n"}{end}' 2>/dev/null \
+    | grep -c True || true)
+  total=$(k3s kubectl get certificates -n "${APP_NAME}" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  [[ "$total" -gt 0 && "$ready" -eq "$total" ]] && break
+  sleep 5
+done
+log "TLS certificates: ${ready}/${total} ready"
+
+if ! curl -sf "https://hub.${DOMAIN}/v2/_catalog" 2>/dev/null | grep -q .; then
+  log "WARNING: Registry at hub.${DOMAIN} is empty or unreachable"
+  log "Push to your site repo to trigger the first image build"
+fi
+
 sudo ufw allow OpenSSH >/dev/null
 sudo ufw allow 80/tcp  >/dev/null
 sudo ufw allow 443/tcp >/dev/null
