@@ -84,10 +84,6 @@ kind: Application
 metadata:
   name: ${APP_NAME}
   namespace: argocd
-  annotations:
-    argocd-image-updater.argoproj.io/image-list: site=hub.${DOMAIN}/getrafty-org/site
-    argocd-image-updater.argoproj.io/site.update-strategy: latest
-    argocd-image-updater.argoproj.io/write-back-method: git
 spec:
   project: default
   source:
@@ -119,25 +115,6 @@ if [[ -n "$GITHUB_USER" ]]; then
   curl -fsSL "https://github.com/${GITHUB_USER}.keys" >> "${REAL_HOME}/.ssh/authorized_keys"
   chmod 600 "${REAL_HOME}/.ssh/authorized_keys"
   chown -R "${REAL_USER}:${REAL_USER}" "${REAL_HOME}/.ssh"
-fi
-
-# --------------------------------------------------------------------
-# Wait for TLS certificates
-# --------------------------------------------------------------------
-log "Waiting for TLS certificates"
-for _ in $(seq 1 60); do
-  ready=$(k3s kubectl get certificates -n "${APP_NAME}" \
-    -o jsonpath='{range .items[*]}{.status.conditions[0].status}{"\n"}{end}' 2>/dev/null \
-    | grep -c True || true)
-  total=$(k3s kubectl get certificates -n "${APP_NAME}" --no-headers 2>/dev/null | wc -l | tr -d ' ')
-  [[ "$total" -gt 0 && "$ready" -eq "$total" ]] && break
-  sleep 5
-done
-log "TLS certificates: ${ready}/${total} ready"
-
-if ! curl -sf "https://hub.${DOMAIN}/v2/_catalog" 2>/dev/null | grep -q .; then
-  log "WARNING: Registry at hub.${DOMAIN} is empty or unreachable"
-  log "Push to your site repo to trigger the first image build"
 fi
 
 sudo ufw allow OpenSSH >/dev/null
