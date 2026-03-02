@@ -111,11 +111,15 @@ EOF
 # Access & Security
 # --------------------------------------------------------------------
 
+REAL_USER="${SUDO_USER:-$(whoami)}"
+REAL_HOME=$(eval echo "~${REAL_USER}")
+
 if [[ -n "$GITHUB_USER" ]]; then
-  log "Importing SSH keys for github.com/${GITHUB_USER}"
-  mkdir -p ~/.ssh && chmod 700 ~/.ssh
-  curl -fsSL "https://github.com/${GITHUB_USER}.keys" >> ~/.ssh/authorized_keys
-  chmod 600 ~/.ssh/authorized_keys
+  log "Importing SSH keys for github.com/${GITHUB_USER} → ${REAL_USER}"
+  mkdir -p "${REAL_HOME}/.ssh" && chmod 700 "${REAL_HOME}/.ssh"
+  curl -fsSL "https://github.com/${GITHUB_USER}.keys" >> "${REAL_HOME}/.ssh/authorized_keys"
+  chmod 600 "${REAL_HOME}/.ssh/authorized_keys"
+  chown -R "${REAL_USER}:${REAL_USER}" "${REAL_HOME}/.ssh"
 fi
 
 sudo ufw allow OpenSSH >/dev/null
