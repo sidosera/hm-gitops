@@ -34,7 +34,6 @@ sudo apt-get install -y git curl ufw fail2ban unattended-upgrades
 if ! command -v k3s >/dev/null 2>&1; then
   log "Installing k3s"
   curl -sfL https://get.k3s.io | sh -s - \
-    --disable=servicelb \
     --write-kubeconfig-mode=644
 fi
 
