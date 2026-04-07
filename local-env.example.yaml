@@ -4,7 +4,7 @@ secrets:
   deploy:
     ansible_host: "CHANGE_ME_VPS_HOST_OR_IP"
     ssh_user: "CHANGE_ME_UNIX_LOGIN"
-    hm_git_repo: "https://github.com/YOU/hackamonth-gitops.git"
+    hm_git_repo: "https://github.com/sidosera/hm-gitops.git"
   xray:
     vless_clients:
       - "REPLACE-WITH-UUID"

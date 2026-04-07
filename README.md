@@ -16,8 +16,8 @@ brew install ansible
 ## Clone
 
 ```bash
-git clone https://github.com/sidosera/hackamonth-gitops.git
-cd hackamonth-gitops
+git clone https://github.com/sidosera/hm-gitops.git
+cd hm-gitops
 chmod +x hm-playbook.sh
 ```
 
