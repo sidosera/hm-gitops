@@ -9,3 +9,21 @@ secrets:
   xray:
     vless_clients:
       - "REPLACE-WITH-UUID"
+    # Strongest practical transport (TLS mimics a real site; use with uTLS-capable clients).
+    # Generate keys: ./scripts/xray-reality-keygen.sh
+    # Requires Traefik IngressRouteTCP CRD on the cluster (k3s Traefik usually includes it).
+    reality:
+      enabled: false
+      # TLS endpoint Xray forwards pre-handshake probes to (must speak TLS 1.3, stable).
+      dest: "www.microsoft.com:443"
+      server_names:
+        - "www.microsoft.com"
+        - "microsoft.com"
+      private_key: "PASTE_PRIVATE_KEY_FROM_xray_x25519"
+      # In `xray x25519` output this is often labeled Password: (that value is the client pbk).
+      public_key: "PASTE_PUBLIC_KEY_FROM_xray_x25519"
+      # Include "" for default shortId; add hex strings for extra ids.
+      short_ids:
+        - ""
+      # Optional: spiderX: "/"
+      # Optional: client TLS fingerprint hint for share links: fingerprint: "chrome"

@@ -124,20 +124,22 @@ If the VPS user needs a password for **`sudo`**, set GitHub secret **`GITOPS_BEC
 
 - **Traefik** (bundled with k3s) + **`k8s/system/traefik-acme.yaml`** HelmChartConfig for ACME TLS.
 - **getrafty** — public image from **`hm_getrafty_image`** (default **`docker.io/sidosera/getrafty-site:latest`**); change in **`ansible/controller_layout.yml`**. Manifest: **`ansible/roles/hm_vps/templates/getrafty.yaml.j2`** (Ingress hosts there too).
-- **Xray** — config from Secret **`hm-xray-config`**.
+- **Xray** — config from Secret **`hm-xray-config`**. Optional **VLESS + REALITY** (TCP/TLS masquerade) is the strongest transport this repo wires up; WebSocket + TLS on **`/xray-ws`** remains a fallback.
 
 **Xray** Ingress host is driven by **`hm_xray_public_host`** (Ansible template). **getrafty** hosts are in **`getrafty.yaml.j2`**.
 
 ### Xray client (import URL)
-
-From the repo root, print a **`vless://…`** link you can paste or scan (v2rayNG, Nekoray, Shadowrocket, etc.):
 
 ```bash
 pip install PyYAML   # once, if `python3` cannot import yaml
 ./scripts/xray-share-url.sh
 ```
 
-Uses **`local-env.yaml`** (UUIDs) and **`ansible/controller_layout.yml`** (**`hm_xray_public_host`**). One line per entry in **`secrets.xray.vless_clients`**.
+With **`secrets.xray.reality.enabled: true`**, this prints a **REALITY** `vless://` link (use a client with **uTLS** / REALITY support, e.g. recent v2rayNG / Nekoray). Add **`--include-ws`** to also print the WebSocket URL. With REALITY off, you get the WebSocket URL only.
+
+**REALITY setup:** **`./scripts/xray-reality-keygen.sh`** → paste **`private_key`** / **`public_key`** into **`local-env.yaml`**, set **`dest`**, **`server_names`**, **`short_ids`**, enable **`reality.enabled`**, run **`./hm-playbook.sh -e hm_action=update`**. Confirm **`kubectl get crd ingressroutetcps.traefik.io`** exists on the cluster.
+
+No proxy is **impossible** to block (IP/domain lists, client fingerprints, active probing, legal pressure). REALITY is a **strong practical** hardening step, not a guarantee.
 
 ## Linting
 

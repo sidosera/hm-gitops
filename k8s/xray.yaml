@@ -17,7 +17,10 @@ spec:
           image: ghcr.io/xtls/xray-core:26.3.27
           args: ["run", "-c", "/usr/local/etc/xray/config.json"]
           ports:
-            - containerPort: 10086
+            - name: ws
+              containerPort: 10086
+            - name: reality
+              containerPort: 10443
           volumeMounts:
             - name: config
               mountPath: /usr/local/etc/xray
@@ -35,5 +38,9 @@ spec:
   selector:
     app: xray
   ports:
-    - port: 10086
+    - name: ws
+      port: 10086
       targetPort: 10086
+    - name: reality
+      port: 10443
+      targetPort: 10443

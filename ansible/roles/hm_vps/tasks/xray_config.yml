@@ -26,6 +26,21 @@
       {{ (hm_local_env.secrets.xray.vless_clients | default([]) | length > 0)
       or (hm_local_env.secrets.xray.vless_client_id | default('') | string | trim | length > 0) }}
 
+- name: Assert Xray REALITY secrets when enabled
+  when: (hm_local_env.secrets.xray.reality | default({})).enabled | default(false) | bool
+  ansible.builtin.assert:
+    that:
+      - (hm_xray_reality.dest | default('') | length) > 0
+      - (hm_xray_reality.private_key | default('') | length) > 0
+      - (hm_xray_reality.public_key | default('') | length) > 0
+      - hm_xray_reality.server_names | default([]) | length > 0
+      - hm_xray_reality.short_ids is defined
+      - hm_xray_reality.short_ids | length > 0
+    fail_msg: >-
+      With secrets.xray.reality.enabled, set dest, private_key, public_key, server_names, short_ids (include '' for default) — see local-env.example.yaml
+  vars:
+    hm_xray_reality: "{{ hm_local_env.secrets.xray.reality }}"
+
 - name: Render Xray config (Jinja) to YAML on host
   ansible.builtin.template:
     src: "{{ hm_xray_template_controller_path }}"

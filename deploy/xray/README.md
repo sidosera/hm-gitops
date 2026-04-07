@@ -47,7 +47,25 @@ Use the same values everywhere; only the **UUID** differs per device if you gave
 
 DNS must resolve the **Address** to your VPS; HTTPS certificates are obtained by Traefik for that hostname.
 
-### Optional: import URL (`vless://`)
+---
+
+## VLESS + REALITY (recommended vs aggressive DPI)
+
+**REALITY** makes the **TLS handshake** toward your VPS look like a connection to a **real third-party site** (the **`dest`**), while the session is actually keyed to your server. Traffic still goes to **your** IP on **port 443**; the **SNI** inside TLS mimics **`server_names`** (e.g. `www.microsoft.com`), not your proxy hostname. Traefik uses **TLS passthrough** (`IngressRouteTCP`) for those SNIs and forwards the raw stream to Xray.
+
+1. Run **`./scripts/xray-reality-keygen.sh`** and copy **PrivateKey** into **`secrets.xray.reality.private_key`** and the **Password / public** line into **`secrets.xray.reality.public_key`** (label varies by Xray version).
+2. Set **`dest`** (e.g. `www.microsoft.com:443`) — must be a stable **TLS 1.3** site; **`server_names`** must match names that site presents.
+3. Set **`short_ids`**: include **`""`** for the default short id; you may add hex strings.
+4. Set **`reality.enabled: true`** in **`local-env.yaml`**, run **`./hm-playbook.sh -e hm_action=update`**.
+5. Import URL: **`./scripts/xray-share-url.sh`** (REALITY link; add **`--include-ws`** for the old WebSocket profile).
+
+**Checks:** `kubectl get ingressroutetcp -n hm` shows **`xray-reality`**. Client must support **REALITY** and usually **`xtls-rprx-vision`** on this server.
+
+**Caveats:** Blocking can still happen (your VPS IP, heuristics, client TLS fingerprint, legal/regulatory). **`dest`** must be a site you are allowed to use as a mask; prefer well-known stable TLS endpoints and avoid abusing small sites.
+
+---
+
+### Optional: import URL (`vless://`) — WebSocket path
 
 Many apps can import from the clipboard. Replace **`UUID`** and **`HOST`** (no `https://`):
 

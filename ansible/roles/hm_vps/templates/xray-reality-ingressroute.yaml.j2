@@ -1,0 +1,18 @@
+# TLS passthrough on :443 by SNI — send REALITY handshakes (mimic dest) to Xray, not Traefik termination.
+# Requires Traefik CRD: kubectl get crd ingressroutetcps.traefik.io
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: xray-reality
+  namespace: {{ hm_k8s_namespace }}
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: "{% for sn in hm_reality_server_names %}HostSNI(`{{ sn }}`){% if not loop.last %} || {% endif %}{% endfor %}"
+      priority: 100
+      services:
+        - name: xray
+          port: 10443
+  tls:
+    passthrough: true

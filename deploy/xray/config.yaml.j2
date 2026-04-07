@@ -33,6 +33,40 @@ inbounds:
         - tls
         - quic
 
+{% if secrets.xray.reality is defined and (secrets.xray.reality.enabled | default(false)) %}
+  - listen: "0.0.0.0"
+    port: 10443
+    protocol: vless
+    settings:
+      clients:
+{% if secrets.xray.vless_clients is defined and secrets.xray.vless_clients | length > 0 %}
+{% for c in secrets.xray.vless_clients %}
+{% if c is mapping %}
+        - id: "{{ c.id | trim }}"
+          flow: "{% if c.flow is defined and (c.flow | string | trim | length) > 0 %}{{ c.flow | string | trim }}{% else %}xtls-rprx-vision{% endif %}"
+{% else %}
+        - id: "{{ c | trim }}"
+          flow: "xtls-rprx-vision"
+{% endif %}
+{% endfor %}
+{% else %}
+        - id: "{{ secrets.xray.vless_client_id }}"
+          flow: "xtls-rprx-vision"
+{% endif %}
+      decryption: none
+    streamSettings:
+      network: tcp
+      security: reality
+      realitySettings:
+        show: false
+        dest: "{{ secrets.xray.reality.dest }}"
+        xver: 0
+        serverNames: {{ secrets.xray.reality.server_names | to_json }}
+        privateKey: "{{ secrets.xray.reality.private_key }}"
+        shortIds: {{ secrets.xray.reality.short_ids | to_json }}
+        spiderX: "{{ secrets.xray.reality.spider_x | default('/') }}"
+{% endif %}
+
 outbounds:
   - protocol: freedom
     tag: direct

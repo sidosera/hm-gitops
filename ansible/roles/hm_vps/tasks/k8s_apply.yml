@@ -33,3 +33,25 @@
   ansible.builtin.command: kubectl apply -f /tmp/hm-xray-ingress.yaml
   environment:
     KUBECONFIG: "{{ hm_k3s_kubeconfig }}"
+
+- name: Render Xray REALITY Traefik TCP route (TLS passthrough by SNI)
+  ansible.builtin.template:
+    dest: /tmp/hm-xray-reality-tcp.yaml
+    mode: "0644"
+    src: xray-reality-ingressroute.yaml.j2
+  vars:
+    hm_reality_server_names: "{{ hm_local_env.secrets.xray.reality.server_names }}"
+  when: (hm_local_env.secrets.xray.reality | default({})).enabled | default(false) | bool
+
+- name: Apply Xray REALITY IngressRouteTCP
+  ansible.builtin.command: kubectl apply -f /tmp/hm-xray-reality-tcp.yaml
+  environment:
+    KUBECONFIG: "{{ hm_k3s_kubeconfig }}"
+  when: (hm_local_env.secrets.xray.reality | default({})).enabled | default(false) | bool
+
+- name: Remove Xray REALITY IngressRouteTCP when disabled
+  ansible.builtin.command: >-
+    kubectl delete ingressroutetcp xray-reality -n {{ hm_k8s_namespace }} --ignore-not-found
+  environment:
+    KUBECONFIG: "{{ hm_k3s_kubeconfig }}"
+  when: not ((hm_local_env.secrets.xray.reality | default({})).enabled | default(false) | bool)
