@@ -128,6 +128,17 @@ If the VPS user needs a password for **`sudo`**, set GitHub secret **`GITOPS_BEC
 
 **Xray** Ingress host is driven by **`hm_xray_public_host`** (Ansible template). **getrafty** hosts are in **`getrafty.yaml.j2`**.
 
+### Xray client (import URL)
+
+From the repo root, print a **`vless://…`** link you can paste or scan (v2rayNG, Nekoray, Shadowrocket, etc.):
+
+```bash
+pip install PyYAML   # once, if `python3` cannot import yaml
+./scripts/xray-share-url.sh
+```
+
+Uses **`local-env.yaml`** (UUIDs) and **`ansible/controller_layout.yml`** (**`hm_xray_public_host`**). One line per entry in **`secrets.xray.vless_clients`**.
+
 ## Linting
 
 ```bash
