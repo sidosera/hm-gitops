@@ -50,7 +50,7 @@ Play 1 **`include_vars`** + **`add_host`** group **`hm`** with **`{{ secrets.dep
 ./hm-playbook.sh -e hm_action=teardown -e hm_teardown_uninstall_k3s=true  # also k3s-uninstall.sh
 ```
 
-Add `--private-key ~/.ssh/id_ed25519` if needed. If sudo is not passwordless:
+Use your normal SSH setup from the laptop (agent or **`ssh -i …`**). Do not put your personal private key in GitHub. If sudo is not passwordless:
 
 ```bash
 ./hm-playbook.sh --ask-become-pass
@@ -60,15 +60,29 @@ Add `--private-key ~/.ssh/id_ed25519` if needed. If sudo is not passwordless:
 
 ## GitHub → Ansible (optional)
 
-Workflow **[`.github/workflows/gitops-apply.yml`](.github/workflows/gitops-apply.yml)** runs **`hm-playbook.sh -e hm_action=update`** on push to **`main`**. Configure secrets **`GITOPS_LOCAL_ENV_B64`** (base64 of `local-env.yaml`) and **`GITOPS_SSH_KEY`** (paste the full private key in the Actions UI). Optionally set **`GITOPS_SSH_KEY_B64`** (base64 of the key, single line) if you prefer storing one line; the workflow accepts either **`GITOPS_SSH_KEY_B64`** or **`GITOPS_SSH_KEY`**.
+Workflow **[`.github/workflows/gitops-apply.yml`](.github/workflows/gitops-apply.yml)** runs **`hm-playbook.sh -e hm_action=update`** on push to **`main`**.
 
-To emulate that job locally with **[act](https://github.com/nektos/act)** (Docker must be running), keep **`local-env.yaml`** at the repo root and run:
+**Secrets (repository):**
+
+- **`GITOPS_LOCAL_ENV_B64`** — `base64` of **`local-env.yaml`** (single line, no newlines).
+- **`GITOPS_DEPLOY_KEY`** — **only** a [dedicated deploy key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys) private key, never your personal **`~/.ssh/id_*`**. Generate and wire it with:
 
 ```bash
-./scripts/run-act-gitops.sh
+./scripts/new-gitops-deploy-key.sh
+# add the printed .pub line to the VPS user's ~/.ssh/authorized_keys
+gh secret set GITOPS_DEPLOY_KEY < ~/.ssh/hm-gitops-deploy
+gh secret set GITOPS_LOCAL_ENV_B64 --body "$(base64 < local-env.yaml | tr -d '\n')"
 ```
 
-That passes **`GITOPS_LOCAL_ENV_B64`** and **`GITOPS_SSH_KEY_B64`** derived from **`local-env.yaml`** and **`~/.ssh/id_ed25519`** (override with **`GITOPS_SSH_KEY_FILE`**). Use **`./scripts/run-act-gitops.sh --dryrun`** to print the plan without executing. The container needs outbound SSH to your **`secrets.deploy.ansible_host`**.
+Optional: **`GITOPS_DEPLOY_KEY_B64`** (same key, base64 one line) — used by **`act`** locally; the workflow prefers **`GITOPS_DEPLOY_KEY_B64`** over **`GITOPS_DEPLOY_KEY`**. Legacy secrets **`GITOPS_SSH_KEY`** / **`GITOPS_SSH_KEY_B64`** are still accepted for migration; delete them after switching.
+
+To emulate that job locally with **[act](https://github.com/nektos/act)** (Docker must be running):
+
+```bash
+GITOPS_DEPLOY_KEY_FILE="$HOME/.ssh/hm-gitops-deploy" ./scripts/run-act-gitops.sh
+```
+
+Use **`--dryrun`** to validate the workflow only. The container needs outbound SSH to **`secrets.deploy.ansible_host`**.
 
 If the VPS user needs a password for **`sudo`**, set GitHub secret **`GITOPS_BECOME_PASSWORD`** or, for act only, run **`GITOPS_BECOME_PASSWORD='…' ./scripts/run-act-gitops.sh`**. Otherwise configure **`NOPASSWD`** for that user so become is non-interactive (recommended for CI).
 

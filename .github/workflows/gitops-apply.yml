@@ -1,9 +1,12 @@
 # Run Ansible in update mode against your VPS
 # Repository secrets:
-#   GITOPS_LOCAL_ENV_B64    <base64-encoded local-env.yaml> (must include secrets.deploy.ssh_user)
-#   GITOPS_SSH_KEY          <VPS private key PEM> (multiline; use in GitHub Actions UI)
-#   GITOPS_SSH_KEY_B64      optional: base64(single-line) of the same key — easier for `act` locally
-#   GITOPS_BECOME_PASSWORD  optional: sudo/become password if the VPS user is not NOPASSWD
+#   GITOPS_LOCAL_ENV_B64       base64(local-env.yaml) — must include secrets.deploy.ssh_user
+#   GITOPS_DEPLOY_KEY          dedicated deploy private key only (see scripts/new-gitops-deploy-key.sh)
+#   GITOPS_DEPLOY_KEY_B64      optional single-line base64 of that key (for `act` locally)
+#   GITOPS_BECOME_PASSWORD     optional sudo password if the VPS user is not NOPASSWD
+#
+# Do not store your personal ~/.ssh/id_* key in GitHub. Legacy GITOPS_SSH_KEY / GITOPS_SSH_KEY_B64
+# are still read if set, for migration only.
 #
 # For host key verification, add a workflow step or set ansible host_key_checking in ansible.cfg.
 name: GitOps apply
@@ -36,19 +39,26 @@ jobs:
           fi
           echo "$GITOPS_LOCAL_ENV_B64" | base64 -d > local-env.yaml
 
-      - name: Install SSH key
+      - name: Install deploy SSH key
         env:
+          GITOPS_DEPLOY_KEY_B64: ${{ secrets.GITOPS_DEPLOY_KEY_B64 }}
+          GITOPS_DEPLOY_KEY: ${{ secrets.GITOPS_DEPLOY_KEY }}
           GITOPS_SSH_KEY_B64: ${{ secrets.GITOPS_SSH_KEY_B64 }}
+          GITOPS_SSH_KEY: ${{ secrets.GITOPS_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          if [ -n "${GITOPS_SSH_KEY_B64}" ]; then
+          if [ -n "${GITOPS_DEPLOY_KEY_B64}" ]; then
+            echo "${GITOPS_DEPLOY_KEY_B64}" | base64 -d > ~/.ssh/gitops
+          elif [ -n "${GITOPS_DEPLOY_KEY}" ]; then
+            printf '%s\n' "${GITOPS_DEPLOY_KEY}" > ~/.ssh/gitops
+          elif [ -n "${GITOPS_SSH_KEY_B64}" ]; then
             echo "${GITOPS_SSH_KEY_B64}" | base64 -d > ~/.ssh/gitops
-          else
-            echo "${{ secrets.GITOPS_SSH_KEY }}" > ~/.ssh/gitops
+          elif [ -n "${GITOPS_SSH_KEY}" ]; then
+            printf '%s\n' "${GITOPS_SSH_KEY}" > ~/.ssh/gitops
           fi
           if [ ! -s ~/.ssh/gitops ]; then
-            echo "Missing or empty GITOPS_SSH_KEY / GITOPS_SSH_KEY_B64" >&2
+            echo "Set GITOPS_DEPLOY_KEY or GITOPS_DEPLOY_KEY_B64 (dedicated deploy key; not your personal SSH key)." >&2
             exit 1
           fi
           chmod 600 ~/.ssh/gitops
