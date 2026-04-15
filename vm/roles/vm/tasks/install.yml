@@ -1,0 +1,6 @@
+---
+- ansible.builtin.include_tasks: packages.yml
+- name: Host hardening (UFW, SSH snippet, etc.)
+  ansible.builtin.include_tasks: security.yml
+  when: (hm_machine_profile.apply_security | default(hm_apply_security)) | bool
+- ansible.builtin.include_tasks: k3s.yml

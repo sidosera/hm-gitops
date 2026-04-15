@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy-service
+  labels:
+    app.kubernetes.io/name: proxy-service
+    app.kubernetes.io/component: edge
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: proxy-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: proxy-service
+        app.kubernetes.io/component: edge
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: render-config
+          image: docker.io/mikefarah/yq:4.52.5
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - >-
+              yq -o=json '
+              (.inbounds[].settings.clients[] |= (.id = (.id_secret | @base64d) | del(.id_secret))) |
+              (.inbounds[].streamSettings.realitySettings |= (.privateKey = (.privateKey_secret | @base64d) | .shortIds = (.shortIds_secret | map(@base64d)) | del(.privateKey_secret, .shortIds_secret)))
+              ' /source/config.yaml > /work/config.json
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+          volumeMounts:
+            - name: config-source
+              mountPath: /source
+              readOnly: true
+            - name: config
+              mountPath: /work
+      containers:
+        - name: proxy-service
+          imagePullPolicy: IfNotPresent
+          args: ["run", "-c", "/usr/local/etc/xray/config.json"]
+          ports:
+            - name: reality
+              containerPort: 10443
+          startupProbe:
+            tcpSocket:
+              port: reality
+            periodSeconds: 5
+            failureThreshold: 12
+          readinessProbe:
+            tcpSocket:
+              port: reality
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: reality
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /usr/local/etc/xray
+              readOnly: true
+      volumes:
+        - name: config-source
+          secret:
+            secretName: proxy-service-config-source
+            defaultMode: 0444
+        - name: config
+          emptyDir: {}

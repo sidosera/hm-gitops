@@ -1,0 +1,18 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: edge-01
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./cluster/clusters/edge-01
+  prune: true
+  wait: true
+  timeout: 5m
+  sourceRef:
+    kind: GitRepository
+    name: hackamonth-gitops
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

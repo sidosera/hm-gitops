@@ -1,0 +1,6 @@
+---
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ hm_base_packages + (hm_machine_profile.extra_packages | default([])) }}"
+    state: present
+    update_cache: true

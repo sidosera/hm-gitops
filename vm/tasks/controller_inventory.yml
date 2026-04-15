@@ -1,0 +1,68 @@
+---
+- name: Assert VM hosts file input present
+  ansible.builtin.assert:
+    that:
+      - vm_hosts_file is defined
+      - (vm_hosts_file | string | length) > 0
+    fail_msg: "Set vm_hosts_file to a YAML file containing vm_hosts: [IPv4, ...]."
+  when: hm_action in ['deploy', 'teardown']
+
+- name: Load shared VM group vars
+  ansible.builtin.include_vars:
+    file: "{{ playbook_dir | dirname }}/group_vars/all.yml"
+  when: hm_action in ['deploy', 'teardown']
+
+- name: Load VM hosts definition
+  ansible.builtin.include_vars:
+    file: "{{ vm_hosts_file }}"
+  when: hm_action in ['deploy', 'teardown']
+
+- name: Assert cluster inventory structure present
+  ansible.builtin.assert:
+    that:
+      - vm_hosts is defined
+      - vm_hosts is sequence
+      - (vm_hosts | length) > 0
+      - ansible_user is defined
+      - (ansible_user | string | length) > 0
+    fail_msg: >-
+      Set vm_hosts in the selected hosts file and ansible_user in vm/group_vars/all.yml.
+  when: hm_action in ['deploy', 'teardown']
+
+- name: Assert VM hosts are plain IPv4 addresses
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item is match('^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')
+    fail_msg: >-
+      The selected vm_hosts_file must contain only IPv4 addresses.
+  loop: "{{ vm_hosts }}"
+  when: hm_action in ['deploy', 'teardown']
+
+- name: Resolve bootstrap host
+  ansible.builtin.set_fact:
+    hm_bootstrap_host_name: "{{ vm_hosts[0] }}"
+  when: hm_action in ['deploy', 'teardown']
+
+- name: Add cluster hosts to in-memory inventory
+  ansible.builtin.add_host:
+    name: "{{ item }}"
+    groups:
+      - vm
+    ansible_host: "{{ item }}"
+    ansible_user: "{{ ansible_user }}"
+    hm_bootstrap_host: "{{ hm_bootstrap_host_name }}"
+    hm_bootstrap_api_host: "{{ hm_bootstrap_host_name }}"
+    hm_is_bootstrap: "{{ item == hm_bootstrap_host_name }}"
+    hm_machine_profile:
+      apply_security: "{{ vm_apply_security | default(true) }}"
+      auto_firewall: "{{ vm_auto_firewall | default(true) }}"
+      firewall_allowed_tcp: "{{ vm_firewall_allowed_tcp | default([22, 80, 443, 6443]) }}"
+      auto_fail2ban: "{{ vm_auto_fail2ban | default(true) }}"
+      auto_unattended_upgrades: "{{ vm_auto_unattended_upgrades | default(true) }}"
+      auto_ssh_harden: "{{ vm_auto_ssh_harden | default(true) }}"
+      extra_packages: "{{ vm_extra_packages | default([]) }}"
+      k3s_channel: "{{ vm_k3s_channel | default('stable') }}"
+    hm_action: "{{ hm_action }}"
+  loop: "{{ vm_hosts }}"
+  when: hm_action in ['deploy', 'teardown']

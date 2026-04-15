@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxy-service
+  labels:
+    app.kubernetes.io/name: proxy-service
+    app.kubernetes.io/component: edge
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: proxy-service
+  ports:
+    - name: reality
+      port: 10443
+      targetPort: reality

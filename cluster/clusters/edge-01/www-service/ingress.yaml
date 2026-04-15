@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: www-service
+  namespace: hm
+  labels:
+    app.kubernetes.io/name: www-service
+    app.kubernetes.io/component: web
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: le
+    traefik.ingress.kubernetes.io/router.middlewares: hm-security-headers@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: www.hackamonth.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: www-service
+                port:
+                  name: http

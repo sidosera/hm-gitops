@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hm
+  labels:
+    app.kubernetes.io/name: hm
+    app.kubernetes.io/part-of: hackamonth

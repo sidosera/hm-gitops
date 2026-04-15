@@ -1,0 +1,56 @@
+---
+- name: Reset and configure UFW from machine profile
+  when: (hm_machine_profile.auto_firewall | default(hm_auto_firewall)) | bool
+  block:
+    - name: Apply UFW rules
+      ansible.builtin.shell: |
+        set -e
+        ufw --force reset >/dev/null
+        {% for port in hm_machine_profile.firewall_allowed_tcp | default([]) %}
+        ufw allow {{ port }}/tcp >/dev/null
+        {% endfor %}
+        ufw default deny incoming >/dev/null
+        ufw default allow outgoing >/dev/null
+        ufw --force enable >/dev/null
+      changed_when: false
+
+- name: Install and enable fail2ban
+  when: (hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban)) | bool
+  block:
+    - name: Install fail2ban
+      ansible.builtin.apt:
+        name: fail2ban
+        state: present
+    - name: Enable fail2ban
+      ansible.builtin.systemd:
+        name: fail2ban
+        enabled: true
+        state: started
+
+- name: Unattended security upgrades
+  when: (hm_machine_profile.auto_unattended_upgrades | default(hm_auto_unattended_upgrades)) | bool
+  block:
+    - name: Install unattended-upgrades
+      ansible.builtin.apt:
+        name: unattended-upgrades
+        state: present
+    - name: Enable unattended-upgrades
+      ansible.builtin.command: dpkg-reconfigure -f noninteractive unattended-upgrades
+      changed_when: false
+      failed_when: false
+
+- name: SSH hardening snippet
+  when: (hm_machine_profile.auto_ssh_harden | default(hm_auto_ssh_harden)) | bool
+  block:
+    - name: Drop weak SSH defaults
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/99-hm.conf
+        mode: "0644"
+        content: |
+          PasswordAuthentication no
+          X11Forwarding no
+          MaxAuthTries 3
+    - name: Reload SSH
+      ansible.builtin.systemd:
+        name: "{{ 'ssh' if ansible_distribution == 'Ubuntu' else 'sshd' }}"
+        state: reloaded

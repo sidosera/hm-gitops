@@ -1,0 +1,62 @@
+# Bootstrap or refresh Flux in the target cluster.
+# Repository secrets:
+#   GITOPS_KUBECONFIG_B64     base64 kubeconfig for the target cluster
+#   GITOPS_FLUX_AGE_KEY       multiline age private key for SOPS decryption
+#   GITOPS_FLUX_AGE_KEY_B64   optional base64 of that key (useful for `act`)
+name: Flux Bootstrap
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: flux-bootstrap
+  cancel-in-progress: true
+
+jobs:
+  flux-bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl
+        run: |
+          curl -fsSL -o kubectl "https://dl.k8s.io/release/v1.34.1/bin/linux/amd64/kubectl"
+          install -m 0755 kubectl /usr/local/bin/kubectl
+
+      - name: Install Flux CLI
+        run: |
+          curl -fsSL https://fluxcd.io/install.sh | sudo bash
+
+      - name: Write kubeconfig from secret
+        env:
+          GITOPS_KUBECONFIG_B64: ${{ secrets.GITOPS_KUBECONFIG_B64 }}
+        run: |
+          if [ -z "${GITOPS_KUBECONFIG_B64}" ]; then
+            echo "Set repository secret GITOPS_KUBECONFIG_B64" >&2
+            exit 1
+          fi
+          echo "$GITOPS_KUBECONFIG_B64" | base64 -d > kubeconfig
+          chmod 600 kubeconfig
+
+      - name: Write SOPS age private key from secret
+        env:
+          GITOPS_FLUX_AGE_KEY: ${{ secrets.GITOPS_FLUX_AGE_KEY }}
+          GITOPS_FLUX_AGE_KEY_B64: ${{ secrets.GITOPS_FLUX_AGE_KEY_B64 }}
+        run: |
+          if [ -n "${GITOPS_FLUX_AGE_KEY_B64}" ]; then
+            echo "$GITOPS_FLUX_AGE_KEY_B64" | base64 -d > flux-age.agekey
+          elif [ -n "${GITOPS_FLUX_AGE_KEY}" ]; then
+            printf '%s\n' "${GITOPS_FLUX_AGE_KEY}" > flux-age.agekey
+          else
+            echo "Set repository secret GITOPS_FLUX_AGE_KEY or GITOPS_FLUX_AGE_KEY_B64" >&2
+            exit 1
+          fi
+          chmod 600 flux-age.agekey
+
+      - name: Bootstrap Flux
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+          HM_FLUX_AGE_KEY_FILE: ${{ github.workspace }}/flux-age.agekey
+        run: |
+          chmod +x scripts/flux-bootstrap.sh
+          ./scripts/flux-bootstrap.sh edge-01

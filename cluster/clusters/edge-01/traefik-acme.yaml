@@ -1,0 +1,15 @@
+# Merge into k3s-bundled Traefik
+# Ref: https://docs.k3s.io/networking#traefik-ingress-controller
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    additionalArguments:
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+      - "--certificatesresolvers.le.acme.email=admin@hackamonth.io"
+      - "--certificatesresolvers.le.acme.storage=/data/acme.json"
+    persistence:
+      enabled: true

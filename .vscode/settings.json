@@ -1,14 +1,17 @@
 {
     "cSpell.words": [
+        "buildx",
         "certresolver",
-        "getrafty",
         "certificatesresolvers",
-        "hackamonth",
-        "Nosniff",
-        "userland",
+        "ghcr",
+        "gitops",
+        "hm",
         "letsencrypt",
+        "Nosniff",
         "redirections",
+        "sidosera",
         "tlschallenge",
+        "userland",
         "websecure"
     ]
 }

@@ -1,0 +1,24 @@
+---
+# k3s (https://k3s.io/) — bare-metal Kubernetes distribution used for the cluster nodes.
+hm_k3s_channel: stable
+hm_k3s_kubeconfig: /etc/rancher/k3s/k3s.yaml
+hm_base_packages:
+  - apache2-utils
+  - ca-certificates
+  - curl
+  - ufw
+  - wget
+  - unzip
+  - util-linux
+  - gnupg
+  - python3
+  - git
+
+hm_apply_security: true
+hm_auto_firewall: true
+hm_auto_fail2ban: true
+hm_auto_unattended_upgrades: true
+hm_auto_ssh_harden: true
+
+# Teardown: set true to run k3s-uninstall.sh (destructive).
+hm_teardown_uninstall_k3s: false

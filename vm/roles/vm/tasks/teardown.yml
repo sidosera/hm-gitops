@@ -1,0 +1,14 @@
+---
+- name: Check for k3s kubeconfig
+  ansible.builtin.stat:
+    path: "{{ hm_k3s_kubeconfig }}"
+  register: hm_k3s_kubeconfig_stat
+
+- name: Uninstall k3s cluster (optional, destructive)
+  ansible.builtin.command: /usr/local/bin/k3s-uninstall.sh
+  when:
+    - hm_teardown_uninstall_k3s | bool
+    - hm_k3s_kubeconfig_stat.stat.exists
+  register: hm_k3s_uninstall
+  changed_when: hm_k3s_uninstall.rc == 0
+  failed_when: false

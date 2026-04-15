@@ -1,0 +1,98 @@
+---
+- name: Derive k3s channel
+  ansible.builtin.set_fact:
+    hm_k3s_channel_effective: "{{ hm_machine_profile.k3s_channel | default(hm_k3s_channel) }}"
+
+- name: Check for k3s binary on target
+  ansible.builtin.command: k3s --version
+  register: hm_k3s_probe
+  changed_when: false
+  failed_when: false
+
+- name: Download k3s install script
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /usr/local/src/k3s-install.sh
+    mode: "0755"
+  when: hm_k3s_probe.rc != 0
+
+- name: Install bootstrap k3s server
+  ansible.builtin.command: /usr/local/src/k3s-install.sh
+  environment:
+    INSTALL_K3S_CHANNEL: "{{ hm_k3s_channel_effective }}"
+    INSTALL_K3S_EXEC: "server --write-kubeconfig-mode 0644 --tls-san {{ hm_bootstrap_api_host }}"
+  args:
+    creates: /usr/local/bin/k3s
+  when:
+    - hm_k3s_probe.rc != 0
+    - hm_is_bootstrap | bool
+
+- name: Enable and start bootstrap k3s service
+  ansible.builtin.systemd:
+    name: k3s
+    enabled: true
+    state: started
+  when: hm_is_bootstrap | bool
+
+- name: Wait for bootstrap API to answer on 6443
+  ansible.builtin.wait_for:
+    host: "{{ hm_bootstrap_api_host }}"
+    port: 6443
+    timeout: 180
+
+- name: Wait for bootstrap kubeconfig
+  ansible.builtin.wait_for:
+    path: "{{ hm_k3s_kubeconfig }}"
+    state: present
+    timeout: 180
+  when: hm_is_bootstrap | bool
+
+- name: Read cluster join token from bootstrap node
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: hm_k3s_node_token_raw
+  when: hm_is_bootstrap | bool
+
+- name: Publish cluster join token
+  ansible.builtin.set_fact:
+    hm_k3s_cluster_token: "{{ hm_k3s_node_token_raw.content | b64decode | trim }}"
+  when: hm_is_bootstrap | bool
+
+- name: Install additional k3s server nodes
+  ansible.builtin.command: /usr/local/src/k3s-install.sh
+  environment:
+    INSTALL_K3S_CHANNEL: "{{ hm_k3s_channel_effective }}"
+    INSTALL_K3S_EXEC: "server --server https://{{ hm_bootstrap_api_host }}:6443"
+    K3S_TOKEN: "{{ hostvars[hm_bootstrap_host].hm_k3s_cluster_token }}"
+  args:
+    creates: /usr/local/bin/k3s
+  when:
+    - hm_k3s_probe.rc != 0
+    - not (hm_is_bootstrap | bool)
+
+- name: Enable and start k3s service on joining nodes
+  ansible.builtin.systemd:
+    name: k3s
+    enabled: true
+    state: started
+  when: not (hm_is_bootstrap | bool)
+
+- name: Symlink kubectl for root
+  ansible.builtin.file:
+    src: /usr/local/bin/k3s
+    dest: /usr/local/bin/kubectl
+    state: link
+    force: true
+
+- name: Verify kubectl reaches API from bootstrap node
+  ansible.builtin.command: kubectl get nodes -o wide
+  environment:
+    KUBECONFIG: "{{ hm_k3s_kubeconfig }}"
+  register: hm_k3s_nodes
+  changed_when: false
+  when: hm_is_bootstrap | bool
+
+- name: Show cluster nodes
+  ansible.builtin.debug:
+    var: hm_k3s_nodes.stdout_lines
+  when: hm_is_bootstrap | bool

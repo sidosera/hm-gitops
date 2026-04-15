@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: www-service
+  labels:
+    app.kubernetes.io/name: www-service
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: www-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

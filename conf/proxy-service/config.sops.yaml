@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: proxy-service-config-source
+    namespace: hm
+type: Opaque
+stringData:
+    config.yaml: |
+        log:
+          loglevel: warning
+        inbounds:
+          - listen: 0.0.0.0
+            port: 10443
+            protocol: vless
+            settings:
+              clients:
+                - id_secret: OTU5YjBlNmMtMWFiNC00NTRhLWFkOTAtNDI0N2RjYzRkMzI5
+                  flow: xtls-rprx-vision
+              decryption: none
+            streamSettings:
+              network: tcp
+              security: reality
+              realitySettings:
+                show: false
+                dest: www.microsoft.com:443
+                xver: 0
+                serverNames:
+                  - hackamonth.io
+                privateKey_secret: cUhRb1huaUdTTVRoWVQzV0gwMXhQY1I2aTc2VVFlME1EdFM1S042X3BrUQ==
+                shortIds_secret:
+                  - ZjVlNmNiZDEyOTQzMDZkYw==
+                spiderX: /
+        outbounds:
+          - protocol: freedom
+            tag: direct
+sops:
+    age:
+        - recipient: age1xpd0gspqq4d2neww2gwerv8p7mt2v7lyuazk5mmz2677my9rp93qd76ves
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBBZzl6VFdRTjlLWWVsT2pa
+            M2ZHb0tzbFdLOUswUjJDeWNZNGhCemVFN2xFCmEyRW5kaDNYeDYzT2J5ZmoxTU9F
+            azFwMkxmVS9nWmtXZjZ2dE80TDVqZVUKLS0tICsycDhVYWtqSEd4NGtETTJ5dmx2
+            TnY0SDVxcTZVbHNya3VMeVgvSlRnem8KvBBIowCrlpvCU89XzapsolAIkrJmxNwg
+            n6PT/FkZHsZUe/BR6tMm01K7UZPvGbhhJXmmA5tPuGamiZtoxbeWtQ==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2026-04-10T20:31:53Z"
+    mac: ENC[AES256_GCM,data:gRjWeGT9V3KdAXHM11+Whh0Wb707TpBdnzaKtOC1p/KdwXcozdkve1C1cpvHHwNNmp1hZgfuej5+ECuTGCgM7BJ3s0hhc14ulrCpcJimDEnM+croIP+VjBoMN+CRkXTMJ5HKFmoNcCnkctJyPXC6w9REYnyFp7GsOE6SGciaNZI=,iv:R8jv8hPes1/se8+/bUgWMDXArBsDFeUOrJpwa9uBBX8=,tag:n43n379JAKsTV4pA+O+goQ==,type:str]
+    encrypted_regex: .*_secret$
+    version: 3.12.2

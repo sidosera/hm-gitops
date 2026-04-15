@@ -1,9 +1,0 @@
----
-# Non-secret layout for the managed host (committed). SSH target (host + unix user) and
-# git clone URL live in local-env.yaml under secrets.deploy (see local-env.example.yaml).
-
-hm_inventory_hostname: edge-01
-hm_git_ref: main
-hm_xray_public_host: proxy.hackamonth.io
-# Public Docker Hub image for the getrafty site Deployment (no private registry).
-hm_getrafty_image: docker.io/sidosera/getrafty-site:latest

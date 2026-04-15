@@ -1,0 +1,13 @@
+ansible_user: sidosera
+vm_k3s_channel: stable
+vm_apply_security: true
+vm_auto_firewall: true
+vm_firewall_allowed_tcp:
+  - 22
+  - 80
+  - 443
+  - 6443
+vm_auto_fail2ban: true
+vm_auto_unattended_upgrades: true
+vm_auto_ssh_harden: true
+vm_extra_packages: []

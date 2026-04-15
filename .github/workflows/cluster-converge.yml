@@ -1,0 +1,63 @@
+# Converge bare-metal cluster hosts with Ansible.
+# Repository secrets:
+#   GITOPS_DEPLOY_KEY      dedicated hm-gitops private key
+#   GITOPS_DEPLOY_KEY_B64  optional base64 of that key (for `act`)
+#   GITOPS_BECOME_PASSWORD optional sudo password if the SSH user is not NOPASSWD
+#
+# This workflow does not apply Kubernetes workloads. It only configures hosts and installs/upgrades k3s.
+name: Cluster Converge
+
+on:
+  workflow_dispatch:
+    inputs:
+      cluster_name:
+        description: Cluster name under cluster/clusters/
+        required: true
+        default: edge-01
+
+concurrency:
+  group: cluster-converge
+  cancel-in-progress: true
+
+jobs:
+  ansible-converge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: pip install --user ansible
+
+      - name: Install hm-gitops SSH key
+        env:
+          GITOPS_DEPLOY_KEY_B64: ${{ secrets.GITOPS_DEPLOY_KEY_B64 }}
+          GITOPS_DEPLOY_KEY: ${{ secrets.GITOPS_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [ -n "${GITOPS_DEPLOY_KEY_B64}" ]; then
+            echo "${GITOPS_DEPLOY_KEY_B64}" | base64 -d > ~/.ssh/gitops
+          elif [ -n "${GITOPS_DEPLOY_KEY}" ]; then
+            printf '%s\n' "${GITOPS_DEPLOY_KEY}" > ~/.ssh/gitops
+          fi
+          if [ ! -s ~/.ssh/gitops ]; then
+            echo "Set repository secrets GITOPS_DEPLOY_KEY (multiline) and/or GITOPS_DEPLOY_KEY_B64 (base64)." >&2
+            exit 1
+          fi
+          chmod 600 ~/.ssh/gitops
+
+      - name: Run Ansible converge
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "false"
+          GITOPS_BECOME_PASSWORD: ${{ secrets.GITOPS_BECOME_PASSWORD }}
+        run: |
+          export PATH="$(python3 -m site --user-base)/bin:$PATH"
+          BP="$HOME/.gitops_become_pass"
+          if [ -n "${GITOPS_BECOME_PASSWORD}" ]; then
+            printf '%s\n' "${GITOPS_BECOME_PASSWORD}" >"$BP"
+            chmod 600 "$BP"
+            ./vm/k3s-bootstrap.sh -e vm_hosts_file="$PWD/cluster/clusters/${{ inputs.cluster_name }}/hosts.yml" -e hm_action=deploy --private-key ~/.ssh/gitops --become-password-file "$BP"
+            rm -f "$BP"
+          else
+            ./vm/k3s-bootstrap.sh -e vm_hosts_file="$PWD/cluster/clusters/${{ inputs.cluster_name }}/hosts.yml" -e hm_action=deploy --private-key ~/.ssh/gitops
+          fi
