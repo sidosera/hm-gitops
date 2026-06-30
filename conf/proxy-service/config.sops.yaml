@@ -22,7 +22,7 @@ stringData:
               security: reality
               realitySettings:
                 show: false
-                dest: 1.1.1.1:443
+                dest: 8.8.8.8:443
                 xver: 0
                 serverNames:
                   - hackamonth.io
@@ -38,13 +38,13 @@ sops:
         - recipient: age1xpd0gspqq4d2neww2gwerv8p7mt2v7lyuazk5mmz2677my9rp93qd76ves
           enc: |
             -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyZEhyUTVGL3VYS1Q5VStM
-            bFRYNEt5SjBLNEhUMmhWY0w4OThBOG1Ydng0CjNKV0lrUFRRRXorVkpxM1hlMHpF
-            MndSS0JOWlk0WHAwdk9BM3d1cm1palkKLS0tIGxDdk1RaUlyWFZ2Yk9GWGM3UG1N
-            cDExSkt3UzZVMWlEWVNlQTlQSHcvdUUKh3VwyAMpwQcGVbAbM87BnZBfvLGvEJ5o
-            TRYavBQGmE11QRVOxrYWY9ANQoegCj9Dtsg0KsEshm45Pk0c5N6Jkw==
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhOFdKM3N2SHM2M3ZsWWc2
+            cUV0RlBCaW9DSzFWbDNMT0JMZVQrTGgvUFY0Ci9odnFwbUtxTVQ0OXBRY3N0Lzhz
+            eXdwNjFuQlk4bFpoUnBVYk1OeEVyZGsKLS0tIEZ6MGVtMnFlSzNTbTNTM0pGb1JG
+            TUZoQUoyRDJuMEZOM1FrMUd1K3hRYVkKGvQkKNiHDPdusauDxNBdK57Tg4FAGnbL
+            iyMdl0CtL3zfC+KIWB3auLPk0ugDArbhmUHGOElmRao4svikQElcDg==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2026-06-30T18:48:43Z"
-    mac: ENC[AES256_GCM,data:2Ecw3UQKO/ZwVlGfAlBfjuaFV3hqCawRsOYbc3XnxbYw9g4urAN/i0wnph7hS744B8r/QDOCLIa2GK2IqlrNkzEpWGkTzuoDHX790wUiHyxxH1w1mg/HrmF4najLXzBlUWNdFP+hNlRB/xLf+46PlXlN8uvZFzm4QbAk28f0xmU=,iv:0/1rlP3uUusf5kibb2uPMNC25MFJSoCoZvOoGFT5r+s=,tag:BeUd2uU5UDVeLYcwZU8gJw==,type:str]
+    lastmodified: "2026-06-30T19:14:58Z"
+    mac: ENC[AES256_GCM,data:qdpK+eWXPCRSa7MBz4EmvSCV1ML1i0ddG5jLfeavNOmNGgToPgo96Frx4rLdFKkk4bpa9z9KNA7Btr9FFjX/mrTZmCQ9Wj4/lpWKUtH+NR6QYBd5rBOU/t9EQVNY1S10KbY1GA1Ahf2elTiu0Rs3pmfSkshaPNK/VpsmhsRvFt4=,iv:Y5+pD8/mR62Gu1f3nMbK11IrY2WLQ7pIkXYXZ8q2ync=,tag:hbLiJRmMcTkgVeOymK/YNA==,type:str]
     encrypted_regex: .*_secret$
     version: 3.12.2
