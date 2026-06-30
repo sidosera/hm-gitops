@@ -8,7 +8,7 @@ metadata:
 spec:
   valuesContent: |-
     additionalArguments:
-      - "--entrypoints.websecure.address=[::]:443"
+      - "--entrypoints.websecure.address=[::]:8443"
       - "--certificatesresolvers.le.acme.tlschallenge=true"
       - "--certificatesresolvers.le.acme.email=admin@hackamonth.io"
       - "--certificatesresolvers.le.acme.storage=/data/acme.json"
