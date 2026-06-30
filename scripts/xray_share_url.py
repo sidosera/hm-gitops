@@ -45,10 +45,20 @@ def build_vless_reality_url(uuid: str, host: str, port: int, reality: dict, name
     return f"vless://{uuid}@{authority}?{query}#{frag}"
 
 
+def _find_node_ipv6(repo: Path) -> str:
+    """Return vm_node_ipv6 from the first hosts.yml found under cluster/clusters/."""
+    for hosts_file in sorted((repo / "cluster" / "clusters").rglob("hosts.yml")):
+        data = load_yaml(hosts_file)
+        ipv6 = data.get("vm_node_ipv6", "")
+        if ipv6:
+            return ipv6
+    return ""
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--repo", type=Path, default=Path(__file__).resolve().parent.parent)
-    ap.add_argument("--host", help="Override server host/IP (default: from local-env.yaml or hackamonth.io)")
+    ap.add_argument("--host", help="Override server host/IP (default: vm_node_ipv6 from hosts.yml)")
     ap.add_argument("--port", type=int, default=443)
     args = ap.parse_args()
 
@@ -71,7 +81,7 @@ def main() -> None:
     if not clients:
         raise SystemExit("local-env.yaml: missing secrets.xray.vless_clients")
 
-    host = args.host or env.get("xray_host") or "jump.hackamonth.io"
+    host = args.host or env.get("xray_host") or _find_node_ipv6(repo) or "jump.hackamonth.io"
 
     for i, client in enumerate(clients):
         uuid = client if isinstance(client, str) else client.get("id", "")
