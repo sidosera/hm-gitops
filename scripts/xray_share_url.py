@@ -71,7 +71,7 @@ def main() -> None:
     if not clients:
         raise SystemExit("local-env.yaml: missing secrets.xray.vless_clients")
 
-    host = args.host or env.get("xray_host") or "hackamonth.io"
+    host = args.host or env.get("xray_host") or "jump.hackamonth.io"
 
     for i, client in enumerate(clients):
         uuid = client if isinstance(client, str) else client.get("id", "")
