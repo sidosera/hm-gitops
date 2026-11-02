@@ -1,94 +1,92 @@
 #!/usr/bin/env python3
-"""Print vless:// REALITY share URLs for importing into Xray/V2Ray clients."""
-
+"""Export VLESS profiles from the SOPS-encrypted source; never commit exports."""
 from __future__ import annotations
-
 import argparse
-import sys
-import urllib.parse
+import json
+import os
 from pathlib import Path
-
-try:
-    import yaml
-except ImportError:
-    print("Install PyYAML: pip install PyYAML", file=sys.stderr)
-    sys.exit(1)
+import re
+import subprocess
+import urllib.parse
+import yaml
 
 
-def load_yaml(path: Path) -> dict:
-    with path.open(encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    if not isinstance(data, dict):
-        raise SystemExit(f"Expected mapping in {path}")
-    return data
+def build_vless_url(user_id: str, host: str, port: int, query: dict, name: str) -> str:
+    authority = f'[{host}]' if ':' in host else host
+    return f'vless://{user_id}@{authority}:{port}?{urllib.parse.urlencode(query)}#{urllib.parse.quote(name, safe="")}'
 
 
-def build_vless_reality_url(uuid: str, host: str, port: int, reality: dict, name: str) -> str:
-    sni = reality.get("server_name") or reality.get("sni") or "hackamonth.io"
-    q = {
-        "encryption": "none",
-        "security": "reality",
-        "sni": sni,
-        "fp": reality.get("fingerprint", "chrome"),
-        "pbk": reality["public_key"],
-        "sid": reality["short_ids"][0],
-        "type": "tcp",
-        "flow": "xtls-rprx-vision",
-    }
-    # IPv6 addresses need brackets in the host part of the URL
-    if ":" in host:
-        authority = f"[{host}]:{port}"
-    else:
-        authority = f"{host}:{port}"
-    query = urllib.parse.urlencode(q)
-    frag = urllib.parse.quote(name, safe="")
-    return f"vless://{uuid}@{authority}?{query}#{frag}"
-
-
-def _find_node_ipv6(repo: Path) -> str:
-    """Return vm_node_ipv6 from the first hosts.yml found under cluster/clusters/."""
-    for hosts_file in sorted((repo / "cluster" / "clusters").rglob("hosts.yml")):
-        data = load_yaml(hosts_file)
-        ipv6 = data.get("vm_node_ipv6", "")
-        if ipv6:
-            return ipv6
-    return ""
+def export_profiles(config: dict, hosts: list[str], public_key: str, https_host: str) -> dict[str, str]:
+    profiles = {}
+    for inbound in config['inbounds']:
+        stream = inbound['streamSettings']
+        if stream.get('security') == 'reality':
+            reality = stream['realitySettings']
+            client = inbound['settings']['clients'][0]
+            for host in hosts:
+                family = 'ipv6' if ':' in host else 'ipv4'
+                for fingerprint in ('chrome', 'firefox', 'safari'):
+                    name = f'hm-reality-{family}-{fingerprint}'
+                    query = {'encryption': 'none', 'security': 'reality',
+                             'sni': reality['serverNames'][0], 'fp': fingerprint,
+                             'pbk': public_key, 'sid': reality['shortIds'][0],
+                             'type': 'tcp', 'flow': client['flow']}
+                    profiles[name] = build_vless_url(client['id'], host, 443, query, name)
+        elif stream.get('network') == 'xhttp':
+            name = 'hm-https-backup'
+            query = {'encryption': 'none', 'security': 'tls', 'sni': https_host,
+                     'fp': 'chrome', 'alpn': 'h2', 'type': 'xhttp',
+                     'host': https_host, 'path': stream['xhttpSettings']['path'],
+                     'mode': 'packet-up'}
+            profiles[name] = build_vless_url(inbound['settings']['clients'][0]['id'],
+                                            https_host, 443, query, name)
+    return profiles
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--repo", type=Path, default=Path(__file__).resolve().parent.parent)
-    ap.add_argument("--host", help="Override server host/IP (default: vm_node_ipv6 from hosts.yml)")
-    ap.add_argument("--port", type=int, default=443)
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser(description=__doc__)
+    repo_default = Path(__file__).resolve().parent.parent
+    parser.add_argument('--repo', type=Path, default=repo_default)
+    parser.add_argument('--host', action='append', help='Direct VPS address; repeat for both address families')
+    parser.add_argument('--https-host', default='www.hackamonth.io')
+    parser.add_argument('--xray', default='xray', help='Xray executable used to derive the public key')
+    parser.add_argument('--output-dir', type=Path, help='Write private profile files instead of stdout')
+    args = parser.parse_args()
+    repo = args.repo.resolve()
+    source = repo / 'conf/proxy-service/config.sops.yaml'
+    decrypted = subprocess.run(['sops', '--decrypt', str(source)], check=True,
+                               capture_output=True, text=True).stdout
+    secret = yaml.safe_load(decrypted)
+    config = json.loads(secret['stringData']['config.json'])
+    reality = next(i['streamSettings']['realitySettings'] for i in config['inbounds']
+                   if i['streamSettings'].get('security') == 'reality')
+    key_output = subprocess.run([args.xray, 'x25519', '-i', reality['privateKey']],
+                                check=True, capture_output=True, text=True).stdout
+    match = re.search(r'(?:Password \(PublicKey\)|Password|PublicKey|Public key):\s*(\S+)', key_output)
+    if not match:
+        raise SystemExit('Cannot read public key from this Xray version')
+    hosts = args.host or []
+    if not hosts:
+        inventory = yaml.safe_load((repo / 'cluster/clusters/edge-01/hosts.yml').read_text())
+        hosts.extend(inventory['vm_hosts'])
+        if inventory.get('vm_node_ipv6'):
+            hosts.append(inventory['vm_node_ipv6'])
+    profiles = export_profiles(config, hosts, match.group(1), args.https_host)
+    if args.output_dir:
+        output = args.output_dir.resolve()
+        if output == repo or repo in output.parents:
+            raise SystemExit('Profile exports must be outside the repository')
+        output.mkdir(mode=0o700, parents=True, exist_ok=True)
+        for name, url in profiles.items():
+            path = output / f'{name}.txt'
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, 'w') as handle:
+                handle.write(url + '\n')
+        print(f'Exported {len(profiles)} private profiles to {output}')
+    else:
+        print('\n'.join(profiles.values()))
 
-    repo: Path = args.repo
-    local_env_path = repo / "local-env.yaml"
-    if not local_env_path.is_file():
-        raise SystemExit(f"Missing {local_env_path} (copy from local-env.example.yaml)")
 
-    env = load_yaml(local_env_path)
-    secrets = env.get("secrets", {})
-    xray = secrets.get("xray", {})
-    reality = xray.get("reality", {})
-
-    if not reality.get("public_key"):
-        raise SystemExit("local-env.yaml: missing secrets.xray.reality.public_key")
-    if not reality.get("short_ids"):
-        raise SystemExit("local-env.yaml: missing secrets.xray.reality.short_ids")
-
-    clients = xray.get("vless_clients") or []
-    if not clients:
-        raise SystemExit("local-env.yaml: missing secrets.xray.vless_clients")
-
-    host = args.host or env.get("xray_host") or _find_node_ipv6(repo) or "jump.hackamonth.io"
-
-    for i, client in enumerate(clients):
-        uuid = client if isinstance(client, str) else client.get("id", "")
-        name = f"hm-proxy-{i + 1}" if len(clients) > 1 else "hm-proxy"
-        url = build_vless_reality_url(uuid, host, args.port, reality, name)
-        print(url)
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

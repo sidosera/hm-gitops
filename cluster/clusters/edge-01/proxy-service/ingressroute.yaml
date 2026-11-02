@@ -10,7 +10,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: "HostSNI(`hackamonth.io`)"
+    - match: HostSNI(`www.google.com`)
       priority: 2000000
       services:
         - name: proxy-service

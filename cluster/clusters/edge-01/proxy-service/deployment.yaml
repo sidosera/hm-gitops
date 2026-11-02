@@ -16,42 +16,25 @@ spec:
       labels:
         app.kubernetes.io/name: proxy-service
         app.kubernetes.io/component: edge
+      annotations:
+        hm.gitops/config-revision: 2026-11-02-rotation-1
     spec:
       automountServiceAccountToken: false
       securityContext:
         seccompProfile:
           type: RuntimeDefault
-      initContainers:
-        - name: render-config
-          image: docker.io/mikefarah/yq:4.52.5
-          imagePullPolicy: IfNotPresent
-          command:
-            - /bin/sh
-            - -ec
-            - >-
-              yq -o=json '
-              (.inbounds[].settings.clients[] |= (.id = (.id_secret | @base64d) | del(.id_secret))) |
-              (.inbounds[].streamSettings.realitySettings |= (.privateKey = (.privateKey_secret | @base64d) | .shortIds = (.shortIds_secret | map(@base64d)) | del(.privateKey_secret, .shortIds_secret)))
-              ' /source/config.yaml > /work/config.json
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-            readOnlyRootFilesystem: true
-            runAsUser: 0
-          volumeMounts:
-            - name: config-source
-              mountPath: /source
-              readOnly: true
-            - name: config
-              mountPath: /work
       containers:
         - name: proxy-service
           imagePullPolicy: IfNotPresent
-          args: ["run", "-c", "/usr/local/etc/xray/config.json"]
+          args:
+            - run
+            - -c
+            - /usr/local/etc/xray/config.json
           ports:
             - name: reality
               containerPort: 10443
+            - name: xhttp
+              containerPort: 18080
           startupProbe:
             tcpSocket:
               port: reality
@@ -68,7 +51,8 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
-              drop: ["ALL"]
+              drop:
+                - ALL
             readOnlyRootFilesystem: true
             runAsNonRoot: true
             runAsUser: 65532
@@ -83,9 +67,13 @@ spec:
               mountPath: /usr/local/etc/xray
               readOnly: true
       volumes:
-        - name: config-source
+        - name: config
           secret:
             secretName: proxy-service-config-source
-            defaultMode: 0444
-        - name: config
-          emptyDir: {}
+            defaultMode: 292
+      terminationGracePeriodSeconds: 30
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0

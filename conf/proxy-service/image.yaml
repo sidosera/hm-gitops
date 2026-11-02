@@ -7,4 +7,4 @@ spec:
     spec:
       containers:
         - name: proxy-service
-          image: ghcr.io/xtls/xray-core:26.3.27
+          image: ghcr.io/xtls/xray-core:26.10.31

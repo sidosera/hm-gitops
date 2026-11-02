@@ -2,3 +2,8 @@
 .ruff_cache
 local-env.yaml
 .secrets
+
+# Credential-bearing proxy exports and private rollback data
+proxy-profiles/
+*.agekey
+__pycache__/

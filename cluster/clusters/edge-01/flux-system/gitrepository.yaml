@@ -5,6 +5,6 @@ metadata:
   namespace: flux-system
 spec:
   interval: 1m
-  url: https://github.com/sidosera/hackamonth-gitops.git
+  url: https://github.com/sidosera/hm-gitops.git
   ref:
     branch: main

@@ -13,3 +13,7 @@ spec:
     - name: reality
       port: 10443
       targetPort: reality
+    - name: xhttp
+      port: 18080
+      targetPort: xhttp
+      protocol: TCP
