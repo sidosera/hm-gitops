@@ -5,5 +5,4 @@ resources:
   - traefik-acme.yaml
   - www-service
   - proxy-service
-  - metrics-dashboard
   - monitoring

@@ -28,7 +28,7 @@ spec:
               containerPort: 3000
           env:
             - name: GF_SERVER_ROOT_URL
-              value: https://www.hackamonth.io/grafana/
+              value: https://www.hackamonth.io/status/
             - name: GF_SERVER_SERVE_FROM_SUB_PATH
               value: 'true'
             - name: GF_SECURITY_COOKIE_SECURE

@@ -8,7 +8,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`www.hackamonth.io`) && (Path(`/grafana`) || PathPrefix(`/grafana/`))
+      match: Host(`www.hackamonth.io`) && (Path(`/status`) || PathPrefix(`/status/`))
       priority: 210
       services:
         - name: grafana

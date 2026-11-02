@@ -130,31 +130,31 @@ sudo kubectl -n hm logs deployment/proxy-service --tail=20
 
 The website ownership init container needs only `CHOWN`; all other capabilities remain dropped. Nginx uses the official unprivileged image pinned by digest, listens on 8080 internally, and runs as UID/GID 101 with no capabilities and a read-only root filesystem. Xray runs as a non-root user with all capabilities dropped and a read-only root filesystem.
 
-## Private service metrics dashboard
+## Grafana and Prometheus
 
-Open `https://www.hackamonth.io/status/` and sign in with the separate dashboard credentials. The password is handed over privately; Git stores only its SHA-256 credential digest inside a SOPS-encrypted Secret. Proxy credentials cannot be used to sign in.
+Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing dashboard username and password. The provisioned **VPS & Proxy** dashboard is the home page. Credentials are stored in a SOPS-encrypted Secret; proxy profiles remain unchanged.
 
-The page refreshes every 15 seconds and shows:
+Prometheus scrapes every 30 seconds and stores seven days of history, bounded to 750 MB of blocks on a 2 GiB volume. Grafana has a separate 1 GiB volume for its settings. Both volumes use the VPS disk, so they do not survive loss of the VPS. History starts when Prometheus is deployed; the previous SQLite history volume is retained as an archive and is not imported.
 
-- active client IP estimates across both authenticated proxy transports;
-- proxy upload/download rates and counters since Xray started;
-- host CPU, memory working set, root disk usage, uptime, and network rates;
-- pod readiness, CPU, memory, and restart counts;
-- resource and client-count charts for up to seven days.
+The dashboard shows:
 
-Counts come from the version-pinned Xray StatsService online-IP maps. They represent distinct source IPs with open authenticated proxy sessions, rather than the number of devices with a VPN app enabled. Shared NAT can merge devices, and a device changing networks can have more than one address. Client IPs are deduplicated transiently and never returned to the browser or written to history. Browsing destinations are not collected. Missing telemetry is shown as unavailable instead of zero. Counter rates suppress negative spikes after restarts.
+- estimated active client IPs and online-statistics health;
+- proxy upload/download rates and cumulative traffic;
+- host CPU, available memory, root disk use, uptime, and network traffic;
+- pod readiness, CPU, memory, and restarts;
+- monitoring memory usage and scrape-target health.
 
-The dashboard is a small Python service using the existing metrics-server and read-only kubelet stats, with no host filesystem mounts and no Prometheus/Grafana stack. Its service account can read this node's stats and this namespace's pod metrics; it cannot read Secrets, execute workloads, or use the node proxy. The bundled native Xray stats CLI is downloaded from its pinned official release and verified against a fixed SHA-256 checksum. Only the read-only StatsService is enabled. NetworkPolicies restrict the raw Xray metrics/API ports to the dashboard and restrict proxy traffic to Traefik.
+Node-exporter supplies host metrics through read-only host mounts. Kube-state-metrics reads pods in the `hm` namespace, and Prometheus reads this node's kubelet resource metrics. Xray-exporter reads native traffic counters with log parsing disabled. A small poller uses the checksum-verified official Xray CLI to publish aggregate online-IP counts through node-exporter's textfile collector. It has no web UI or history database. Only Xray's read-only StatsService is enabled.
 
-SQLite history uses a 1 GiB local-path claim, with a seven-day retention window. The claim survives dashboard restarts but shares the VPS disk; losing the VPS loses its history. Memory-intensive history requests are avoided by reading at most about 240 time-bucket samples. The main container is non-root, drops all capabilities, uses a read-only root filesystem, and has a 96 MiB memory limit.
+Client counts are lower-bound estimates of distinct source IPs with open authenticated sessions. Shared NAT and Traefik can merge clients, and changing networks can count one device twice. Addresses are deduplicated in memory and never exported as metrics; browsing destinations are not collected. Failed online-statistics reads omit counts and report an unhealthy collector instead of reporting zero clients. Prometheus rates handle counter resets.
 
-To keep source addresses useful, the edge Service uses local external traffic handling, a parallel REALITY listener was tested with PROXY protocol v2, and forwarded HTTP headers are trusted only from Cloudflare's published address ranges. Switching the existing REALITY route to source-address forwarding requires separate approval; until then its client count is a lower-bound estimate. Update those trusted ranges if Cloudflare changes them. Do not expose the unauthenticated native Xray stats ports through an ingress or public NodePort.
+Grafana requires authentication. Prometheus and the pod exporters have no public ingress and use NetworkPolicies. Node-exporter uses host networking and is protected by the VPS firewall; port 9100 must remain closed publicly. The Xray API is restricted to its collectors. All monitoring containers have memory limits; Grafana and Prometheus are limited to 320 MiB and 256 MiB respectively.
 
-Tests:
+The existing REALITY route is preserved. A parallel source-address-forwarding listener has been tested, but switching the production route requires separate approval. Until then, client counts remain approximate. The HTTPS fallback and client credentials are unchanged.
+
+Validation:
 
 ```sh
 python3 -m unittest discover -s tests -v
 kubectl kustomize cluster/clusters/edge-01 >/dev/null
 ```
-
-Changing the proxy configuration does not require changing client profiles unless credentials or public transport settings are also changed. Dashboard enablement preserves the existing proxy credentials.
