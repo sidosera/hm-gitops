@@ -26,7 +26,7 @@ spec:
         args:
         - --resources=pods
         - --namespaces=hm
-        - --metric-allowlist=kube_pod_status_ready,kube_pod_status_phase,kube_pod_container_status_restarts_total
+        - --metric-allowlist=kube_pod_status_ready,kube_pod_status_phase,kube_pod_container_status_restarts_total,kube_pod_container_resource_limits
         ports:
         - name: http
           containerPort: 8080

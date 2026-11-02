@@ -132,7 +132,7 @@ The website ownership init container needs only `CHOWN`; all other capabilities 
 
 ## Grafana and Prometheus
 
-Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing dashboard username and password. The provisioned **VPS & Proxy** dashboard is the home page. Credentials are stored in a SOPS-encrypted Secret; proxy profiles remain unchanged.
+Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing dashboard username and password. The provisioned **VPN / Service Operations** dashboard is the home page. Credentials are stored in a SOPS-encrypted Secret; proxy profiles remain unchanged.
 
 Prometheus scrapes every 30 seconds and stores seven days of history, bounded to 750 MB of blocks on a 2 GiB volume. Grafana has a separate 1 GiB volume for its settings. Both volumes use the VPS disk, so they do not survive loss of the VPS. History starts when Prometheus is deployed; the previous SQLite history volume is retained as an archive and is not imported.
 
@@ -158,3 +158,17 @@ Validation:
 python3 -m unittest discover -s tests -v
 kubectl kustomize cluster/clusters/edge-01 >/dev/null
 ```
+
+## Operating the dashboard
+
+The overview follows the incident path: server-side health, authenticated traffic, host capacity, then workload diagnostics. The Workload selector filters only workload panels; headline service health always refers to the VPN. Expand **Telemetry & failure diagnostics** to investigate missing data, collector freshness and host network errors.
+
+- **VPN fails, server checks green:** test the existing client profile from the affected ISP. Internal API health and pod readiness do not measure end-to-end reachability, latency, handshake errors or DPI blocking. These signals are not instrumented, so the dashboard does not claim a client-facing SLO or error budget.
+- **API failed or pod not ready:** inspect `kubectl -n hm logs deployment/proxy-service` and pod events. Check collector health before interpreting missing data.
+- **Client count unknown:** inspect node-exporter and its `online-clients` container. Counts require a successful scrape, successful native API poll and a textfile younger than 60 seconds. A successful observation with no sessions shows zero. Counts remain a lower-bound IP estimate.
+- **Memory pressure:** compare MemAvailable with Linux pressure stall information (PSI), swapping and each container's working set / configured memory limit. Occupied swap alone does not prove current pressure.
+- **Disk pressure:** inspect both free space and free inodes on `/`. Dashboard thresholds are investigation guides: memory/disk headroom under 20% warns, under 10% is urgent; container memory-limit use above 80% warns, above 95% is urgent. No paging or notifications are configured by the dashboard.
+
+Traffic rates use Grafana's adaptive rate interval with a 30-second scrape interval; selected-window transfer totals use reset-aware increases. Missing samples remain gaps. PSI begins at this rollout; older periods have no PSI history. Recent restarts use a rolling 15-minute window and do not count pod replacements. Container limit panels omit containers without a memory limit.
+
+The layout follows [Google SRE monitoring guidance](https://sre.google/sre-book/monitoring-distributed-systems/) while making unmeasured user-path signals explicit.

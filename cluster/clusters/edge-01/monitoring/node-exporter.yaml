@@ -73,6 +73,7 @@ spec:
             - --collector.time
             - --collector.uname
             - --collector.vmstat
+            - --collector.pressure
             - --collector.textfile
             - --collector.textfile.directory=/textfile
             - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+|var/lib/rancher/k3s/agent/containerd/.+)($|/)
