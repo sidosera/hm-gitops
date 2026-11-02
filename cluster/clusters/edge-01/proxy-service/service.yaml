@@ -17,3 +17,12 @@ spec:
       port: 18080
       targetPort: xhttp
       protocol: TCP
+    - name: realv2
+      port: 11443
+      targetPort: realv2
+    - name: stats-api
+      port: 10085
+      targetPort: stats-api
+    - name: metrics
+      port: 11111
+      targetPort: metrics

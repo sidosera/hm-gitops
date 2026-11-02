@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metrics-dashboard
+  namespace: hm
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hm-metrics-dashboard
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - nodes
+  - nodes/stats
+  resourceNames:
+  - machine
+  verbs:
+  - get
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - nodes
+  resourceNames:
+  - machine
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hm-metrics-dashboard
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hm-metrics-dashboard
+subjects:
+- kind: ServiceAccount
+  name: metrics-dashboard
+  namespace: hm
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: metrics-dashboard
+  namespace: hm
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: metrics-dashboard
+  namespace: hm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: metrics-dashboard
+subjects:
+- kind: ServiceAccount
+  name: metrics-dashboard
+  namespace: hm

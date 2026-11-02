@@ -17,7 +17,7 @@ spec:
         app.kubernetes.io/name: proxy-service
         app.kubernetes.io/component: edge
       annotations:
-        hm.gitops/config-revision: 2026-11-02-rotation-1
+        hm.gitops/config-revision: 2026-11-02-metrics-stage1
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -35,6 +35,12 @@ spec:
               containerPort: 10443
             - name: xhttp
               containerPort: 18080
+            - name: realv2
+              containerPort: 11443
+            - name: stats-api
+              containerPort: 10085
+            - name: metrics
+              containerPort: 11111
           startupProbe:
             tcpSocket:
               port: reality

@@ -129,3 +129,32 @@ sudo kubectl -n hm logs deployment/proxy-service --tail=20
 ```
 
 The website ownership init container needs only `CHOWN`; all other capabilities remain dropped. Nginx uses the official unprivileged image pinned by digest, listens on 8080 internally, and runs as UID/GID 101 with no capabilities and a read-only root filesystem. Xray runs as a non-root user with all capabilities dropped and a read-only root filesystem.
+
+## Private service metrics dashboard
+
+Open `https://www.hackamonth.io/status/` and sign in with the separate dashboard credentials. The password is handed over privately; Git stores only its SHA-256 credential digest inside a SOPS-encrypted Secret. Proxy credentials cannot be used to sign in.
+
+The page refreshes every 15 seconds and shows:
+
+- active client IP estimates across both authenticated proxy transports;
+- proxy upload/download rates and counters since Xray started;
+- host CPU, memory working set, root disk usage, uptime, and network rates;
+- pod readiness, CPU, memory, and restart counts;
+- resource and client-count charts for up to seven days.
+
+Counts come from the version-pinned Xray StatsService online-IP maps. They represent distinct source IPs with open authenticated proxy sessions, rather than the number of devices with a VPN app enabled. Shared NAT can merge devices, and a device changing networks can have more than one address. Client IPs are deduplicated transiently and never returned to the browser or written to history. Browsing destinations are not collected. Missing telemetry is shown as unavailable instead of zero. Counter rates suppress negative spikes after restarts.
+
+The dashboard is a small Python service using the existing metrics-server and read-only kubelet stats, with no host filesystem mounts and no Prometheus/Grafana stack. Its service account can read this node's stats and this namespace's pod metrics; it cannot read Secrets, execute workloads, or use the node proxy. The bundled native Xray stats CLI is downloaded from its pinned official release and verified against a fixed SHA-256 checksum. Only the read-only StatsService is enabled. NetworkPolicies restrict the raw Xray metrics/API ports to the dashboard and restrict proxy traffic to Traefik.
+
+SQLite history uses a 1 GiB local-path claim, with a seven-day retention window. The claim survives dashboard restarts but shares the VPS disk; losing the VPS loses its history. Memory-intensive history requests are avoided by reading at most about 240 time-bucket samples. The main container is non-root, drops all capabilities, uses a read-only root filesystem, and has a 96 MiB memory limit.
+
+To keep source addresses useful, the edge Service uses local external traffic handling, REALITY receives PROXY protocol v2 from Traefik, and forwarded HTTP headers are trusted only from Cloudflare's published address ranges. Update those trusted ranges if Cloudflare changes them. Do not expose the unauthenticated native Xray stats ports through an ingress or public NodePort.
+
+Tests:
+
+```sh
+python3 -m unittest discover -s tests -v
+kubectl kustomize cluster/clusters/edge-01 >/dev/null
+```
+
+Changing the proxy configuration does not require changing client profiles unless credentials or public transport settings are also changed. Dashboard enablement preserves the existing proxy credentials.
