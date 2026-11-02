@@ -67,6 +67,21 @@ class DashboardTests(unittest.TestCase):
             self.assertIsNone(store.snapshot()['rates']['proxy_upload'])
             store.db.close()
 
+    def test_traffic_includes_existing_primary_listener(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = app.Store(Path(directory))
+            stats = {'stats': {'inbound': {'reality': {'uplink': 5, 'downlink': 10},
+                                          'reality-legacy': {'uplink': 7, 'downlink': 20},
+                                          'https-backup': {'uplink': 3, 'downlink': 4}}}}
+            def fetch(url, authenticated=False):
+                return stats if url == app.METRICS_URL else {}
+            with patch.object(app, 'kube', return_value={}), patch.object(app, 'get_json', side_effect=fetch), patch.object(app, 'online_stats', return_value={'clients': 0}):
+                app.collect(store)
+            self.assertEqual(store.snapshot()['proxy']['upload_total'], 15)
+            self.assertEqual(store.snapshot()['proxy']['download_total'], 34)
+            self.assertEqual(store.snapshot()['proxy']['transports']['reality']['downlink'], 30)
+            store.db.close()
+
     def test_authentication_fails_closed(self):
         handler = app.Handler.__new__(app.Handler)
         handler.headers = {}

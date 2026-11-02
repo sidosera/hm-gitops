@@ -148,7 +148,7 @@ The dashboard is a small Python service using the existing metrics-server and re
 
 SQLite history uses a 1 GiB local-path claim, with a seven-day retention window. The claim survives dashboard restarts but shares the VPS disk; losing the VPS loses its history. Memory-intensive history requests are avoided by reading at most about 240 time-bucket samples. The main container is non-root, drops all capabilities, uses a read-only root filesystem, and has a 96 MiB memory limit.
 
-To keep source addresses useful, the edge Service uses local external traffic handling, REALITY receives PROXY protocol v2 from Traefik, and forwarded HTTP headers are trusted only from Cloudflare's published address ranges. Update those trusted ranges if Cloudflare changes them. Do not expose the unauthenticated native Xray stats ports through an ingress or public NodePort.
+To keep source addresses useful, the edge Service uses local external traffic handling, a parallel REALITY listener was tested with PROXY protocol v2, and forwarded HTTP headers are trusted only from Cloudflare's published address ranges. Switching the existing REALITY route to source-address forwarding requires separate approval; until then its client count is a lower-bound estimate. Update those trusted ranges if Cloudflare changes them. Do not expose the unauthenticated native Xray stats ports through an ingress or public NodePort.
 
 Tests:
 

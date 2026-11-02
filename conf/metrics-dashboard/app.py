@@ -80,7 +80,8 @@ def online_stats():
         all_ips.update(addresses)
         per_profile[user.get('email', 'unknown')] = len(addresses)
     return {'clients': len(all_ips), 'profiles': per_profile,
-            'active_profiles': sum(count > 0 for count in per_profile.values())}
+            'active_profiles': sum(count > 0 for count in per_profile.values()),
+            'source_preserved': os.getenv('PRIMARY_SOURCE_PRESERVED', 'false') == 'true'}
 
 
 def delta_rate(value, old_value, seconds):
@@ -205,12 +206,15 @@ def collect(store):
     xray = values.get('xray')
     if xray is not None:
         inbounds = xray.get('stats', {}).get('inbound', {})
-        result['proxy']['transports'] = {name: inbounds.get(name, {'uplink': 0, 'downlink': 0})
-                                         for name in ('reality', 'https-backup')}
+        primary = {direction: sum(int(inbounds.get(name, {}).get(direction, 0))
+                                   for name in ('reality', 'reality-legacy'))
+                   for direction in ('uplink', 'downlink')}
+        result['proxy']['transports'] = {'reality': primary,
+                                        'https-backup': inbounds.get('https-backup', {'uplink': 0, 'downlink': 0})}
         raw['proxy_upload'] = sum(int(value.get('uplink', 0)) for name, value in inbounds.items()
-                                  if name in ('reality', 'https-backup'))
+                                  if name in ('reality', 'reality-legacy', 'https-backup'))
         raw['proxy_download'] = sum(int(value.get('downlink', 0)) for name, value in inbounds.items()
-                                    if name in ('reality', 'https-backup'))
+                                    if name in ('reality', 'reality-legacy', 'https-backup'))
         result['proxy']['upload_total'] = raw['proxy_upload']
         result['proxy']['download_total'] = raw['proxy_download']
     pod_usage = {pod['metadata']['name']: pod for pod in values.get('pod_usage', {}).get('items', [])}
