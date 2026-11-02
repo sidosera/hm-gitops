@@ -1533,7 +1533,6 @@
             }
           ],
           "min": 0,
-          "max": 100,
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "linear",
@@ -1554,7 +1553,8 @@
             },
             "thresholdsStyle": {
               "mode": "off"
-            }
+            },
+            "axisSoftMax": 10
           }
         },
         "overrides": []
@@ -1956,7 +1956,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "cores",
-          "decimals": 1,
+          "decimals": 3,
           "noValue": "UNKNOWN",
           "color": {
             "mode": "palette-classic"
@@ -2242,8 +2242,10 @@
             },
             "thresholdsStyle": {
               "mode": "dashed"
-            }
-          }
+            },
+            "axisSoftMax": 3
+          },
+          "min": 0
         },
         "overrides": []
       },
