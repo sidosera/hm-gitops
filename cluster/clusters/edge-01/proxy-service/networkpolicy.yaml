@@ -28,6 +28,12 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: metrics-dashboard
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: xray-exporter
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: node-exporter
       ports:
         - protocol: TCP
           port: 10085

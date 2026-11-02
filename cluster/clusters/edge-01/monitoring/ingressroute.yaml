@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grafana
+  namespace: hm
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`www.hackamonth.io`) && (Path(`/grafana`) || PathPrefix(`/grafana/`))
+      priority: 210
+      services:
+        - name: grafana
+          port: 3000
+  tls:
+    certResolver: le

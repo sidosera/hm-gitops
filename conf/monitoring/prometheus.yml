@@ -1,0 +1,48 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  scrape_timeout: 8s
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+    metric_relabel_configs:
+      - source_labels:
+          - __name__
+        regex: prometheus_tsdb_head_series|prometheus_tsdb_storage_blocks_bytes|process_resident_memory_bytes
+        action: keep
+  - job_name: node
+    static_configs:
+      - targets:
+          - 87.106.74.217:9100
+        labels:
+          node: machine
+    sample_limit: 1500
+  - job_name: kubelet
+    scheme: https
+    metrics_path: /metrics/resource
+    authorization:
+      credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    static_configs:
+      - targets:
+          - 87.106.74.217:10250
+    metric_relabel_configs:
+      - source_labels:
+          - __name__
+        regex: node_cpu_usage_seconds_total|node_memory_working_set_bytes|container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_start_time_seconds|pod_cpu_usage_seconds_total|pod_memory_working_set_bytes
+        action: keep
+    sample_limit: 2000
+  - job_name: kube-state-metrics
+    static_configs:
+      - targets:
+          - kube-state-metrics.hm.svc.cluster.local:8080
+    sample_limit: 1500
+  - job_name: xray
+    metrics_path: /scrape
+    static_configs:
+      - targets:
+          - xray-exporter.hm.svc.cluster.local:9550
+    sample_limit: 500

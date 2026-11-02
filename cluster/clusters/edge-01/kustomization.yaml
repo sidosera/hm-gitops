@@ -6,3 +6,4 @@ resources:
   - www-service
   - proxy-service
   - metrics-dashboard
+  - monitoring

@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - grafana-auth-secret.sops.yaml
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus.yml
+  - name: grafana-datasources
+    files:
+      - datasources.yaml
+  - name: grafana-providers
+    files:
+      - dashboards.yaml
+  - name: grafana-dashboards
+    files:
+      - overview.json
+  - name: online-client-code
+    files:
+      - online_clients.py
