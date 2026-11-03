@@ -17,7 +17,6 @@
         ufw allow from {{ peer }} to any port 51820 proto udp >/dev/null
         ufw allow from {{ peer }} to any port 51821 proto udp >/dev/null
         ufw allow from {{ peer }} to any port 9100 proto tcp >/dev/null
-        ufw allow from {{ peer }} to any port 9115 proto tcp >/dev/null
         ufw allow from {{ peer }} to any port 10250 proto tcp >/dev/null
         {% endfor %}
         {% for peer in hm_cluster_peer_ipv6 | default([]) if peer != hm_node_ipv6 %}

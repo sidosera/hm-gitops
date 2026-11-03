@@ -567,7 +567,7 @@
     {
       "id": 10,
       "type": "row",
-      "title": "Details \u00b7 transport diagnostics",
+      "title": "Details \u00b7 traffic and connectivity",
       "collapsed": true,
       "gridPos": {
         "x": 0,
@@ -576,77 +576,6 @@
         "h": 1
       },
       "panels": [
-        {
-          "id": 20,
-          "title": "Transport diagnostics",
-          "type": "state-timeline",
-          "gridPos": {
-            "x": 0,
-            "y": 17,
-            "w": 24,
-            "h": 6
-          },
-          "description": "Authenticated synthetic checks, labelled by observer, destination and path. These datacenter checks do not prove connectivity from every client ISP.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "expr": "probe_success{cluster=~\"${cluster:regex}\",service=\"gateway\",source_zone!=\"\",target_zone!=\"\",source_zone=~\"${source_zone:regex}\"} and on(instance,check) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",source_zone!=\"\",target_zone!=\"\",source_zone=~\"${source_zone:regex}\"} == 1)",
-              "legendFormat": "{{source_zone}} \u2192 {{target_zone}} / {{check}}",
-              "editorMode": "code",
-              "instant": false,
-              "range": true,
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              }
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "decimals": 1,
-              "noValue": "N/A",
-              "color": {
-                "mode": "palette-classic"
-              },
-              "mappings": [
-                {
-                  "type": "value",
-                  "options": {
-                    "0": {
-                      "text": "Failed",
-                      "color": "red"
-                    },
-                    "1": {
-                      "text": "Passed",
-                      "color": "green"
-                    }
-                  }
-                }
-              ]
-            },
-            "overrides": []
-          },
-          "maxDataPoints": 600,
-          "interval": "30s",
-          "options": {
-            "showValue": "auto",
-            "alignValue": "left",
-            "mergeValues": true,
-            "rowHeight": 0.8,
-            "legend": {
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          }
-        },
         {
           "id": 21,
           "title": "Transport traffic by measurement zone",

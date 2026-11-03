@@ -9,15 +9,6 @@ spec:
       port: 14443
   - from:
     - ipBlock:
-        cidr: 87.106.74.217/32
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: prometheus
-    ports:
-    - protocol: TCP
-      port: 9115
-  - from:
-    - ipBlock:
         cidr: 212.116.115.29/32
     - podSelector:
         matchLabels:

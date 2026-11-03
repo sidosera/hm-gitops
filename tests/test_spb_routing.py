@@ -40,9 +40,9 @@ class RoutingSafetyTests(unittest.TestCase):
         self.assertEqual(self.config['routing']['rules'][-1]['balancerTag'], 'uk-egress')
         self.assertEqual(self.config['routing']['rules'][-1]['network'], 'tcp,udp')
 
-    def test_diagnostic_socks_are_loopback_and_stats_pod_bound(self):
+    def test_only_stats_inbound_remains_in_public_config(self):
         inbounds = self.config['inbounds']
-        self.assertTrue(all(x['listen'] == '127.0.0.1' for x in inbounds if x['protocol'] == 'socks'))
+        self.assertEqual([x['tag'] for x in inbounds], ['api-in'])
         self.assertEqual([x['tag'] for x in inbounds if x['listen'] != '127.0.0.1'], ['api-in'])
         self.assertEqual(self.config['api']['services'], ['StatsService'])
 

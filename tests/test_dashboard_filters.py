@@ -54,12 +54,10 @@ class DashboardFilterTests(unittest.TestCase):
         by_id = {p['id']: p for p in panels(vpn['panels'])}
         for target in by_id[3]['targets']:
             self.assertIn('${entry_zone:regex}', target['expr'])
-        path = by_id[20]['targets'][0]['expr']
-        self.assertIn('${source_zone:regex}', path)
-        self.assertNotIn('${target_zone:regex}', path)
-        self.assertNotIn('${entry_zone:regex}', path)
-        self.assertIn('source_zone!=""', path)
-        self.assertIn('target_zone!=""', path)
+        self.assertNotIn(20, by_id)  # Retired Blackbox transport diagnostics.
+        for target in by_id[30]['targets']:
+            self.assertIn('${source_zone:regex}', target['expr'])
+            self.assertNotIn('${entry_zone:regex}', target['expr'])
         for target in by_id[21]['targets']:
             self.assertIn('by(cluster,zone,target)', target['expr'])
             self.assertNotIn('${entry_zone:regex}', target['expr'])

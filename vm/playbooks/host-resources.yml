@@ -1,0 +1,27 @@
+---
+# Apply the shared resource policy without reinstalling packages or restarting K3s.
+- name: Register cluster inventory
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Set inventory action
+      ansible.builtin.set_fact:
+        hm_action: deploy
+    - name: Load controller inventory
+      ansible.builtin.include_tasks: ../tasks/controller_inventory.yml
+
+- name: Apply resource policy to every cluster host
+  hosts: vm
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../roles/vm/defaults/main.yml
+  tasks:
+    - name: Apply shared low-memory host settings
+      ansible.builtin.include_tasks: ../roles/vm/tasks/low-memory.yml
+    - name: Remove retired Blackbox peer firewall rule
+      ansible.builtin.command:
+        argv: [ufw, --force, delete, allow, from, '{{ item }}', to, any, port, '9115', proto, tcp]
+      loop: '{{ hm_cluster_peers | difference([ansible_host]) }}'
+      register: hm_retired_blackbox_rule
+      changed_when: "'Rule deleted' in hm_retired_blackbox_rule.stdout"

@@ -1,42 +1,15 @@
 groups:
-- name: gateway-connectivity
+- name: host-telemetry
   interval: 30s
   rules:
-  - alert: GatewayTransportUnavailable
-    expr: (probe_success{job="gateway-transport-probes",check=~"primary|backup|split-default"}
-      == 0) and on(instance) (probe_success{job="gateway-transport-probes",check="internet"}
-      == 1)
+  - alert: NodeTelemetryUnavailable
+    expr: up{job="node-exporter"} == 0
     for: 3m
     labels:
       severity: warning
-      service: gateway
     annotations:
-      summary: Gateway in {{ $labels.source_zone }} {{ $labels.check }} path cannot
-        reach the expected upstream exit
-      description: Direct internet control succeeds but this authenticated path fails.
-        Check the transport and compare backup. This is a datacenter vantage point,
-        not a residential ISP.
-  - alert: GatewayTelemetryUnavailable
-    expr: up{job=~"node-exporter|gateway-blackbox|gateway-transport-probes"} == 0
-    for: 3m
-    labels:
-      severity: warning
-      service: gateway
-    annotations:
-      summary: Gateway in {{ $labels.source_zone }} telemetry unavailable
-      description: Monitoring cannot reach an mTLS endpoint; VPN blocking is not established.
-        Check the source host, certificates, source-IP firewall rules and network
-        path.
-  - alert: GatewayInternetUnavailable
-    expr: probe_success{job="gateway-transport-probes",check="internet"} == 0
-    for: 3m
-    labels:
-      severity: warning
-      service: gateway
-    annotations:
-      summary: Gateway in {{ $labels.source_zone }} direct-internet control failed
-      description: Do not diagnose this as a VPN transport block; check the source
-        network and the control target.
+      summary: 'Node telemetry unavailable in {{ $labels.zone }}'
+      description: Host metrics are unavailable. Check the node, mTLS and private monitoring path.
 - name: vpn-end-to-end
   interval: 30s
   rules:
@@ -49,7 +22,7 @@ groups:
       summary: '{{ $labels.site }} failed through {{ $labels.target_zone }} Gateway
         from {{ $labels.source_zone }}'
       description: The VPN client could not fetch the expected HTTPS page. Compare
-        the direct baseline for the same site, exit-IP check and transport diagnostics.
+        the direct baseline for the same site, exit-IP check and gateway traffic.
         A destination can also reject VPN egress.
   - alert: VPNProbeUnavailable
     expr: up{job="vpn-client-probes"} == 0

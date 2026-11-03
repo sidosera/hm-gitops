@@ -28,3 +28,35 @@
     - fail2ban.service
   failed_when: false
   when: not (hm_machine_profile.auto_fail2ban | default(true) | bool)
+
+- name: Create background package maintenance drop-in directories
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.service.d"
+    state: directory
+    mode: '0755'
+  loop:
+    - apt-daily
+    - apt-daily-upgrade
+
+- name: Keep package maintenance below serving traffic priority
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item }}.service.d/20-hm-resources.conf"
+    mode: '0644'
+    content: |
+      [Service]
+      CPUWeight=10
+      CPUQuota=25%
+      IOWeight=10
+      Nice=19
+      IOSchedulingClass=idle
+      # Soft reclaim/throttling only: no hard limit that could kill dpkg.
+      MemoryHigh=128M
+  loop:
+    - apt-daily
+    - apt-daily-upgrade
+  register: hm_package_maintenance_qos
+
+- name: Reload package maintenance resource policy
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: hm_package_maintenance_qos.changed
