@@ -1990,7 +1990,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * avg by (node,mode) (rate(node_cpu_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mode!=\"idle\"}[$__rate_interval]))",
+          "expr": "100 * avg by (region,node,mode) (rate(node_cpu_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mode!=\"idle\"}[$__rate_interval]))",
           "legendFormat": "{{region}} / {{node}} \u00b7 {{mode}}",
           "editorMode": "code",
           "instant": false,
@@ -2464,7 +2464,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (node,device) (rate(node_network_receive_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
+          "expr": "sum by (region,node,device) (rate(node_network_receive_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
           "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} receive",
           "editorMode": "code",
           "instant": false,
@@ -2476,7 +2476,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum by (node,device) (rate(node_network_transmit_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
+          "expr": "sum by (region,node,device) (rate(node_network_transmit_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
           "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} send",
           "editorMode": "code",
           "instant": false,
@@ -3371,7 +3371,7 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by(node,device) (rate(node_network_receive_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
+              "expr": "sum by(region,node,device) (rate(node_network_receive_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
               "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} errors",
               "editorMode": "code",
               "instant": false,
@@ -3383,7 +3383,7 @@
             },
             {
               "refId": "B",
-              "expr": "sum by(node,device) (rate(node_network_receive_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
+              "expr": "sum by(region,node,device) (rate(node_network_receive_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
               "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} drops",
               "editorMode": "code",
               "instant": false,
