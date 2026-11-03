@@ -7,3 +7,5 @@ resources:
   - ../../../services/gateway/overlays/uk
   - monitoring
   - ../../../services/gateway/overlays/spb
+  - ../../../services/vpn-probe/overlays/uk
+  - ../../../services/vpn-probe/overlays/spb

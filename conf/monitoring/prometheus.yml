@@ -175,6 +175,184 @@ scrape_configs:
   - target_label: __address__
     replacement: 212.116.115.29:9115
   sample_limit: 100
+- job_name: vpn-client-probes
+  scheme: http
+  metrics_path: /probe
+  scrape_interval: 60s
+  scrape_timeout: 25s
+  static_configs:
+  - targets:
+    - https://myanimelist.net/
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: spb
+      source_region: spb
+      target_region: uk
+      probe_scope: public-client
+      check: client-web
+      site: myanimelist
+      module: website_myanimelist
+      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://youtube.com/
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: spb
+      source_region: spb
+      target_region: uk
+      probe_scope: public-client
+      check: client-web
+      site: youtube
+      module: website_youtube
+      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://facebook.com/
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: spb
+      source_region: spb
+      target_region: uk
+      probe_scope: public-client
+      check: client-web
+      site: facebook
+      module: website_facebook
+      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://instagram.com/
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: spb
+      source_region: spb
+      target_region: uk
+      probe_scope: public-client
+      check: client-web
+      site: instagram
+      module: website_instagram
+      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://x.com/
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: spb
+      source_region: spb
+      target_region: uk
+      probe_scope: public-client
+      check: client-web
+      site: x
+      module: website_x
+      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://api.ipify.org
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: spb
+      source_region: spb
+      target_region: uk
+      probe_scope: public-client
+      check: client-exit
+      site: exit
+      module: exit
+      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://myanimelist.net/
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: uk
+      source_region: uk
+      target_region: spb
+      probe_scope: public-client
+      check: client-web
+      site: myanimelist
+      module: website_myanimelist
+      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://youtube.com/
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: uk
+      source_region: uk
+      target_region: spb
+      probe_scope: public-client
+      check: client-web
+      site: youtube
+      module: website_youtube
+      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://facebook.com/
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: uk
+      source_region: uk
+      target_region: spb
+      probe_scope: public-client
+      check: client-web
+      site: facebook
+      module: website_facebook
+      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://instagram.com/
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: uk
+      source_region: uk
+      target_region: spb
+      probe_scope: public-client
+      check: client-web
+      site: instagram
+      module: website_instagram
+      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://x.com/
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: uk
+      source_region: uk
+      target_region: spb
+      probe_scope: public-client
+      check: client-web
+      site: x
+      module: website_x
+      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+  - targets:
+    - https://api.ipify.org
+    labels:
+      service: vpn-probe
+      target_service: gateway
+      region: uk
+      source_region: uk
+      target_region: spb
+      probe_scope: public-client
+      check: client-exit
+      site: exit
+      module: exit
+      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+  relabel_configs:
+  - source_labels:
+    - __address__
+    target_label: __param_target
+  - source_labels:
+    - module
+    target_label: __param_module
+  - source_labels:
+    - __param_target
+    target_label: instance
+  - source_labels:
+    - exporter
+    target_label: __address__
+  - action: labeldrop
+    regex: exporter
+  sample_limit: 100
 rule_files:
 - /etc/prometheus/spb-rules.yml
 - /etc/prometheus/service-rules.yml

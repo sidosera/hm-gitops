@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpn-probe
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vpn-probe
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vpn-probe
+        hm.gitops/service: vpn-probe
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: client
+        image: ghcr.io/xtls/xray-core:26.10.31@sha256:ceabeac03a89d991d2a247361825c1d1d2e9c91cd5dc010f298c7dc0c2f325c9
+        args:
+        - run
+        - -c
+        - /etc/xray/config.json
+        env:
+        - name: GOMEMLIMIT
+          value: 24MiB
+        securityContext: &id001
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 5m
+            memory: 12Mi
+          limits:
+            memory: 40Mi
+        volumeMounts:
+        - name: client-config
+          mountPath: /etc/xray
+          readOnly: true
+        readinessProbe:
+          tcpSocket:
+            port: 10800
+          periodSeconds: 10
+      - name: blackbox
+        image: quay.io/prometheus/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13
+        args:
+        - --config.file=/etc/blackbox/blackbox.yml
+        - --web.listen-address=:9115
+        env:
+        - name: GOMEMLIMIT
+          value: 24MiB
+        ports:
+        - name: http
+          containerPort: 9115
+        securityContext: *id001
+        resources:
+          requests:
+            cpu: 5m
+            memory: 12Mi
+          limits:
+            memory: 40Mi
+        volumeMounts:
+        - name: checks
+          mountPath: /etc/blackbox
+          readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /-/healthy
+            port: http
+          periodSeconds: 10
+      volumes:
+      - name: client-config
+        secret:
+          secretName: vpn-probe-client
+          defaultMode: 292
+      - name: checks
+        configMap:
+          name: vpn-probe-checks
+      tolerations:
+      - key: hm.gitops/edge
+        operator: Exists
+        effect: NoSchedule

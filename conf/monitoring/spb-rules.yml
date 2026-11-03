@@ -38,3 +38,25 @@ groups:
       summary: Gateway in {{ $labels.region }} direct-internet control failed
       description: Do not diagnose this as a VPN transport block; check the SPB network
         and the control target.
+- name: vpn-end-to-end
+  interval: 30s
+  rules:
+  - alert: VPNWebsiteAccessFailed
+    expr: probe_success{probe_scope="public-client",check="client-web"} == 0
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      summary: '{{ $labels.site }} failed through {{ $labels.target_region }} Gateway
+        from {{ $labels.source_region }}'
+      description: A real client using the public VPN listener could not fetch the
+        expected HTTPS page. Inspect HTTP status, matching client-exit check and transport
+        diagnostics; the destination may also reject VPN traffic.
+  - alert: VPNProbeUnavailable
+    expr: up{job="vpn-client-probes"} == 0
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      summary: VPN Probe in {{ $labels.source_region }} unavailable
+      description: Probe telemetry is unavailable; website connectivity is unknown.

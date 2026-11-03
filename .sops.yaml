@@ -5,6 +5,9 @@ creation_rules:
   - path_regex: conf/.*/.*secret.*\.sops\.ya?ml$
     encrypted_regex: ^(data|stringData)$
     age: age1xpd0gspqq4d2neww2gwerv8p7mt2v7lyuazk5mmz2677my9rp93qd76ves
+  - path_regex: services/vpn-probe/overlays/[^/]+/.*secret.*\.sops\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1xpd0gspqq4d2neww2gwerv8p7mt2v7lyuazk5mmz2677my9rp93qd76ves
   - path_regex: services/gateway/overlays/[^/]+/.*secret.*\.sops\.ya?ml$
     encrypted_regex: ^(data|stringData)$
     age: age1xpd0gspqq4d2neww2gwerv8p7mt2v7lyuazk5mmz2677my9rp93qd76ves

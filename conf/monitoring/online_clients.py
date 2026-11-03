@@ -20,7 +20,7 @@ def collect():
     profiles = {}
     for user in json.loads(response.stdout).get('users', []):
         # Relay/probe sessions are infrastructure, not end-user clients.
-        if user.get('email') == 'spb-relay@local':
+        if user.get('email') in {'spb-relay@local', 'probe-e2e@local'}:
             continue
         addresses = set()
         for item in user.get('ips', []):
