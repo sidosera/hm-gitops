@@ -101,6 +101,18 @@ Verify with `sudo k3s secrets-encrypt status`; expect `Enabled`, `reencrypt_fini
 
 Encrypted recovery archives live under `/var/backups/hm-k3s`, mode 0600 in a root-only directory. Backups are produced through tmpfs and an age pipe so no plaintext archive is written to disk. Keep the private age identity separately, and copy encrypted backups off the server. A backup contains `server/db/state.db`, `server/token`, `config.yaml`, and, once enabled, `server/cred/encryption-config.json`. Restore them together while K3s is stopped, preserving ownership/permissions; the server token and matching encryption configuration are essential. The pre-migration archive restores the pre-encryption state. The encrypted archive requires its matching encryption configuration. Git can rebuild application desired state, but is not a backup of monitoring volumes or Kubernetes runtime state.
 
+An emergency copy of the existing Flux age identity is committed as `conf/bootstrap/flux-age-identity.age`, encrypted with age to the existing administrative `hm-gitops` SSH public key. Its SSH fingerprint is `SHA256:OqrF/Zavic+jHraIVs8za8nOIxixdw5pt1CqgzWVlJs`. Recovery decryption with the matching local private key was verified without writing the plaintext identity to disk. This recovery artifact is not applied as a workload manifest. Keep that SSH private key backed up separately; a repository clone alone cannot decrypt the identity or application Secrets.
+
+To restore the Flux identity into a **new** private file, install age and run:
+
+```bash
+umask 077
+(set -C; age --decrypt --identity ~/.ssh/hm-gitops \
+  conf/bootstrap/flux-age-identity.age > /secure/path/flux-age.agekey)
+```
+
+Use that file with `HM_FLUX_AGE_KEY_FILE` during Flux bootstrap. After a complete server loss, a fresh K3s datastore can use a new storage encryption key while Flux restores the same application UUIDs from Git using the recovered age identity. Restoring an old SQLite snapshot instead requires its matching K3s storage encryption key and server token.
+
 The K3s encryption key is stored root-only in `/var/lib/rancher/k3s/server/cred/encryption-config.json`. It protects a copied datastore; it does not protect against an attacker with root access to the running control-plane host. SOPS age private keys and K3s bootstrap keys are recovery roots, not application credentials, and must never be committed in plaintext.
 
 ## Current Cluster

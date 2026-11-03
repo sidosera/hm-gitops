@@ -167,7 +167,7 @@ def finish_sqlite_history():
             file.write('pending')
     if not marker.exists():
         return False
-    until = time.monotonic() + 900
+    until = time.monotonic() + 1800
     print('Waiting for native Kine compaction of pre-encryption history', flush=True)
     while count:
         if time.monotonic() >= until:
