@@ -9,7 +9,7 @@
         {% for port in hm_machine_profile.firewall_allowed_tcp | default([]) %}
         {% if port | int == 22 %}
         ufw limit 22/tcp >/dev/null
-        {% elif not (hm_is_agent | default(false) | bool) or port | int == 443 %}
+        {% elif port | int != 6443 and (not (hm_is_agent | default(false) | bool) or port | int == 443) %}
         ufw allow {{ port }}/tcp >/dev/null
         {% endif %}
         {% endfor %}
@@ -27,6 +27,9 @@
         ufw default allow outgoing >/dev/null
         ufw --force enable >/dev/null
       changed_when: false
+
+- name: Restrict Kubernetes API to cluster traffic
+  ansible.builtin.include_tasks: api-firewall.yml
 
 - name: Install and enable fail2ban
   when: (hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban)) | bool

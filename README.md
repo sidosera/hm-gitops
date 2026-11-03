@@ -42,6 +42,19 @@ The provisioning contract is:
 
 To add a new VM to a cluster, append its IPv4 to `cluster/clusters/<cluster>/hosts.yml` and run the `Cluster Converge` workflow for that cluster.
 
+Kubernetes API TCP 6443 is not a public port. Ansible permits it on server nodes only from inventory node addresses and the pod CIDRs on CNI/WireGuard interfaces. Worker nodes do not expose an API listener. Public TCP defaults are SSH 22, HTTP 80 (server only) and HTTPS/VPN 443. The API port is excluded even if an old public-port profile still lists it.
+
+Apply only this API firewall policy to existing hosts without resetting UFW or restarting K3s:
+
+```bash
+ANSIBLE_CONFIG=vm/ansible.cfg ansible-playbook -i vm/inventory/localhost.yml \
+  vm/playbooks/api-firewall.yml \
+  -e vm_hosts_file="$PWD/cluster/clusters/hm-cluster/hosts.yml" \
+  --private-key ~/.ssh/hm-gitops
+```
+
+For administration, run kubectl over SSH on the control-plane host, or forward `127.0.0.1:16443` to its `127.0.0.1:6443`. A local kubeconfig using that tunnel must retain CA verification and set `tls-server-name` to the inventory control-plane IP. The Flux Bootstrap workflow uses this tunnel with the shared deploy key and host keys pinned in `vm/ssh_known_hosts`; it does not require public API access. Verify and update pinned SSH host keys when replacing a control-plane machine. Adding a node requires applying the updated inventory firewall policy on existing servers before the node joins.
+
 ## GitOps
 
 Bootstrap Flux once:

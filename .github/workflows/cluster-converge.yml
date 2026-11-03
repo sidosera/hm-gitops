@@ -13,7 +13,7 @@ on:
       cluster_name:
         description: Cluster name under cluster/clusters/
         required: true
-        default: edge-01
+        default: hm-cluster
 
 concurrency:
   group: cluster-converge

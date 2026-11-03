@@ -23,3 +23,12 @@ hm_auto_ssh_harden: true
 
 # Teardown: set true to run k3s-uninstall.sh (destructive).
 hm_teardown_uninstall_k3s: false
+
+# Match the shared K3s pod networks and wireguard-native CNI devices.
+hm_api_pod_cidrs:
+  - 10.42.0.0/16
+  - fd00:42::/48
+hm_api_pod_interfaces:
+  - cni0
+  - flannel-wg
+  - flannel-wg-v6

@@ -1,0 +1,29 @@
+---
+# Add scoped access before removing old public rules; do not reset the firewall
+# or restart K3s when applying this task to an existing cluster.
+- name: Restrict API access without interrupting cluster peers
+  when: (hm_machine_profile.auto_firewall | default(hm_auto_firewall)) | bool
+  ansible.builtin.shell: |
+    set -e
+    {% if not (hm_is_agent | default(false) | bool) %}
+    {% for peer in hm_cluster_peers | default([]) %}
+    ufw allow from {{ peer | quote }} to any port 6443 proto tcp
+    {% endfor %}
+    {% for peer in hm_cluster_peer_ipv6 | default([]) if peer | length > 0 %}
+    ufw allow from {{ peer | quote }} to any port 6443 proto tcp
+    {% endfor %}
+    {% for interface in hm_api_pod_interfaces %}
+    {% for cidr in hm_api_pod_cidrs %}
+    ufw allow in on {{ interface | quote }} from {{ cidr | quote }} to any port 6443 proto tcp
+    {% endfor %}
+    {% endfor %}
+    {% endif %}
+    ufw --force delete allow 6443/tcp
+    ufw --force delete allow 6443
+  environment:
+    LC_ALL: C
+  register: hm_api_firewall_result
+  changed_when: >-
+    'Rule added' in hm_api_firewall_result.stdout or
+    'Rules updated' in hm_api_firewall_result.stdout or
+    'Rule deleted' in hm_api_firewall_result.stdout

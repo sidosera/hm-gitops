@@ -1,5 +1,6 @@
 # Bootstrap or refresh Flux in the target cluster.
 # Repository secrets:
+#   GITOPS_DEPLOY_KEY / GITOPS_DEPLOY_KEY_B64  shared cluster SSH identity
 #   GITOPS_KUBECONFIG_B64     base64 kubeconfig for the target cluster
 #   GITOPS_FLUX_AGE_KEY       multiline age private key for SOPS decryption
 #   GITOPS_FLUX_AGE_KEY_B64   optional base64 of that key (useful for `act`)
@@ -38,6 +39,48 @@ jobs:
           echo "$GITOPS_KUBECONFIG_B64" | base64 -d > kubeconfig
           chmod 600 kubeconfig
 
+      - name: Open authenticated SSH tunnel to the private Kubernetes API
+        env:
+          GITOPS_DEPLOY_KEY: ${{ secrets.GITOPS_DEPLOY_KEY }}
+          GITOPS_DEPLOY_KEY_B64: ${{ secrets.GITOPS_DEPLOY_KEY_B64 }}
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          python3 -m pip install PyYAML
+          install -d -m 700 ~/.ssh
+          if [ -n "$GITOPS_DEPLOY_KEY_B64" ]; then
+            printf '%s' "$GITOPS_DEPLOY_KEY_B64" | base64 -d > ~/.ssh/gitops
+          elif [ -n "$GITOPS_DEPLOY_KEY" ]; then
+            printf '%s\n' "$GITOPS_DEPLOY_KEY" > ~/.ssh/gitops
+          else
+            echo 'Set GITOPS_DEPLOY_KEY or GITOPS_DEPLOY_KEY_B64' >&2
+            exit 1
+          fi
+          chmod 600 ~/.ssh/gitops
+          cp vm/ssh_known_hosts ~/.ssh/known_hosts
+          python3 - <<'PYCODE'
+          import ipaddress, os, re, yaml
+          inventory = yaml.safe_load(open('cluster/clusters/hm-cluster/hosts.yml'))
+          defaults = yaml.safe_load(open('vm/group_vars/all.yml'))
+          host = str(ipaddress.IPv4Address(inventory['vm_hosts'][0]))
+          user = inventory.get('vm_node_settings', {}).get(host, {}).get('user', defaults['ansible_user'])
+          if not re.fullmatch(r'[a-z_][a-z0-9_-]*', user):
+              raise SystemExit('Invalid inventory SSH user')
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f'GITOPS_API_HOST={host}\nGITOPS_SSH_TARGET={user}@{host}\n')
+          PYCODE
+
+      - name: Connect to Kubernetes through SSH
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          ssh -i ~/.ssh/gitops -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ExitOnForwardFailure=yes -M -S "$RUNNER_TEMP/hm-api-ssh" -fN \
+            -L 127.0.0.1:16443:127.0.0.1:6443 "$GITOPS_SSH_TARGET"
+          cluster=$(kubectl config view --minify -o jsonpath='{.contexts[0].context.cluster}')
+          kubectl config set-cluster "$cluster" --server=https://127.0.0.1:16443 \
+            --tls-server-name="$GITOPS_API_HOST"
+          kubectl get --raw=/readyz
+
       - name: Write SOPS age private key from secret
         env:
           GITOPS_FLUX_AGE_KEY: ${{ secrets.GITOPS_FLUX_AGE_KEY }}
@@ -59,4 +102,12 @@ jobs:
           HM_FLUX_AGE_KEY_FILE: ${{ github.workspace }}/flux-age.agekey
         run: |
           chmod +x scripts/flux-bootstrap.sh
-          ./scripts/flux-bootstrap.sh edge-01
+          ./scripts/flux-bootstrap.sh hm-cluster
+
+      - name: Remove bootstrap credentials and close tunnel
+        if: always()
+        run: |
+          if [ -S "$RUNNER_TEMP/hm-api-ssh" ]; then
+            ssh -S "$RUNNER_TEMP/hm-api-ssh" -O exit "$GITOPS_SSH_TARGET" || true
+          fi
+          rm -f kubeconfig flux-age.agekey ~/.ssh/gitops
