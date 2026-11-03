@@ -9,7 +9,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -164,7 +164,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Xray traffic and client activity. **Upload** goes toward destinations; **download** returns to clients. Zones show separate measurements of traffic that may cross both. [Website reachability \u2192](/status/d/hm-vpn/vpn-operations)"
+        "content": "Xray traffic includes probes; connected-IP estimates exclude them. Each zone is a separate measurement point."
       }
     },
     {
@@ -295,7 +295,7 @@
         "w": 6,
         "h": 4
       },
-      "description": "Entry-side throughput per zone and selected listener. Missing telemetry stays No data. Zones are never summed as unique fleet traffic.",
+      "description": "Entry-side throughput per zone and selected listener. Missing telemetry stays No data. Zones are never summed as unique fleet traffic. Public-listener traffic includes authenticated VPN probes; the connected-IP estimate separately excludes infrastructure identities.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -303,7 +303,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum by(cluster,zone) (rate(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "expr": "(sum by(cluster,zone) ((rate(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval]) and on(job,instance) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1) and on(job,instance) ((time() - timestamp(up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"})) < 90)))) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
           "legendFormat": "{{zone}}",
           "editorMode": "code",
           "instant": true,
@@ -354,7 +354,7 @@
         "w": 6,
         "h": 4
       },
-      "description": "Entry-side throughput per zone and selected listener. Upload/download are Xray application bytes, not host-interface bytes.",
+      "description": "Entry-side throughput per zone and selected listener. Upload/download are Xray application bytes, not host-interface bytes. Public-listener traffic includes authenticated VPN probes; the connected-IP estimate separately excludes infrastructure identities.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -362,7 +362,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum by(cluster,zone) (rate(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "expr": "(sum by(cluster,zone) ((rate(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval]) and on(job,instance) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1) and on(job,instance) ((time() - timestamp(up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"})) < 90)))) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
           "legendFormat": "{{zone}}",
           "editorMode": "code",
           "instant": true,
@@ -413,7 +413,7 @@
         "w": 16,
         "h": 8
       },
-      "description": "Authenticated proxy listener traffic. Diagnostic SOCKS/API counters are excluded. Labels describe the gateway where bytes were measured, not where the metrics collector runs.",
+      "description": "Authenticated proxy listener traffic. Diagnostic SOCKS/API counters are excluded. Labels describe the gateway where bytes were measured, not where the metrics collector runs. Public-listener traffic includes authenticated VPN probes; the connected-IP estimate separately excludes infrastructure identities.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -421,7 +421,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum by(cluster,zone,target) (rate(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "expr": "(sum by(cluster,zone,target) ((rate(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval]) and on(job,instance) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1) and on(job,instance) ((time() - timestamp(up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"})) < 90)))) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
           "legendFormat": "{{zone}} / {{target}} \u00b7 upload",
           "editorMode": "code",
           "instant": false,
@@ -433,7 +433,7 @@
         },
         {
           "refId": "B",
-          "expr": "(sum by(cluster,zone,target) (rate(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "expr": "(sum by(cluster,zone,target) ((rate(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval]) and on(job,instance) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1) and on(job,instance) ((time() - timestamp(up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"})) < 90)))) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
           "legendFormat": "{{zone}} / {{target}} \u00b7 download",
           "editorMode": "code",
           "instant": false,
@@ -553,7 +553,7 @@
         "w": 12,
         "h": 8
       },
-      "description": "Counter increases per zone/listener, with counter resets handled. Range totals may include small Prometheus boundary extrapolation; not billing data. Forwarded traffic can occur in both zones and must not be summed as unique client volume. Less than two samples produces No data.",
+      "description": "Counter increases per zone/listener, with counter resets handled. Range totals may include small Prometheus boundary extrapolation; not billing data. Forwarded traffic can occur in both zones and must not be summed as unique client volume. Less than two samples produces No data. Public-listener traffic includes authenticated VPN probes; the connected-IP estimate separately excludes infrastructure identities.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -627,7 +627,7 @@
         "w": 12,
         "h": 8
       },
-      "description": "Actual egress path counters, for example local direct or upstream transports. These are bytes, not successful requests or errors. Listener filter does not apply: Xray does not provide listener-to-route attribution.",
+      "description": "Actual egress path counters, for example local direct or upstream transports. These are bytes, not successful requests or errors. Listener filter does not apply: Xray does not provide listener-to-route attribution. Public-listener traffic includes authenticated VPN probes; the connected-IP estimate separately excludes infrastructure identities.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -635,7 +635,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum by(cluster,zone,target) (rate(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"outbound\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "expr": "(sum by(cluster,zone,target) ((rate(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"outbound\"}[$__rate_interval]) and on(job,instance) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1) and on(job,instance) ((time() - timestamp(up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"})) < 90)))) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
           "legendFormat": "{{zone}} / {{target}} \u00b7 upload",
           "editorMode": "code",
           "instant": false,
@@ -647,7 +647,7 @@
         },
         {
           "refId": "B",
-          "expr": "(sum by(cluster,zone,target) (rate(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"outbound\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "expr": "(sum by(cluster,zone,target) ((rate(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"outbound\"}[$__rate_interval]) and on(job,instance) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1) and on(job,instance) ((time() - timestamp(up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"})) < 90)))) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
           "legendFormat": "{{zone}} / {{target}} \u00b7 download",
           "editorMode": "code",
           "instant": false,

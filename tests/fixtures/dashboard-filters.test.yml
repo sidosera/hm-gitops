@@ -150,3 +150,32 @@ tests:
     exp_samples:
     - labels: '{}'
       value: 1
+- interval: 30s
+  input_series:
+  - series: node_uname_info{cluster="test",zone="zone-a",node="node-a"}
+    values: 1+0x10
+  - series: kube_pod_info{namespace="hm",pod="current",node="node-a"}
+    values: 1+0x10
+  - series: kube_pod_info{namespace="hm",pod="retired",node="node-a"}
+    values: 1+0x4
+  - series: kube_pod_labels{namespace="hm",pod="current",label_hm_gitops_service="gateway"}
+    values: 1+0x10
+  - series: kube_pod_labels{namespace="hm",pod="retired",label_hm_gitops_service="gateway"}
+    values: 1+0x10
+  - series: kube_pod_status_phase{namespace="hm",pod="current",phase="Running"}
+    values: 1+0x10
+  - series: kube_pod_status_phase{namespace="hm",pod="retired",phase="Running"}
+    values: 1+0x10
+  - series: kube_pod_status_ready{namespace="hm",pod="current",condition="true"}
+    values: 1+0x10
+  - series: kube_pod_status_ready{namespace="hm",pod="retired",condition="true"}
+    values: 1+0x10
+  promql_expr_test:
+  - expr: sum(hm:service_instance:ready{service="gateway",zone="zone-a"})
+    eval_time: 5m
+    exp_samples:
+    - labels: '{}'
+      value: 1
+  - expr: hm:service_instance:info{pod="retired"}
+    eval_time: 5m
+    exp_samples: []
