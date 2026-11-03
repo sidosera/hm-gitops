@@ -8,7 +8,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -155,7 +155,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Entry region** scopes Gateway readiness and client estimates. **Probe source / destination** scope synthetic paths independently, including upstream dependencies. Transport counters are labelled by their measurement region; they are not end-to-end client totals."
+        "content": "**Entry region** scopes readiness and clients. **Probe source / destination** scope connectivity independently. Transport traffic in Details is labelled by measurement region."
       }
     },
     {
@@ -306,7 +306,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "probe_success{service=\"gateway\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\"} and on(instance,check) (up{service=\"gateway\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\"} == 1)",
+          "expr": "probe_success{service=\"gateway\",source_region!=\"\",target_region!=\"\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\"} and on(instance,check) (up{service=\"gateway\",source_region!=\"\",target_region!=\"\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\"} == 1)",
           "legendFormat": "{{source_region}} \u2192 {{target_region}} / {{check}}",
           "editorMode": "code",
           "instant": false,

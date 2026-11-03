@@ -57,6 +57,8 @@ class DashboardFilterTests(unittest.TestCase):
         self.assertIn('${source_region:regex}', path)
         self.assertIn('${target_region:regex}', path)
         self.assertNotIn('${entry_region:regex}', path)
+        self.assertIn('source_region!=""', path)
+        self.assertIn('target_region!=""', path)
         for target in by_id[21]['targets']:
             self.assertIn('by(region,target)', target['expr'])
             self.assertNotIn('${entry_region:regex}', target['expr'])
