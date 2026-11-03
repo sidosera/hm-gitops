@@ -1,4 +1,4 @@
-"""Regression boundaries for service/region selection and overview complexity."""
+"""Dashboard domain boundaries and fleet discovery contracts."""
 import json
 from pathlib import Path
 import unittest
@@ -12,42 +12,28 @@ def panels(items):
         yield from panels(panel.get('panels', []))
 
 
+def load(name):
+    return json.loads((ROOT / 'conf/monitoring' / name).read_text())
+
+
 class DashboardFilterTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.dashboard = json.loads((ROOT / 'conf/monitoring/overview.json').read_text())
+    def test_filters_discover_fleet_dimensions(self):
+        for name in ['overview.json', 'inventory.json', 'vpn.json']:
+            for variable in load(name)['templating']['list']:
+                self.assertEqual(variable['type'], 'query')
+                self.assertIn('label_values(', variable['query']['query'])
+                self.assertEqual(variable['allValue'], '.*')
 
-    def test_service_values_are_service_identities_not_pod_regexes(self):
-        variables = {v['name']: v for v in self.dashboard['templating']['list']}
-        self.assertEqual(set(variables), {'service_name', 'region'})
-        values = {v['value'] for v in variables['service_name']['options'] if v['value'] != '$__all'}
-        self.assertEqual(values, {'gateway', 'website', 'observability'})
-        self.assertEqual(variables['service_name']['current']['value'], 'gateway')
-
-    def test_every_query_respects_both_selectors(self):
-        for panel in panels(self.dashboard['panels']):
+    def test_generic_service_queries_are_consistently_scoped(self):
+        for panel in panels(load('overview.json')['panels']):
             for target in panel.get('targets', []):
-                with self.subTest(panel=panel['title'], target=target['refId']):
-                    self.assertIn('${service_name:regex}', target['expr'])
-                    self.assertIn('${region:regex}', target['expr'])
-                    self.assertNotIn('${service:raw}', target['expr'])
-                    self.assertNotIn('${node:', target['expr'])
-
-    def test_specialist_signals_are_collapsed(self):
-        visible = [p for p in self.dashboard['panels'] if p['type'] not in ['row', 'text']]
-        self.assertLessEqual(len(visible), 5)
-        details = [p for p in self.dashboard['panels'] if p['type'] == 'row']
-        self.assertTrue(details)
-        self.assertTrue(all(p['collapsed'] for p in details))
-
-    def test_services_exclude_physical_host_capacity(self):
-        for panel in panels(self.dashboard['panels']):
-            for target in panel.get('targets', []):
-                for metric in ['node_memory_', 'node_cpu_', 'node_filesystem_', 'node_network_']:
+                self.assertIn('${service_name:regex}', target['expr'])
+                self.assertIn('${region:regex}', target['expr'])
+                for metric in ['xray_', 'probe_', 'node_memory_', 'node_cpu_', 'node_filesystem_', 'node_network_']:
                     self.assertNotIn(metric, target['expr'])
 
     def test_inventory_is_independent_of_services(self):
-        inventory = json.loads((ROOT / 'conf/monitoring/inventory.json').read_text())
+        inventory = load('inventory.json')
         variables = {v['name']: v for v in inventory['templating']['list']}
         self.assertEqual(set(variables), {'region', 'node'})
         self.assertIn('${region:regex}', variables['node']['query']['query'])
@@ -56,12 +42,35 @@ class DashboardFilterTests(unittest.TestCase):
                 self.assertIn('${region:regex}', target['expr'])
                 self.assertIn('${node:regex}', target['expr'])
                 self.assertNotIn('hm:service_instance', target['expr'])
-                self.assertNotIn('service_name', target['expr'])
 
-    def test_unsupported_signals_are_not_fabricated_as_zero(self):
-        for panel in panels(self.dashboard['panels']):
-            for target in panel.get('targets', []):
-                self.assertNotIn('or vector(0)', target['expr'])
+    def test_vpn_separates_entry_paths_and_measurement_locations(self):
+        vpn = load('vpn.json')
+        by_id = {p['id']: p for p in panels(vpn['panels'])}
+        for target in by_id[3]['targets']:
+            self.assertIn('${entry_region:regex}', target['expr'])
+        path = by_id[20]['targets'][0]['expr']
+        self.assertIn('${source_region:regex}', path)
+        self.assertIn('${target_region:regex}', path)
+        self.assertNotIn('${entry_region:regex}', path)
+        for target in by_id[21]['targets']:
+            self.assertIn('by(region,target)', target['expr'])
+            self.assertNotIn('${entry_region:regex}', target['expr'])
+
+    def test_no_current_topology_constants_in_dashboards(self):
+        for name in ['overview.json', 'inventory.json', 'vpn.json']:
+            dashboard = json.dumps(load(name))
+            for constant in ['spb-01', 'machine', 'node|spb-node', 'uk|spb', 'checked from SPB', 'UK measurement', '87.106.74.217', '212.116.115.29']:
+                self.assertNotIn(constant, dashboard)
+
+    def test_overviews_remain_compact_and_missing_data_is_not_zero(self):
+        for name in ['overview.json', 'vpn.json']:
+            dashboard = load(name)
+            visible = [p for p in dashboard['panels'] if p['type'] not in ['row', 'text']]
+            self.assertLessEqual(len(visible), 5)
+            self.assertTrue(all(p['collapsed'] for p in dashboard['panels'] if p['type'] == 'row'))
+            for panel in panels(dashboard['panels']):
+                for target in panel.get('targets', []):
+                    self.assertNotIn('or vector(0)', target['expr'])
 
 
 if __name__ == '__main__':

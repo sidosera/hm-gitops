@@ -13,6 +13,7 @@ spec:
   template:
     metadata:
       labels:
+        hm.gitops/service: gateway
         app.kubernetes.io/name: gateway
         hm.gitops/xray: 'true'
       annotations:

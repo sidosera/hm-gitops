@@ -8,7 +8,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -36,6 +36,15 @@
   "fiscalYearStartMonth": 0,
   "links": [
     {
+      "title": "VPN",
+      "url": "/status/d/hm-vpn/vpn-operations",
+      "type": "link",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "includeVars": false,
+      "keepTime": true
+    },
+    {
       "title": "Services",
       "url": "/status/d/hm-services/services-overview",
       "type": "link",
@@ -50,33 +59,27 @@
       {
         "name": "region",
         "label": "Region",
-        "type": "custom",
-        "query": "uk,spb",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(node_uname_info{region!=\"\",node!=\"\"}, region)",
+          "refId": "region"
+        },
+        "definition": "label_values(node_uname_info{region!=\"\",node!=\"\"}, region)",
+        "refresh": 1,
+        "sort": 1,
         "multi": false,
         "includeAll": true,
-        "allValue": "uk|spb",
+        "allValue": ".*",
         "current": {
-          "selected": true,
           "text": "All",
-          "value": "$__all"
+          "value": "$__all",
+          "selected": true
         },
-        "options": [
-          {
-            "text": "All",
-            "value": "$__all",
-            "selected": true
-          },
-          {
-            "text": "uk",
-            "value": "uk",
-            "selected": false
-          },
-          {
-            "text": "spb",
-            "value": "spb",
-            "selected": false
-          }
-        ],
+        "options": [],
         "hide": 0,
         "skipUrlSync": false
       },
@@ -89,10 +92,10 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(node_uname_info{job=~\"node|spb-node\",region=~\"${region:regex}\"}, node)",
-          "refId": "HostVariable"
+          "query": "label_values(node_uname_info{region=~\"${region:regex}\",node!=\"\"}, node)",
+          "refId": "node"
         },
-        "definition": "label_values(node_uname_info{job=~\"node|spb-node\",region=~\"${region:regex}\"}, node)",
+        "definition": "label_values(node_uname_info{region=~\"${region:regex}\",node!=\"\"}, node)",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -146,7 +149,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * (1 - avg by (region,node) (rate(node_cpu_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mode=\"idle\"}[$__rate_interval])))",
+          "expr": "100 * (1 - avg by (region,node) (rate(node_cpu_seconds_total{node=~\"${node:regex}\",region=~\"${region:regex}\",mode=\"idle\"}[$__rate_interval])))",
           "legendFormat": "{{region}} / {{node}}",
           "editorMode": "code",
           "instant": true,
@@ -235,7 +238,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} / node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
+          "expr": "100 * node_memory_MemAvailable_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\"} / node_memory_MemTotal_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\"}",
           "legendFormat": "{{region}} / {{node}} \u00b7 Memory headroom",
           "editorMode": "code",
           "instant": true,
@@ -324,7 +327,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+          "expr": "100 * node_filesystem_avail_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
           "legendFormat": "{{region}} / {{node}} \u00b7 Root disk available",
           "editorMode": "code",
           "instant": true,
@@ -413,7 +416,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * (1 - avg by (region,node) (rate(node_cpu_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mode=\"idle\"}[$__rate_interval])))",
+          "expr": "100 * (1 - avg by (region,node) (rate(node_cpu_seconds_total{node=~\"${node:regex}\",region=~\"${region:regex}\",mode=\"idle\"}[$__rate_interval])))",
           "legendFormat": "{{region}} / {{node}}",
           "editorMode": "code",
           "instant": false,
@@ -515,7 +518,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
+          "expr": "node_memory_MemAvailable_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\"}",
           "legendFormat": "{{region}} / {{node}} \u00b7 Available RAM",
           "editorMode": "code",
           "instant": false,
@@ -607,7 +610,7 @@
         "w": 24,
         "h": 6
       },
-      "description": "Physical interface traffic includes all host services and transport overhead. It will differ from authenticated Xray payload rates.",
+      "description": "Traffic per non-loopback, non-overlay interface. Includes all workloads and transport overhead; interfaces are not summed into a host total.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -615,7 +618,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (region,node,device) (rate(node_network_receive_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
+          "expr": "sum by (region,node,device) (rate(node_network_receive_bytes_total{node=~\"${node:regex}\",region=~\"${region:regex}\",device!~\"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|wg.*\"}[$__rate_interval])) * 8",
           "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} receive",
           "editorMode": "code",
           "instant": false,
@@ -627,7 +630,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum by (region,node,device) (rate(node_network_transmit_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
+          "expr": "sum by (region,node,device) (rate(node_network_transmit_bytes_total{node=~\"${node:regex}\",region=~\"${region:regex}\",device!~\"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|wg.*\"}[$__rate_interval])) * 8",
           "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} send",
           "editorMode": "code",
           "instant": false,
@@ -739,7 +742,7 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+              "expr": "100 * node_filesystem_avail_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
               "legendFormat": "{{region}} / {{node}} \u00b7 Available space",
               "editorMode": "code",
               "instant": false,
@@ -751,7 +754,7 @@
             },
             {
               "refId": "B",
-              "expr": "100 * node_filesystem_files_free{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+              "expr": "100 * node_filesystem_files_free{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
               "legendFormat": "{{region}} / {{node}} \u00b7 Free inodes",
               "editorMode": "code",
               "instant": false,

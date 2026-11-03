@@ -15,6 +15,7 @@ spec:
   template:
     metadata:
       labels:
+        hm.gitops/service: website
         app.kubernetes.io/name: www-service
         app.kubernetes.io/component: web
     spec:

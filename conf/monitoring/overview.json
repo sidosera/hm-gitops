@@ -1,15 +1,14 @@
 {
   "uid": "hm-services",
   "title": "Services / Overview",
-  "description": "A compact service view. Service and Region apply consistently to all panels; detailed Gateway checks and traffic are collapsed.",
+  "description": "Generic workload health and resource usage, discovered by service identity and region.",
   "tags": [
     "hackamonth",
-    "operations",
-    "vpn"
+    "services"
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 7,
+  "version": 8,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -37,8 +36,8 @@
   "fiscalYearStartMonth": 0,
   "links": [
     {
-      "title": "Inventory",
-      "url": "/status/d/hm-inventory/inventory-capacity",
+      "title": "VPN",
+      "url": "/status/d/hm-vpn/vpn-operations",
       "type": "link",
       "icon": "dashboard",
       "targetBlank": false,
@@ -46,11 +45,13 @@
       "keepTime": true
     },
     {
-      "title": "Triage guide",
-      "url": "https://github.com/sidosera/hm-gitops#operating-the-dashboard",
+      "title": "Inventory",
+      "url": "/status/d/hm-inventory/inventory-capacity",
       "type": "link",
-      "icon": "book",
-      "targetBlank": true
+      "icon": "dashboard",
+      "targetBlank": false,
+      "includeVars": false,
+      "keepTime": true
     }
   ],
   "templating": {
@@ -58,71 +59,54 @@
       {
         "name": "service_name",
         "label": "Service",
-        "type": "custom",
-        "query": "Gateway : gateway,Website : website,Observability : observability",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(hm:service_instance:info, service)",
+          "refId": "service_name"
+        },
+        "definition": "label_values(hm:service_instance:info, service)",
+        "refresh": 1,
+        "sort": 1,
         "multi": false,
         "includeAll": true,
-        "allValue": "gateway|website|observability",
+        "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": "Gateway",
-          "value": "gateway"
+          "text": "All",
+          "value": "$__all",
+          "selected": true
         },
-        "options": [
-          {
-            "text": "All",
-            "value": "$__all",
-            "selected": false
-          },
-          {
-            "text": "Gateway",
-            "value": "gateway",
-            "selected": true
-          },
-          {
-            "text": "Website",
-            "value": "website",
-            "selected": false
-          },
-          {
-            "text": "Observability",
-            "value": "observability",
-            "selected": false
-          }
-        ],
+        "options": [],
         "hide": 0,
         "skipUrlSync": false
       },
       {
         "name": "region",
         "label": "Region",
-        "type": "custom",
-        "query": "uk,spb",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(hm:service_instance:info, region)",
+          "refId": "region"
+        },
+        "definition": "label_values(hm:service_instance:info, region)",
+        "refresh": 1,
+        "sort": 1,
         "multi": false,
         "includeAll": true,
-        "allValue": "uk|spb",
+        "allValue": ".*",
         "current": {
-          "selected": true,
           "text": "All",
-          "value": "$__all"
+          "value": "$__all",
+          "selected": true
         },
-        "options": [
-          {
-            "text": "All",
-            "value": "$__all",
-            "selected": true
-          },
-          {
-            "text": "uk",
-            "value": "uk",
-            "selected": false
-          },
-          {
-            "text": "spb",
-            "value": "spb",
-            "selected": false
-          }
-        ],
+        "options": [],
         "hide": 0,
         "skipUrlSync": false
       }
@@ -144,7 +128,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Select a **service** and **region**. All panels follow that selection. Clients and transport checks apply to Gateway; **N/A** means that signal is not collected for the selection."
+        "content": "Workload readiness and resource usage for any **service** and **region**. Use **VPN** for client connectivity and **Inventory** for host capacity."
       }
     },
     {
@@ -219,8 +203,8 @@
       }
     },
     {
-      "id": 3,
-      "title": "Connected clients",
+      "id": 9,
+      "title": "Restarts \u00b7 last hour",
       "type": "stat",
       "gridPos": {
         "x": 8,
@@ -228,7 +212,7 @@
         "w": 8,
         "h": 4
       },
-      "description": "Gateway only: fresh authenticated source-IP estimates, shown separately by region. Shared IPs make this a lower bound; do not sum across regions as unique people.",
+      "description": "Container restarts in currently scheduled instances over a rolling hour. Pod replacements are not restarts.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -236,8 +220,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "xray_active_client_ips{service=~\"${service_name:regex}\",region=~\"${region:regex}\"} and on(instance) (xray_online_scrape_success{service=~\"${service_name:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",region=~\"${region:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",region=~\"${region:regex}\",file=\"/textfile/xray_online.prom\"}) < 60)",
-          "legendFormat": "{{region}}",
+          "expr": "sum(hm:service_instance:restarts_1h{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "legendFormat": "Restarts",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -251,7 +235,7 @@
         "defaults": {
           "unit": "short",
           "decimals": 0,
-          "noValue": "N/A",
+          "noValue": "No instances",
           "color": {
             "mode": "palette-classic"
           },
@@ -354,8 +338,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(region) (hm:service_instance:cpu_cores{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
-          "legendFormat": "{{region}}",
+          "expr": "sum by(service,region) (hm:service_instance:cpu_cores{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "legendFormat": "{{service}} / {{region}}",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -368,7 +352,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "cores",
-          "decimals": 1,
+          "decimals": 3,
           "noValue": "No data",
           "color": {
             "mode": "palette-classic"
@@ -409,8 +393,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(region) (hm:service_instance:memory_bytes{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
-          "legendFormat": "{{region}}",
+          "expr": "sum by(service,region) (hm:service_instance:memory_bytes{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "legendFormat": "{{service}} / {{region}}",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -449,7 +433,7 @@
     {
       "id": 10,
       "type": "row",
-      "title": "Details \u00b7 connectivity & instances",
+      "title": "Details \u00b7 workload instances",
       "collapsed": true,
       "gridPos": {
         "x": 0,
@@ -459,205 +443,12 @@
       },
       "panels": [
         {
-          "id": 20,
-          "title": "Gateway paths \u00b7 checked from SPB",
-          "type": "state-timeline",
-          "gridPos": {
-            "x": 0,
-            "y": 13,
-            "w": 12,
-            "h": 6
-          },
-          "description": "Authenticated checks from SPB. Region filters the Gateway deployment under test: REALITY/HTTPS target UK; direct control and routing checks target SPB. N/A for other services.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "expr": "probe_success{service=~\"${service_name:regex}\",target_region=~\"${region:regex}\"} and on(instance,check) (up{job=\"spb-probes\",service=~\"${service_name:regex}\",target_region=~\"${region:regex}\"} == 1)",
-              "legendFormat": "{{target_region}} \u00b7 {{check}}",
-              "editorMode": "code",
-              "instant": false,
-              "range": true,
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              }
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "decimals": 1,
-              "noValue": "N/A",
-              "color": {
-                "mode": "palette-classic"
-              },
-              "mappings": [
-                {
-                  "type": "value",
-                  "options": {
-                    "0": {
-                      "text": "Failed",
-                      "color": "red"
-                    },
-                    "1": {
-                      "text": "Passed",
-                      "color": "green"
-                    }
-                  }
-                }
-              ]
-            },
-            "overrides": []
-          },
-          "maxDataPoints": 600,
-          "interval": "30s",
-          "options": {
-            "showValue": "auto",
-            "alignValue": "left",
-            "mergeValues": true,
-            "rowHeight": 0.8,
-            "legend": {
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          }
-        },
-        {
-          "id": 21,
-          "title": "Gateway traffic \u00b7 UK measurement",
-          "type": "timeseries",
-          "gridPos": {
-            "x": 12,
-            "y": 13,
-            "w": 12,
-            "h": 6
-          },
-          "description": "Traffic counters are currently collected at the UK Gateway only. SPB or another service shows N/A; these are not fleet-wide totals.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "expr": "sum(rate(xray_traffic_downlink_bytes_total{service=~\"${service_name:regex}\",region=~\"${region:regex}\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__rate_interval])) * 8",
-              "legendFormat": "Download",
-              "editorMode": "code",
-              "instant": false,
-              "range": true,
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              }
-            },
-            {
-              "refId": "B",
-              "expr": "sum(rate(xray_traffic_uplink_bytes_total{service=~\"${service_name:regex}\",region=~\"${region:regex}\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__rate_interval])) * 8",
-              "legendFormat": "Upload",
-              "editorMode": "code",
-              "instant": false,
-              "range": true,
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              }
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "bps",
-              "decimals": 1,
-              "noValue": "N/A",
-              "color": {
-                "mode": "palette-classic"
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "maxDataPoints": 600,
-          "interval": "30s",
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "calcs": []
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
-          "id": 22,
-          "title": "Service restarts \u00b7 last hour",
-          "type": "timeseries",
-          "gridPos": {
-            "x": 0,
-            "y": 19,
-            "w": 24,
-            "h": 6
-          },
-          "description": "Restarts for currently scheduled instances of the selected service.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "expr": "sum by(region) (hm:service_instance:restarts_1h{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
-              "legendFormat": "{{region}}",
-              "editorMode": "code",
-              "instant": false,
-              "range": true,
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              }
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "decimals": 1,
-              "noValue": "No data",
-              "color": {
-                "mode": "palette-classic"
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "maxDataPoints": 600,
-          "interval": "30s",
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "calcs": []
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
           "id": 8,
           "title": "Regional instances",
           "type": "table",
           "gridPos": {
             "x": 0,
-            "y": 25,
+            "y": 13,
             "w": 24,
             "h": 5
           },
@@ -739,18 +530,20 @@
                   "Time": true,
                   "__name__": true,
                   "namespace": true,
-                  "service": true,
+                  "service": false,
                   "node": true
                 },
                 "indexByName": {
-                  "region": 0,
-                  "pod": 1,
-                  "Value": 2
+                  "service": 0,
+                  "region": 1,
+                  "pod": 2,
+                  "Value": 3
                 },
                 "renameByName": {
                   "region": "Region",
                   "pod": "Instance",
-                  "Value": "Ready"
+                  "Value": "Ready",
+                  "service": "Service"
                 }
               }
             }

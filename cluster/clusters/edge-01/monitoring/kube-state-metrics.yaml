@@ -24,9 +24,10 @@ spec:
       - name: kube-state-metrics
         image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0
         args:
+        - --metric-labels-allowlist=pods=[app.kubernetes.io/name,hm.gitops/service]
         - --resources=pods
         - --namespaces=hm
-        - --metric-allowlist=kube_pod_info,kube_pod_status_ready,kube_pod_status_phase,kube_pod_container_status_restarts_total,kube_pod_container_resource_limits
+        - --metric-allowlist=kube_pod_labels,kube_pod_info,kube_pod_status_ready,kube_pod_status_phase,kube_pod_container_status_restarts_total,kube_pod_container_resource_limits
         ports:
         - name: http
           containerPort: 8080

@@ -136,7 +136,13 @@ Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing 
 
 Prometheus scrapes every 30 seconds and stores seven days of history, bounded to 750 MB of blocks on a 2 GiB volume. Grafana has a separate 1 GiB volume for its settings. Both volumes use the VPS disk, so they do not survive loss of the VPS. History starts when Prometheus is deployed; the previous SQLite history volume is retained as an archive and is not imported.
 
-The Services overview has five signal panels: ready/scheduled instances, Gateway client estimates, service memory, CPU history and memory history. Service and Region filter all of them. Expand **Details** for Gateway paths, UK traffic counters, restarts and the regional instance list. Physical host capacity is in the separate [Inventory / Capacity](https://www.hackamonth.io/status/d/hm-inventory/inventory-capacity) dashboard, filtered by Region and Host. Both dashboards share the same Grafana and Prometheus. Gateway-only signals show N/A for other services; regions with no deployment show no instances.
+Three purpose-based dashboards share the same Grafana and Prometheus:
+
+- [Services / Overview](https://www.hackamonth.io/status/d/hm-services/services-overview): generic readiness, rolling-hour restarts, working-set memory and CPU. Service and Region apply to every panel. Instance details are collapsed; there are no VPN or host-capacity panels.
+- [VPN / Operations](https://www.hackamonth.io/status/d/hm-vpn/vpn-operations): entry readiness and authenticated client-IP estimates, synthetic connectivity paths and transport measurements. Entry region scopes client-facing signals. Probe source and destination independently scope connectivity checks, including upstream dependencies. Transport traffic is labelled by measurement region and listener; it is not attributed to the selected entry region or summed across hops as unique client traffic.
+- [Inventory / Capacity](https://www.hackamonth.io/status/d/hm-inventory/inventory-capacity): physical host CPU, available RAM, root-disk capacity and per-interface network traffic, filtered by Region and Host. The queries work for both virtual and bare-metal hosts.
+
+All region, service and host options come from metrics. No dashboard contains UK/SPB lists, host names, IPs or regional exporter job names. Missing observations remain missing.
 
 Node-exporter supplies host metrics through read-only host mounts. Kube-state-metrics reads pods in the `hm` namespace, and Prometheus reads this node's kubelet resource metrics. Xray-exporter reads native traffic counters with log parsing disabled. A small poller uses the checksum-verified official Xray CLI to publish aggregate online-IP counts through node-exporter's textfile collector. It has no web UI or history database. Only Xray's read-only StatsService is enabled.
 
@@ -155,7 +161,7 @@ kubectl kustomize cluster/clusters/edge-01 >/dev/null
 
 ## Operating the dashboard
 
-Select Service and Region to scope the entire dashboard. Gateway is selected initially; All regions includes its UK and SPB instances. The five overview panels show readiness, clients and service resource usage. Expand Details for connectivity checks and workload diagnostics. Open Inventory for host CPU, available RAM, disk capacity and physical network traffic; its Region and Host filters are independent of service placement. These selections also apply to Details. Workload readiness is separate from end-to-end connectivity.
+Use Services to investigate a workload, VPN to investigate client connectivity and upstream paths, and Inventory to investigate host capacity. Each starts with all discovered values and can be narrowed with its own filters. Workload readiness is separate from end-to-end connectivity.
 
 - **VPN fails, server checks green:** test the existing client profile from the affected ISP. Compare the authenticated Russia probes with the direct-internet control. They measure datacenter reachability and request duration, but cannot establish availability from every residential/mobile ISP or a client-facing SLO.
 - **API failed or pod not ready:** inspect `kubectl -n hm logs deployment/proxy-service` and pod events. Check collector health before interpreting missing data.
@@ -163,7 +169,7 @@ Select Service and Region to scope the entire dashboard. Gateway is selected ini
 - **Memory pressure:** compare MemAvailable with Linux pressure stall information (PSI), swapping and each container's working set / configured memory limit. Occupied swap alone does not prove current pressure.
 - **Disk pressure:** inspect both free space and free inodes on `/`. Dashboard thresholds are investigation guides: memory/disk headroom under 20% warns, under 10% is urgent; container memory-limit use above 80% warns, above 95% is urgent. No paging or notifications are configured by the dashboard.
 
-Traffic rates use Grafana's adaptive rate interval with a 30-second scrape interval; selected-window transfer totals use reset-aware increases. Missing samples remain gaps. PSI begins at this rollout; older periods have no PSI history. Recent restarts use a rolling one-hour window and do not count pod replacements. Container limit panels omit containers without a memory limit.
+Traffic rates use Grafana's adaptive rate interval with a 30-second scrape interval. Missing samples remain gaps. Recent restarts use a rolling one-hour window and do not count pod replacements.
 
 The layout follows [Google SRE monitoring guidance](https://sre.google/sre-book/monitoring-distributed-systems/) while making unmeasured user-path signals explicit.
 
@@ -176,7 +182,7 @@ Both hosts use the same Ansible `vm/playbooks/bootstrap.yml` bootstrap and Flux 
 
 The SPB gateway runs Xray plus a blackbox-exporter sidecar. `services/gateway/overlays/spb/config.json` is an explicit domain suffix allowlist for Russian egress, not a blanket `.ru` exception. Unknown destinations use the original upstream through either REALITY or HTTPS/XHTTP; failure never switches foreign traffic to Russian direct egress. SOCKS probe ports are loopback-only inside the pod; native StatsService is protected by a NetworkPolicy. Node/blackbox metrics use mTLS. TLS private material and authenticated Xray connection settings are SOPS encrypted; public routing settings are ConfigMaps. Certificates must be renewed before November 2027.
 
-Both regions share the Services dashboard at `/status/d/hm-services`; physical hosts are covered separately by Inventory at `/status/d/hm-inventory`. Service and Region filter every Services panel. The default view shows ready instances, clients, service memory, CPU and memory history; specialist signals are in a collapsed Details row. Gateway has five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
+Both regions share the three dashboards described above. The VPN dashboard discovers the existing five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
 
 For client import, use the private `hm-spb-smart-routing.txt` VLESS profile provided outside Git. Existing upstream profiles remain valid. The bootstrap password is unnecessary after key-only SSH is configured.
 
@@ -185,7 +191,7 @@ On small hosts: only source-controller and kustomize-controller are needed by Fl
 
 ## Service model
 
-Use [the glossary](GLOSSARY.md) for infrastructure terminology. **Gateway** is one service with deployments in the `uk` and `spb` regions. Its regional roles differ: SPB provides client ingress, regional egress and upstream routing; UK provides upstream egress and keeps existing client ingress. `proxy-service` and `spb-gateway` are deployment resource names, not different service identities. The Website and Observability services are separate from Gateway.
+Use [the glossary](GLOSSARY.md) for infrastructure terminology. **Gateway** is one service with deployments in the `uk` and `spb` regions. Its regional roles differ: SPB provides client ingress, regional egress and upstream routing; UK provides upstream egress and keeps existing client ingress. `proxy-service` and `spb-gateway` are deployment resource names, not different service identities. Website is separate from Gateway. Monitoring workloads such as Grafana and Prometheus are individually selectable services.
 
 Region, provider availability zone and host are separate placement dimensions. `machine` and `spb-01` are hosts; control-plane/worker are cluster roles. Inventory records region and optionally zone. No availability-zone or failover independence is inferred from a region name. `uk` is the existing operational region name, not a new assertion about provider geography.
 
@@ -205,6 +211,14 @@ Change routing in the regional public JSON and validate with `kubectl kustomize 
 Validate routing and overlay boundaries with `python -m unittest discover -s tests -v` (Python, PyYAML and kubectl required). The checks cover private-network blocks, fail-closed routing, credential isolation, stable selectors, unchanged source selectors in ingress policies, and shared runtime/image configuration.
 
 
-The service dashboard uses `service_name` and `region` variables with literal service identifiers, not pod-name regexes. Lightweight Prometheus recording rules map current pod identities to Gateway, Website and Observability, and derive placement from node metrics; service workload queries use those dimensions consistently. Gateway-only signals show N/A for other services. Transport probes retain their SPB observation origin and carry a separate target_region for filtering. Gateway byte counters are currently UK-only and are labelled accordingly in the collapsed Details section.
+## Monitoring identity and fleet growth
 
-Filter regression checks: `python -m unittest discover -s tests -v`; with Prometheus tooling installed, `promtool test rules tests/fixtures/dashboard-filters.test.yml` checks service/region isolation, memory attribution, unready pods and empty regions against synthetic source metrics.
+Workload identity comes from pod labels, never resource-name regexes. Set `hm.gitops/service` on the pod template when several regional workload names implement one logical service (Gateway and Website use this). Otherwise `app.kubernetes.io/name` is the service identity. Kube-state-metrics exposes only these two allowlisted label keys, alongside the existing small metric set. Recording rules attach the actual node's `region`, discarding the collector's placement. The generic dashboard discovers services from these rules, including new application names automatically. Current workload collection is intentionally scoped to namespace `hm`; adding another application namespace requires extending the collector/rule scope and RBAC deliberately.
+
+For any new VM or bare-metal host, register it through the existing inventory/bootstrap and deploy the shared node collector. Register its protected scrape endpoint with stable `node` and `region` target labels and provision TLS/firewall access. Once scraped, it appears in Inventory automatically; there is no dashboard change. New Kubernetes services follow the label contract above and require no service allowlist or dashboard edit. Existing static scrape targets, network peers and certificates still need explicit host onboarding; metric-discovered filters do not provision machines.
+
+VPN collectors use `service="gateway"`, `region` for the measurement location, and stable listener names in `target`. Probes use `source_region`, `target_region` and `check` independently of exporter location. Add those labels when registering a new path and it appears automatically. Current traffic counters are collected only in UK; other regions are unmeasured until exporters are configured. Client estimates are per entry host and may count one IP in multiple places; they are not unique-user fleet totals.
+
+This split adds no monitoring process, database or controller. It adds a Grafana JSON document and one allowlisted kube-state-metrics family; the identity rules replace three hardcoded service rules with one generic rule.
+
+Filter regression checks: `python -m unittest discover -s tests -v`; with Prometheus tooling installed, `promtool test rules tests/fixtures/dashboard-filters.test.yml` checks service/region isolation, label precedence, new service discovery, a third region with a differently named bare-metal exporter, memory attribution, unready pods and empty regions against synthetic source metrics.

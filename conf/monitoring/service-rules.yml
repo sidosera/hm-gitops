@@ -3,35 +3,25 @@ groups:
   interval: 30s
   rules:
   - record: hm:service_instance:info
-    expr: "(max by(namespace,pod,node) (kube_pod_info{namespace=\"hm\",pod=~\"(proxy-service|spb-gateway)-.*\"\
-      })\n and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"\
-      hm\",phase!~\"Succeeded|Failed\"}) == 1))\n * on(node) group_left(region) max\
-      \ by(node,region) (node_uname_info{job=~\"node|spb-node\",region!=\"\"})"
-    labels:
-      service: gateway
-  - record: hm:service_instance:info
-    expr: "(max by(namespace,pod,node) (kube_pod_info{namespace=\"hm\",pod=~\"(www-service)-.*\"\
-      })\n and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"\
-      hm\",phase!~\"Succeeded|Failed\"}) == 1))\n * on(node) group_left(region) max\
-      \ by(node,region) (node_uname_info{job=~\"node|spb-node\",region!=\"\"})"
-    labels:
-      service: website
-  - record: hm:service_instance:info
-    expr: "(max by(namespace,pod,node) (kube_pod_info{namespace=\"hm\",pod=~\"(grafana|prometheus|node-exporter|kube-state-metrics|xray-exporter)-.*\"\
-      })\n and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"\
-      hm\",phase!~\"Succeeded|Failed\"}) == 1))\n * on(node) group_left(region) max\
-      \ by(node,region) (node_uname_info{job=~\"node|spb-node\",region!=\"\"})"
-    labels:
-      service: observability
+    expr: |-
+      ((max by(namespace,pod,node) (kube_pod_info{namespace="hm",node!=""})
+        and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace="hm",phase!~"Succeeded|Failed"}) == 1))
+       * on(namespace,pod) group_left(service)
+       max by(namespace,pod,service) (
+         label_replace(kube_pod_labels{namespace="hm",label_hm_gitops_service!=""}, "service", "$1", "label_hm_gitops_service", "(.+)")
+         or
+         label_replace(kube_pod_labels{namespace="hm",label_hm_gitops_service="",label_app_kubernetes_io_name!=""}, "service", "$1", "label_app_kubernetes_io_name", "(.+)")
+       ))
+       * on(node) group_left(region) max by(node,region) (node_uname_info{region!="",node!=""})
   - record: hm:service_instance:ready
-    expr: max by(namespace,pod) (kube_pod_status_ready{namespace="hm",condition="true"})
-      * on(namespace,pod) group_left(service,region,node) hm:service_instance:info
+    expr: max by(namespace,pod) (kube_pod_status_ready{namespace="hm",condition="true"}) * on(namespace,pod) group_left(service,region,node)
+      hm:service_instance:info
   - record: hm:service_instance:cpu_cores
     expr: sum by(namespace,pod) (rate(container_cpu_usage_seconds_total{job="kubelet",namespace="hm",container!=""}[2m]))
       * on(namespace,pod) group_left(service,region,node) hm:service_instance:info
   - record: hm:service_instance:memory_bytes
-    expr: sum by(namespace,pod) (container_memory_working_set_bytes{job="kubelet",namespace="hm",container!=""})
-      * on(namespace,pod) group_left(service,region,node) hm:service_instance:info
+    expr: sum by(namespace,pod) (container_memory_working_set_bytes{job="kubelet",namespace="hm",container!=""}) * on(namespace,pod)
+      group_left(service,region,node) hm:service_instance:info
   - record: hm:service_instance:restarts_1h
-    expr: sum by(namespace,pod) (increase(kube_pod_container_status_restarts_total{namespace="hm"}[1h]))
-      * on(namespace,pod) group_left(service,region,node) hm:service_instance:info
+    expr: sum by(namespace,pod) (increase(kube_pod_container_status_restarts_total{namespace="hm"}[1h])) * on(namespace,pod)
+      group_left(service,region,node) hm:service_instance:info

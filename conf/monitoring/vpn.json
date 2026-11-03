@@ -1,0 +1,444 @@
+{
+  "uid": "hm-vpn",
+  "title": "VPN / Operations",
+  "description": "VPN clients, synthetic paths and transport measurements. Entry and probe dimensions are independent.",
+  "tags": [
+    "hackamonth",
+    "vpn"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m"
+    ],
+    "time_options": [
+      "15m",
+      "1h",
+      "3h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d"
+    ]
+  },
+  "editable": false,
+  "graphTooltip": 1,
+  "fiscalYearStartMonth": 0,
+  "links": [
+    {
+      "title": "Services",
+      "url": "/status/d/hm-services/services-overview",
+      "type": "link",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "includeVars": false,
+      "keepTime": true
+    },
+    {
+      "title": "Inventory",
+      "url": "/status/d/hm-inventory/inventory-capacity",
+      "type": "link",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "entry_region",
+        "label": "Entry region",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(hm:service_instance:info{service=\"gateway\"}, region)",
+          "refId": "entry_region"
+        },
+        "definition": "label_values(hm:service_instance:info{service=\"gateway\"}, region)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all",
+          "selected": true
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "source_region",
+        "label": "Probe source",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(probe_success{service=\"gateway\"}, source_region)",
+          "refId": "source_region"
+        },
+        "definition": "label_values(probe_success{service=\"gateway\"}, source_region)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all",
+          "selected": true
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "target_region",
+        "label": "Probe destination",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(probe_success{service=\"gateway\",source_region=~\"${source_region:regex}\"}, target_region)",
+          "refId": "target_region"
+        },
+        "definition": "label_values(probe_success{service=\"gateway\",source_region=~\"${source_region:regex}\"}, target_region)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all",
+          "selected": true
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "VPN operations",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 2
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Entry region** scopes Gateway readiness and client estimates. **Probe source / destination** scope synthetic paths independently, including upstream dependencies. Transport counters are labelled by their measurement region; they are not end-to-end client totals."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Entry instances ready",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 2,
+        "w": 12,
+        "h": 4
+      },
+      "description": "Ready / scheduled Gateway pods in the selected entry region. Workload readiness does not establish end-to-end client connectivity.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(hm:service_instance:ready{service=\"gateway\",region=~\"${entry_region:regex}\"})",
+          "legendFormat": "Ready",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "count(hm:service_instance:info{service=\"gateway\",region=~\"${entry_region:regex}\"})",
+          "legendFormat": "Scheduled",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "No instances",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Connected client IPs",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 2,
+        "w": 12,
+        "h": 4
+      },
+      "description": "Gateway only: fresh authenticated source-IP estimates, shown separately by region. Shared IPs make this a lower bound; do not sum across regions as unique people.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "xray_active_client_ips{service=\"gateway\",region=~\"${entry_region:regex}\"} and on(instance) (xray_online_scrape_success{service=\"gateway\",region=~\"${entry_region:regex}\"} == 1) and on(instance) (up{region=~\"${entry_region:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{region=~\"${entry_region:regex}\",file=\"/textfile/xray_online.prom\"}) < 60)",
+          "legendFormat": "{{region}} / {{node}}",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "N/A",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 20,
+      "title": "Connectivity paths",
+      "type": "state-timeline",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 6
+      },
+      "description": "Authenticated synthetic checks, labelled by observer, destination and path. These datacenter checks do not prove connectivity from every client ISP.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_success{service=\"gateway\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\"} and on(instance,check) (up{service=\"gateway\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\"} == 1)",
+          "legendFormat": "{{source_region}} \u2192 {{target_region}} / {{check}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "noValue": "N/A",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Failed",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Passed",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "showValue": "auto",
+        "alignValue": "left",
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Details \u00b7 transport measurements",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 21,
+          "title": "Transport traffic by measurement region",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 13,
+            "w": 24,
+            "h": 6
+          },
+          "description": "Transport counters where an Xray exporter is deployed. Forwarded and direct client traffic can overlap between regions; do not sum as unique client traffic. Missing exporters are unmeasured.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by(region,target) (rate(xray_traffic_downlink_bytes_total{service=\"gateway\",dimension=\"inbound\"}[$__rate_interval])) * 8",
+              "legendFormat": "{{region}} / {{target}} \u00b7 Download",
+              "editorMode": "code",
+              "instant": false,
+              "range": true,
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            },
+            {
+              "refId": "B",
+              "expr": "sum by(region,target) (rate(xray_traffic_uplink_bytes_total{service=\"gateway\",dimension=\"inbound\"}[$__rate_interval])) * 8",
+              "legendFormat": "{{region}} / {{target}} \u00b7 Upload",
+              "editorMode": "code",
+              "instant": false,
+              "range": true,
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bps",
+              "decimals": 1,
+              "noValue": "N/A",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "maxDataPoints": 600,
+          "interval": "30s",
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "calcs": []
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
