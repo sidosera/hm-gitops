@@ -8,7 +8,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 8,
+  "version": 9,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -65,10 +65,10 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(hm:service_instance:info, service)",
+          "query": "query_result(count by (service) (hm:service_instance:info))",
           "refId": "service_name"
         },
-        "definition": "label_values(hm:service_instance:info, service)",
+        "definition": "query_result(count by (service) (hm:service_instance:info))",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -81,7 +81,8 @@
         },
         "options": [],
         "hide": 0,
-        "skipUrlSync": false
+        "skipUrlSync": false,
+        "regex": "/service=\"([^\"]+)\"/"
       },
       {
         "name": "region",

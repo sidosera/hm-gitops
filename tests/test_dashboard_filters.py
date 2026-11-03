@@ -21,8 +21,13 @@ class DashboardFilterTests(unittest.TestCase):
         for name in ['overview.json', 'inventory.json', 'vpn.json']:
             for variable in load(name)['templating']['list']:
                 self.assertEqual(variable['type'], 'query')
-                self.assertIn('label_values(', variable['query']['query'])
+                self.assertTrue(variable['query']['query'].startswith(('label_values(', 'query_result(')))
                 self.assertEqual(variable['allValue'], '.*')
+
+    def test_services_select_current_identities_not_historical_names(self):
+        variable = load('overview.json')['templating']['list'][0]
+        self.assertIn('query_result(count by (service)', variable['query']['query'])
+        self.assertIn('service=', variable['regex'])
 
     def test_generic_service_queries_are_consistently_scoped(self):
         for panel in panels(load('overview.json')['panels']):
