@@ -28,7 +28,7 @@ class PublicGatewayConfigTests(unittest.TestCase):
         for region in ['uk', 'spb']:
             secret = yaml.safe_load((ROOT / 'services/gateway/overlays' / region / 'credentials-secret.sops.yaml').read_text())
             self.assertIn('sops', secret)
-            self.assertIn('credentials.json', secret['stringData'])
+            self.assertEqual(set(secret['stringData']), {'credentials.json'})
             self.assertTrue(all(value.startswith('ENC[') for value in secret['stringData'].values()))
 
 
