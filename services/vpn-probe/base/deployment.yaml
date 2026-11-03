@@ -80,7 +80,8 @@ spec:
             port: http
           periodSeconds: 10
         command:
-        - python3
+        - /usr/local/bin/python3
+        - -I
         - -B
         - /etc/probe/probe.py
       volumes:

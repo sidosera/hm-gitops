@@ -1,0 +1,31 @@
+---
+# kube-proxy ACCEPTs healthCheckNodePorts before UFW INPUT rules.
+# Drop public NodePort traffic before DNAT, leaving SSH/ingress/overlay untouched.
+- name: Collect public network interfaces
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+      - '!min'
+      - network
+- name: Install public NodePort guard
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../roles/vm/templates/nodeport-guard.sh.j2"
+    dest: /usr/local/sbin/hm-nodeport-guard
+    owner: root
+    group: root
+    mode: '0750'
+    validate: /bin/sh -n %s
+- name: Restore NodePort guard when UFW starts
+  ansible.builtin.blockinfile:
+    path: /etc/ufw/before.init
+    insertafter: '^start\)'
+    marker: '# {mark} HM PUBLIC NODEPORT GUARD'
+    block: '    /usr/local/sbin/hm-nodeport-guard'
+    owner: root
+    group: root
+    mode: '0750'
+    validate: /bin/sh -n %s
+- name: Apply NodePort guard without restarting networking
+  ansible.builtin.command: /usr/local/sbin/hm-nodeport-guard
+  register: hm_nodeport_guard
+  changed_when: "'Installed' in hm_nodeport_guard.stdout"

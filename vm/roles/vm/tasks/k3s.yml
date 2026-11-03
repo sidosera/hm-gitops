@@ -59,7 +59,8 @@
 
 - name: Download k3s install script
   ansible.builtin.get_url:
-    url: https://get.k3s.io
+    url: https://raw.githubusercontent.com/k3s-io/k3s/01b6f04aaa69e8b09303f0393d4b4f1811da23aa/install.sh
+    checksum: sha256:46177d4c99440b4c0311b67233823a8e8a2fc09693f6c89af1a7161e152fbfad
     dest: /usr/local/src/k3s-install.sh
     mode: "0755"
   when: hm_k3s_probe.rc != 0

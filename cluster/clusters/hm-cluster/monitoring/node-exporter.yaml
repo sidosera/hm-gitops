@@ -13,7 +13,6 @@ spec:
         app.kubernetes.io/name: node-exporter
     spec:
       hostNetwork: true
-      hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: false
       securityContext:
@@ -24,7 +23,8 @@ spec:
       - name: stats-client
         image: docker.io/library/python:3.13-alpine@sha256:7984cf56ceaddebe4fefeb75d64000b9f45d8b77b11a09b24524da6cdc3af0c8
         command:
-        - python
+        - /usr/local/bin/python3
+        - -I
         - -c
         - "import urllib.request,hashlib,zipfile,pathlib,os,shutil\nh=hashlib.sha256()\n\
           with urllib.request.urlopen('https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip',timeout=60)\
@@ -116,7 +116,8 @@ spec:
       - name: online-clients
         image: docker.io/library/python:3.13-alpine@sha256:7984cf56ceaddebe4fefeb75d64000b9f45d8b77b11a09b24524da6cdc3af0c8
         command:
-        - python
+        - /usr/local/bin/python3
+        - -I
         - -B
         - /app/online_clients.py
         securityContext:
@@ -143,9 +144,6 @@ spec:
           readOnly: true
         - name: textfile
           mountPath: /textfile
-        env:
-        - name: XRAY_STATS_SERVER
-          value: node-xray-stats.hm.svc.cluster.local:10085
       volumes:
       - name: host-proc
         hostPath:

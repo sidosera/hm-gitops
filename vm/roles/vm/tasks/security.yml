@@ -83,3 +83,6 @@
       ansible.builtin.systemd:
         name: "{{ 'ssh' if ansible_distribution == 'Ubuntu' else 'sshd' }}"
         state: reloaded
+
+- name: Block public NodePorts before kube-proxy accepts them
+  ansible.builtin.include_tasks: nodeport-firewall.yml

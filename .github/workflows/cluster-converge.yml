@@ -19,14 +19,19 @@ concurrency:
   group: cluster-converge
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   ansible-converge:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Install Ansible
-        run: pip install --user ansible
+        run: pip install --user ansible-core==2.20.11 PyYAML==6.0.3
 
       - name: Install hm-gitops SSH key
         env:
@@ -48,16 +53,26 @@ jobs:
 
       - name: Run Ansible converge
         env:
-          ANSIBLE_HOST_KEY_CHECKING: "false"
+          ANSIBLE_HOST_KEY_CHECKING: "true"
+          CLUSTER_NAME: ${{ inputs.cluster_name }}
           GITOPS_BECOME_PASSWORD: ${{ secrets.GITOPS_BECOME_PASSWORD }}
         run: |
+          set -euo pipefail
+          umask 077
+          if [[ ! "$CLUSTER_NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+            echo 'Invalid cluster name' >&2
+            exit 1
+          fi
+          cp vm/ssh_known_hosts ~/.ssh/known_hosts
+          export ANSIBLE_SSH_ARGS='-o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts'
+          trap 'rm -f "$HOME/.gitops_become_pass" "$HOME/.ssh/gitops"' EXIT
           export PATH="$(python3 -m site --user-base)/bin:$PATH"
           BP="$HOME/.gitops_become_pass"
           if [ -n "${GITOPS_BECOME_PASSWORD}" ]; then
             printf '%s\n' "${GITOPS_BECOME_PASSWORD}" >"$BP"
             chmod 600 "$BP"
-            ./vm/k3s-bootstrap.sh -e vm_hosts_file="$PWD/cluster/clusters/${{ inputs.cluster_name }}/hosts.yml" -e hm_action=deploy --private-key ~/.ssh/gitops --become-password-file "$BP"
+            ./vm/k3s-bootstrap.sh -e vm_hosts_file="$PWD/cluster/clusters/${CLUSTER_NAME}/hosts.yml" -e hm_action=deploy --private-key ~/.ssh/gitops --become-password-file "$BP"
             rm -f "$BP"
           else
-            ./vm/k3s-bootstrap.sh -e vm_hosts_file="$PWD/cluster/clusters/${{ inputs.cluster_name }}/hosts.yml" -e hm_action=deploy --private-key ~/.ssh/gitops
+            ./vm/k3s-bootstrap.sh -e vm_hosts_file="$PWD/cluster/clusters/${CLUSTER_NAME}/hosts.yml" -e hm_action=deploy --private-key ~/.ssh/gitops
           fi

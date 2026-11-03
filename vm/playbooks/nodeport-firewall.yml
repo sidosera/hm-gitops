@@ -1,0 +1,21 @@
+---
+# Apply only the public NodePort policy, using the same inventory as full provisioning.
+- name: Register cluster inventory
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Set inventory action
+      ansible.builtin.set_fact:
+        hm_action: deploy
+    - name: Load controller inventory
+      ansible.builtin.include_tasks: ../tasks/controller_inventory.yml
+
+- name: Restrict public NodePorts on cluster hosts
+  hosts: vm
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../roles/vm/defaults/main.yml
+  tasks:
+    - name: Apply NodePort firewall policy
+      ansible.builtin.include_tasks: ../roles/vm/tasks/nodeport-firewall.yml

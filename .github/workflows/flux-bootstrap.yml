@@ -13,20 +13,29 @@ concurrency:
   group: flux-bootstrap
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   flux-bootstrap:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Install kubectl
         run: |
           curl -fsSL -o kubectl "https://dl.k8s.io/release/v1.34.1/bin/linux/amd64/kubectl"
+          echo "7721f265e18709862655affba5343e85e1980639395d5754473dafaadcaa69e3  kubectl" | sha256sum --check --strict
           install -m 0755 kubectl /usr/local/bin/kubectl
 
       - name: Install Flux CLI
         run: |
-          curl -fsSL https://fluxcd.io/install.sh | sudo bash
+          curl -fsSL --retry 3 -o flux.tar.gz https://github.com/fluxcd/flux2/releases/download/v2.10.0/flux_2.10.0_linux_amd64.tar.gz
+          echo "208dd7012c04fedeed5b2d0b6e63df3b15b1c34a381527811685c098bc9f8659  flux.tar.gz" | sha256sum --check --strict
+          tar -xzf flux.tar.gz flux
+          install -m 0755 flux /usr/local/bin/flux
 
       - name: Write kubeconfig from secret
         env:
@@ -45,7 +54,7 @@ jobs:
           GITOPS_DEPLOY_KEY_B64: ${{ secrets.GITOPS_DEPLOY_KEY_B64 }}
           KUBECONFIG: ${{ github.workspace }}/kubeconfig
         run: |
-          python3 -m pip install PyYAML
+          python3 -m pip install PyYAML==6.0.3
           install -d -m 700 ~/.ssh
           if [ -n "$GITOPS_DEPLOY_KEY_B64" ]; then
             printf '%s' "$GITOPS_DEPLOY_KEY_B64" | base64 -d > ~/.ssh/gitops

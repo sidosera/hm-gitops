@@ -1,0 +1,13 @@
+#!/bin/sh
+# Managed by Ansible. Public clients use ingress 80/443, never NodePorts.
+set -eu
+{% for iface in ([ansible_facts['default_ipv4']['interface']] + ([ansible_facts['default_ipv6']['interface']] if ansible_facts['default_ipv6']['interface'] is defined else [])) | unique %}
+{% for tool in ['/usr/sbin/iptables', '/usr/sbin/ip6tables'] %}
+{% for proto in ['tcp', 'udp'] %}
+if ! {{ tool }} -w 5 -t raw -C PREROUTING -i {{ iface | quote }} -p {{ proto }} --dport 30000:32767 -j DROP 2>/dev/null; then
+    {{ tool }} -w 5 -t raw -I PREROUTING 1 -i {{ iface | quote }} -p {{ proto }} --dport 30000:32767 -j DROP
+    echo 'Installed public NodePort guard'
+fi
+{% endfor %}
+{% endfor %}
+{% endfor %}

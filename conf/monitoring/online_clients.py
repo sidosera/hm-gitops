@@ -6,9 +6,9 @@ from pathlib import Path
 import subprocess
 import time
 
-OUTPUT = Path(os.environ.get('METRICS_OUTPUT', '/textfile/xray_online.prom'))
-CLI = os.environ.get('XRAY_CLI', '/tools/xray')
-SERVER = os.environ.get('XRAY_STATS_SERVER', 'proxy-service.hm.svc.cluster.local:10085')
+OUTPUT = Path('/textfile/xray_online.prom')
+CLI = '/tools/xray'
+SERVER = 'node-xray-stats.hm.svc.cluster.local:10085'
 
 
 def collect():

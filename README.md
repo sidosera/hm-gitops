@@ -148,14 +148,14 @@ The primary connects directly to the VPS. Do not enable Cloudflare's HTTP proxy 
 
 The website and backup share the existing HTTPS certificate. ACME uses HTTP-01 on port 80, because TLS-ALPN-01 cannot be passed through Cloudflare's ordinary HTTP proxy. Keep the challenge URL reachable through Cloudflare without a challenge page or access policy.
 
-Export profiles privately (Python with PyYAML, SOPS, and Xray are required):
+Export profiles privately (Python with PyYAML and cryptography, plus SOPS, are required):
 
 ```sh
 SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey python3 scripts/xray_share_url.py \
   --zone uk-ldn-1 --output-dir /secure/path/proxy-profiles
 ```
 
-The exporter refuses to write profiles inside this repository. Imports include IPv4 and IPv6 variants with Chrome, Firefox, and Safari TLS fingerprints, plus the HTTPS backup. Fingerprint variants require client support. The backup requires XHTTP support; “V2Ray” alone does not identify a compatible iOS app or core version. Keep the current installed app until the replacement profile works.
+The exporter refuses to write profiles inside this repository, to a directory readable by others, or over existing files/symlinks. Public-key derivation happens in memory, without passing the private key to another process. Imports include IPv4 and IPv6 variants with Chrome, Firefox, and Safari TLS fingerprints, plus the HTTPS backup. Fingerprint variants require client support. The backup requires XHTTP support; “V2Ray” alone does not identify a compatible iOS app or core version. Keep the current installed app until the replacement profile works.
 
 Test a profile from the network you need to use:
 

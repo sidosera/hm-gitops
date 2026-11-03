@@ -6,10 +6,11 @@ import base64
 import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import urllib.parse
 import yaml
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 
 def build_vless_url(user_id: str, host: str, port: int, query: dict, name: str) -> str:
@@ -44,6 +45,19 @@ def export_profiles(config: dict, hosts: list[str], public_key: str, https_host:
     return profiles
 
 
+def derive_public_key(private_key: str) -> str:
+    raw = base64.urlsafe_b64decode(private_key + '=' * (-len(private_key) % 4))
+    public = X25519PrivateKey.from_private_bytes(raw).public_key()
+    return base64.urlsafe_b64encode(public.public_bytes(Encoding.Raw, PublicFormat.Raw)).rstrip(b'=').decode()
+
+
+def write_private_profile(path: Path, url: str) -> None:
+    # Refuse existing files, including symlinks; never truncate an unexpected target.
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w') as handle:
+        handle.write(url + '\n')
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     repo_default = Path(__file__).resolve().parent.parent
@@ -51,7 +65,6 @@ def main() -> None:
     parser.add_argument('--zone', default='uk-ldn-1', help='Gateway zone to export')
     parser.add_argument('--host', action='append', help='Direct VPS address; repeat for both address families')
     parser.add_argument('--https-host', default='www.hackamonth.io')
-    parser.add_argument('--xray', default='xray', help='Xray executable used to derive the public key')
     parser.add_argument('--output-dir', type=Path, help='Write private profile files instead of stdout')
     args = parser.parse_args()
     repo = args.repo.resolve()
@@ -68,11 +81,7 @@ def main() -> None:
     config['inbounds'] = [i for i in config['inbounds'] if i.get('tag') == public_tag or i.get('streamSettings', {}).get('network') == 'xhttp']
     reality = next(i['streamSettings']['realitySettings'] for i in config['inbounds']
                    if i['streamSettings'].get('security') == 'reality')
-    key_output = subprocess.run([args.xray, 'x25519', '-i', reality['privateKey']],
-                                check=True, capture_output=True, text=True).stdout
-    match = re.search(r'(?:Password \(PublicKey\)|Password|PublicKey|Public key):\s*(\S+)', key_output)
-    if not match:
-        raise SystemExit('Cannot read public key from this Xray version')
+    public_key = derive_public_key(reality['privateKey'])
     hosts = args.host or []
     if not hosts:
         inventory = yaml.safe_load((repo / 'cluster/clusters/hm-cluster/hosts.yml').read_text())
@@ -84,18 +93,17 @@ def main() -> None:
         ipv6 = machine.get('ipv6')
         if ipv6:
             hosts.append(ipv6)
-    profiles = export_profiles(config, hosts, match.group(1), args.https_host)
+    profiles = export_profiles(config, hosts, public_key, args.https_host)
     if args.output_dir:
         output = args.output_dir.resolve()
         if output == repo or repo in output.parents:
             raise SystemExit('Profile exports must be outside the repository')
         output.mkdir(mode=0o700, parents=True, exist_ok=True)
+        info = output.stat()
+        if info.st_uid != os.getuid() or info.st_mode & 0o077:
+            raise SystemExit('Profile directory must be owned by you and accessible only to you (chmod 700)')
         for name, url in profiles.items():
-            path = output / f'{name}.txt'
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            os.fchmod(fd, 0o600)
-            with os.fdopen(fd, 'w') as handle:
-                handle.write(url + '\n')
+            write_private_profile(output / f'{name}.txt', url)
         print(f'Exported {len(profiles)} private profiles to {output}')
     else:
         print('\n'.join(profiles.values()))
