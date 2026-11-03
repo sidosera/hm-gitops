@@ -1,7 +1,7 @@
 {
   "uid": "hm-services",
-  "title": "VPN / Service Operations",
-  "description": "Operational overview: server health, authenticated demand, capacity and workload diagnostics. User-path latency and reachability are not instrumented. Seven days of Prometheus retention.",
+  "title": "Infrastructure / Operations",
+  "description": "One Kubernetes cluster and one Prometheus/Grafana: UK primary and SPB worker, host capacity, client estimates, routing and authenticated connectivity probes from Russia. Seven days retention.",
   "tags": [
     "hackamonth",
     "operations",
@@ -9,7 +9,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "time": {
     "from": "now-3h",
@@ -37,12 +37,6 @@
   "fiscalYearStartMonth": 0,
   "links": [
     {
-      "title": "SPB routing & probes",
-      "type": "link",
-      "url": "/status/d/hm-spb",
-      "targetBlank": false
-    },
-    {
       "title": "Triage guide",
       "url": "https://github.com/sidosera/hm-gitops#operating-the-dashboard",
       "type": "link",
@@ -53,10 +47,43 @@
   "templating": {
     "list": [
       {
+        "name": "node",
+        "label": "Host capacity & clients",
+        "type": "custom",
+        "query": "machine,spb-01",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [
+          {
+            "text": "All",
+            "value": "$__all",
+            "selected": true
+          },
+          {
+            "text": "machine",
+            "value": "machine",
+            "selected": false
+          },
+          {
+            "text": "spb-01",
+            "value": "spb-01",
+            "selected": false
+          }
+        ],
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
         "name": "workload",
         "label": "Workload",
         "type": "custom",
-        "query": "proxy-service,www-service,grafana,prometheus,node-exporter,kube-state-metrics,xray-exporter",
+        "query": "proxy-service,www-service,grafana,prometheus,node-exporter,kube-state-metrics,xray-exporter,spb-gateway",
         "multi": false,
         "includeAll": true,
         "allValue": ".*",
@@ -105,6 +132,11 @@
             "text": "xray-exporter",
             "value": "xray-exporter",
             "selected": false
+          },
+          {
+            "text": "spb-gateway",
+            "value": "spb-gateway",
+            "selected": false
           }
         ],
         "hide": 0,
@@ -118,7 +150,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "HACKAMONTH / SERVICE OPERATIONS",
+      "title": "HACKAMONTH / INFRASTRUCTURE OPERATIONS",
       "type": "text",
       "gridPos": {
         "x": 0,
@@ -129,12 +161,12 @@
       "description": "",
       "options": {
         "mode": "markdown",
-        "content": "**One VPS \u00b7 two VPN transports \u00b7 30 s collection \u00b7 7 d retention**\n\nServer-side health and traffic are measured. **Client reachability, latency and request error rate are not instrumented**; green server checks cannot rule out ISP blocking. [Triage guide](https://github.com/sidosera/hm-gitops#operating-the-dashboard)"
+        "content": "**One K3s cluster \u00b7 one Flux deployment \u00b7 one Prometheus/Grafana \u00b7 30 s collection \u00b7 7 d retention**\n\n**machine (UK)** hosts the control plane, monitoring and upstream VPN exit. **spb-01** is the worker, Russian entry/exit and probe vantage point. The host selector filters capacity/client panels; workload panels cover the whole cluster."
       }
     },
     {
       "id": 2,
-      "title": "Xray control API",
+      "title": "Upstream Xray API",
       "type": "stat",
       "gridPos": {
         "x": 0,
@@ -230,7 +262,7 @@
     },
     {
       "id": 3,
-      "title": "Proxy pod readiness",
+      "title": "Gateway pod readiness",
       "type": "stat",
       "gridPos": {
         "x": 4,
@@ -246,7 +278,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min(kube_pod_status_ready{namespace=\"hm\",condition=\"true\",pod=~\"proxy-service-.*\"}) and on() (min(up{job=\"kube-state-metrics\"}) == 1)",
+          "expr": "min(kube_pod_status_ready{namespace=\"hm\",condition=\"true\",pod=~\"(proxy-service|spb-gateway)-.*\"} and on(namespace,pod) (kube_pod_status_phase{namespace=\"hm\",phase=\"Running\"} == 1)) and on() (min(up{job=\"kube-state-metrics\"}) == 1)",
           "legendFormat": "Proxy pod readiness",
           "editorMode": "code",
           "instant": true,
@@ -334,7 +366,7 @@
         "w": 4,
         "h": 4
       },
-      "description": "Exactly five expected scrape targets must exist and all must be up. Check the collector row before trusting traffic or resource values.",
+      "description": "All configured Prometheus targets, including both hosts, both kubelets and Russia connectivity checks. Failed probes are shown separately from scrape availability.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -342,7 +374,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min(up{job=~\"node|kubelet|kube-state-metrics|xray|prometheus\"}) * (count(up{job=~\"node|kubelet|kube-state-metrics|xray|prometheus\"}) == bool 5)",
+          "expr": "min(up)",
           "legendFormat": "Telemetry coverage",
           "editorMode": "code",
           "instant": true,
@@ -430,7 +462,7 @@
         "w": 4,
         "h": 4
       },
-      "description": "Distinct authenticated source IPs across both transports. Shared NAT and ingress masking merge devices. Hidden if polling fails, textfile is older than 60 s, or node scraping fails. Not a device count.",
+      "description": "Separate per-host lower-bound IP estimates. Infrastructure relay/probe users are excluded; do not sum across hosts as a unique-person count.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -438,8 +470,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "xray_active_client_ips{job=\"node\"} and on(instance) ((xray_online_scrape_success{job=\"node\"} == 1) and on(instance) (up{job=\"node\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=\"node\",file=\"/textfile/xray_online.prom\"}) < 60))",
-          "legendFormat": "Client IPs \u00b7 lower bound",
+          "expr": "xray_active_client_ips{job=~\"node|spb-node\",node=~\"${node:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
+          "legendFormat": "{{node}} \u00b7 Client IPs \u00b7 lower bound",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -494,7 +526,7 @@
         "orientation": "auto",
         "colorMode": "value",
         "graphMode": "none",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "wideLayout": true,
         "justifyMode": "auto"
       }
@@ -517,8 +549,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_memory_MemAvailable_bytes{job=\"node\"} / node_memory_MemTotal_bytes{job=\"node\"}",
-          "legendFormat": "Memory headroom",
+          "expr": "100 * node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"} / node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"}",
+          "legendFormat": "{{node}} \u00b7 Memory headroom",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -583,7 +615,7 @@
         "orientation": "auto",
         "colorMode": "value",
         "graphMode": "none",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "wideLayout": true,
         "justifyMode": "auto"
       }
@@ -606,8 +638,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_filesystem_avail_bytes{job=\"node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=\"node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-          "legendFormat": "Root disk available",
+          "expr": "100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+          "legendFormat": "{{node}} \u00b7 Root disk available",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -672,9 +704,833 @@
         "orientation": "auto",
         "colorMode": "value",
         "graphMode": "none",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "wideLayout": true,
         "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 100,
+      "type": "row",
+      "title": "RUSSIA \u2192 UPSTREAM / ROUTING & CONNECTIVITY",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 101,
+      "title": "SPB internet",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 4,
+        "h": 4
+      },
+      "description": "An authenticated HTTPS request is tested every 30 s. Exit-IP checks validate the expected VPS address. UNKNOWN means telemetry is missing. Not a residential ISP measurement.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_success{job=\"spb-probes\",check=\"internet\"} and on(instance,check) (up{job=\"spb-probes\",check=\"internet\"} == 1)",
+          "legendFormat": "{{check}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "noValue": "UNKNOWN",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FAILED",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "UNKNOWN",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "maxDataPoints": 600,
+      "interval": "30s"
+    },
+    {
+      "id": 102,
+      "title": "REALITY \u2192 upstream",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 8,
+        "w": 4,
+        "h": 4
+      },
+      "description": "An authenticated HTTPS request is tested every 30 s. Exit-IP checks validate the expected VPS address. UNKNOWN means telemetry is missing. Not a residential ISP measurement.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_success{job=\"spb-probes\",check=\"primary\"} and on(instance,check) (up{job=\"spb-probes\",check=\"primary\"} == 1)",
+          "legendFormat": "{{check}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "noValue": "UNKNOWN",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FAILED",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "UNKNOWN",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "maxDataPoints": 600,
+      "interval": "30s"
+    },
+    {
+      "id": 103,
+      "title": "HTTPS \u2192 upstream",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 8,
+        "w": 4,
+        "h": 4
+      },
+      "description": "An authenticated HTTPS request is tested every 30 s. Exit-IP checks validate the expected VPS address. UNKNOWN means telemetry is missing. Not a residential ISP measurement.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_success{job=\"spb-probes\",check=\"backup\"} and on(instance,check) (up{job=\"spb-probes\",check=\"backup\"} == 1)",
+          "legendFormat": "{{check}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "noValue": "UNKNOWN",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FAILED",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "UNKNOWN",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "maxDataPoints": 600,
+      "interval": "30s"
+    },
+    {
+      "id": 104,
+      "title": "Default route \u2192 upstream",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 4,
+        "h": 4
+      },
+      "description": "An authenticated HTTPS request is tested every 30 s. Exit-IP checks validate the expected VPS address. UNKNOWN means telemetry is missing. Not a residential ISP measurement.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_success{job=\"spb-probes\",check=\"split-default\"} and on(instance,check) (up{job=\"spb-probes\",check=\"split-default\"} == 1)",
+          "legendFormat": "{{check}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "noValue": "UNKNOWN",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FAILED",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "UNKNOWN",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "maxDataPoints": 600,
+      "interval": "30s"
+    },
+    {
+      "id": 105,
+      "title": "Russian site via SPB",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 8,
+        "w": 4,
+        "h": 4
+      },
+      "description": "An authenticated HTTPS request is tested every 30 s. Exit-IP checks validate the expected VPS address. UNKNOWN means telemetry is missing. Not a residential ISP measurement.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_success{job=\"spb-probes\",check=\"ru-site\"} and on(instance,check) (up{job=\"spb-probes\",check=\"ru-site\"} == 1)",
+          "legendFormat": "{{check}}",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "noValue": "UNKNOWN",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FAILED",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "UNKNOWN",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "maxDataPoints": 600,
+      "interval": "30s"
+    },
+    {
+      "id": 106,
+      "title": "Firing connectivity alerts",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 8,
+        "w": 4,
+        "h": 4
+      },
+      "description": "Prometheus evaluates failures for 3 minutes, separating transport failures from control/telemetry failures. No notification destination is configured.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(ALERTS{alertstate=\"firing\",region=\"spb\"}) or vector(0)",
+          "legendFormat": "Firing SPB alerts",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "UNKNOWN",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "UNKNOWN",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "maxDataPoints": 600,
+      "interval": "30s"
+    },
+    {
+      "id": 114,
+      "title": "Connection checks over time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 7
+      },
+      "description": "1 = expected response and exit IP, 0 = failed. Scrape failure leaves a gap.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_success{job=\"spb-probes\"}",
+          "legendFormat": "{{check}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "noValue": "UNKNOWN",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FAILED",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "UNKNOWN",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 6,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "maxDataPoints": 600,
+      "interval": "30s"
+    },
+    {
+      "id": 115,
+      "title": "End-to-end request duration",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 7
+      },
+      "description": "Synthetic HTTP request duration via each path, not user-request latency. Failed probes can be short or time out.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_duration_seconds{job=\"spb-probes\"}",
+          "legendFormat": "{{check}}",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1,
+          "noValue": "UNKNOWN",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "UNKNOWN",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 6,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "maxDataPoints": 600,
+      "interval": "30s"
+    },
+    {
+      "id": 120,
+      "type": "text",
+      "title": "Routing & probe scope",
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Client \u2192 SPB \u2192 Russian domain allowlist: SPB exit; everything else: upstream exit.** No direct-Russia fallback for other destinations. Checks run from the SPB Kubernetes pod and verify REALITY, HTTPS backup, default-route exit IP, local internet and a Russian site. Probe failures and missing telemetry are distinct; external notifications are not configured."
       }
     },
     {
@@ -683,7 +1539,7 @@
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 7,
+        "y": 22,
         "w": 24,
         "h": 1
       },
@@ -693,11 +1549,11 @@
     },
     {
       "id": 9,
-      "title": "Client download by transport",
+      "title": "Upstream client download by transport",
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 8,
+        "y": 23,
         "w": 12,
         "h": 7
       },
@@ -793,11 +1649,11 @@
     },
     {
       "id": 10,
-      "title": "Client upload by transport",
+      "title": "Upstream client upload by transport",
       "type": "timeseries",
       "gridPos": {
         "x": 12,
-        "y": 8,
+        "y": 23,
         "w": 12,
         "h": 7
       },
@@ -897,11 +1753,11 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 15,
+        "y": 30,
         "w": 12,
         "h": 6
       },
-      "description": "Lower-bound estimates of concurrent source IPs. Profile counts overlap and must not be added. Successful polling and a fresh textfile are required.",
+      "description": "Per-host authenticated source-IP estimates; addresses can be masked by ingress. These are not exact unique people and must not be summed across hosts.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -909,8 +1765,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "xray_active_client_ips{job=\"node\"} and on(instance) ((xray_online_scrape_success{job=\"node\"} == 1) and on(instance) (up{job=\"node\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=\"node\",file=\"/textfile/xray_online.prom\"}) < 60))",
-          "legendFormat": "Distinct IPs \u00b7 deduplicated",
+          "expr": "xray_active_client_ips{job=~\"node|spb-node\",node=~\"${node:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
+          "legendFormat": "{{node}} \u00b7 Distinct IPs \u00b7 deduplicated",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -921,8 +1777,8 @@
         },
         {
           "refId": "B",
-          "expr": "xray_active_profile_clients{job=\"node\"} and on(instance) ((xray_online_scrape_success{job=\"node\"} == 1) and on(instance) (up{job=\"node\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=\"node\",file=\"/textfile/xray_online.prom\"}) < 60))",
-          "legendFormat": "{{profile}} profile \u00b7 IP estimate",
+          "expr": "xray_active_profile_clients{job=~\"node|spb-node\",node=~\"${node:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
+          "legendFormat": "{{node}} \u00b7 {{profile}} profile \u00b7 IP estimate",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1009,7 +1865,7 @@
       "type": "stat",
       "gridPos": {
         "x": 12,
-        "y": 15,
+        "y": 30,
         "w": 12,
         "h": 6
       },
@@ -1100,7 +1956,7 @@
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 21,
+        "y": 36,
         "w": 24,
         "h": 1
       },
@@ -1114,7 +1970,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 37,
         "w": 8,
         "h": 7
       },
@@ -1126,8 +1982,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * avg by (mode) (rate(node_cpu_seconds_total{job=\"node\",mode!=\"idle\"}[$__rate_interval]))",
-          "legendFormat": "{{mode}}",
+          "expr": "100 * avg by (node,mode) (rate(node_cpu_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",mode!=\"idle\"}[$__rate_interval]))",
+          "legendFormat": "{{node}} \u00b7 {{mode}}",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1216,7 +2072,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 8,
-        "y": 22,
+        "y": 37,
         "w": 8,
         "h": 7
       },
@@ -1228,8 +2084,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "node_memory_MemAvailable_bytes{job=\"node\"}",
-          "legendFormat": "Available RAM",
+          "expr": "node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"}",
+          "legendFormat": "{{node}} \u00b7 Available RAM",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1240,8 +2096,8 @@
         },
         {
           "refId": "B",
-          "expr": "node_memory_MemTotal_bytes{job=\"node\"}",
-          "legendFormat": "Total RAM",
+          "expr": "node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"}",
+          "legendFormat": "{{node}} \u00b7 Total RAM",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1252,8 +2108,8 @@
         },
         {
           "refId": "C",
-          "expr": "node_memory_SwapTotal_bytes{job=\"node\"} - node_memory_SwapFree_bytes{job=\"node\"}",
-          "legendFormat": "Swap occupied",
+          "expr": "node_memory_SwapTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"} - node_memory_SwapFree_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"}",
+          "legendFormat": "{{node}} \u00b7 Swap occupied",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1340,7 +2196,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 16,
-        "y": 22,
+        "y": 37,
         "w": 8,
         "h": 7
       },
@@ -1352,8 +2208,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_filesystem_avail_bytes{job=\"node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=\"node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-          "legendFormat": "Available space",
+          "expr": "100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+          "legendFormat": "{{node}} \u00b7 Available space",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1364,8 +2220,8 @@
         },
         {
           "refId": "B",
-          "expr": "100 * node_filesystem_files_free{job=\"node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{job=\"node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-          "legendFormat": "Free inodes",
+          "expr": "100 * node_filesystem_files_free{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+          "legendFormat": "{{node}} \u00b7 Free inodes",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1462,7 +2318,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 29,
+        "y": 44,
         "w": 8,
         "h": 7
       },
@@ -1474,8 +2330,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * rate(node_pressure_cpu_waiting_seconds_total{job=\"node\"}[$__rate_interval])",
-          "legendFormat": "CPU",
+          "expr": "100 * rate(node_pressure_cpu_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{node}} \u00b7 CPU",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1486,8 +2342,8 @@
         },
         {
           "refId": "B",
-          "expr": "100 * rate(node_pressure_memory_waiting_seconds_total{job=\"node\"}[$__rate_interval])",
-          "legendFormat": "Memory",
+          "expr": "100 * rate(node_pressure_memory_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{node}} \u00b7 Memory",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1498,8 +2354,8 @@
         },
         {
           "refId": "C",
-          "expr": "100 * rate(node_pressure_io_waiting_seconds_total{job=\"node\"}[$__rate_interval])",
-          "legendFormat": "I/O",
+          "expr": "100 * rate(node_pressure_io_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{node}} \u00b7 I/O",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1588,7 +2444,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 8,
-        "y": 29,
+        "y": 44,
         "w": 8,
         "h": 7
       },
@@ -1600,8 +2456,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (device) (rate(node_network_receive_bytes_total{job=\"node\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
-          "legendFormat": "{{device}} receive",
+          "expr": "sum by (node,device) (rate(node_network_receive_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
+          "legendFormat": "{{node}} \u00b7 {{device}} receive",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1612,8 +2468,8 @@
         },
         {
           "refId": "B",
-          "expr": "sum by (device) (rate(node_network_transmit_bytes_total{job=\"node\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
-          "legendFormat": "{{device}} send",
+          "expr": "sum by (node,device) (rate(node_network_transmit_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
+          "legendFormat": "{{node}} \u00b7 {{device}} send",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1700,7 +2556,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 16,
-        "y": 29,
+        "y": 44,
         "w": 8,
         "h": 7
       },
@@ -1712,8 +2568,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(node_vmstat_pswpin{job=\"node\"}[$__rate_interval])",
-          "legendFormat": "Pages swapped in",
+          "expr": "rate(node_vmstat_pswpin{job=~\"node|spb-node\",node=~\"${node:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{node}} \u00b7 Pages swapped in",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1724,8 +2580,8 @@
         },
         {
           "refId": "B",
-          "expr": "rate(node_vmstat_pswpout{job=\"node\"}[$__rate_interval])",
-          "legendFormat": "Pages swapped out",
+          "expr": "rate(node_vmstat_pswpout{job=~\"node|spb-node\",node=~\"${node:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{node}} \u00b7 Pages swapped out",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1812,7 +2668,7 @@
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 36,
+        "y": 51,
         "w": 24,
         "h": 1
       },
@@ -1826,7 +2682,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 37,
+        "y": 52,
         "w": 12,
         "h": 7
       },
@@ -1936,7 +2792,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 12,
-        "y": 37,
+        "y": 52,
         "w": 12,
         "h": 7
       },
@@ -2036,7 +2892,7 @@
       "type": "table",
       "gridPos": {
         "x": 0,
-        "y": 44,
+        "y": 59,
         "w": 12,
         "h": 6
       },
@@ -2168,7 +3024,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 12,
-        "y": 44,
+        "y": 59,
         "w": 12,
         "h": 6
       },
@@ -2278,7 +3134,7 @@
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 50,
+        "y": 65,
         "w": 24,
         "h": 1
       },
@@ -2291,7 +3147,7 @@
           "type": "state-timeline",
           "gridPos": {
             "x": 0,
-            "y": 51,
+            "y": 66,
             "w": 12,
             "h": 6
           },
@@ -2303,8 +3159,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "up{job=~\"node|kubelet|kube-state-metrics|xray|prometheus\"}",
-              "legendFormat": "{{job}}",
+              "expr": "up{job=~\"node|spb-node|kubelet|kube-state-metrics|xray|prometheus|spb-blackbox|spb-probes\"}",
+              "legendFormat": "{{job}} \u00b7 {{instance}}",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -2383,7 +3239,7 @@
           "type": "timeseries",
           "gridPos": {
             "x": 12,
-            "y": 51,
+            "y": 66,
             "w": 12,
             "h": 6
           },
@@ -2395,8 +3251,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "time() - node_textfile_mtime_seconds{job=\"node\",file=\"/textfile/xray_online.prom\"}",
-              "legendFormat": "Online-client file age",
+              "expr": "time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",file=\"/textfile/xray_online.prom\"}",
+              "legendFormat": "{{node}} \u00b7 Online-client file age",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -2407,8 +3263,8 @@
             },
             {
               "refId": "B",
-              "expr": "scrape_duration_seconds{job=~\"node|kubelet|kube-state-metrics|xray|prometheus\"}",
-              "legendFormat": "{{job}} scrape duration",
+              "expr": "scrape_duration_seconds{job=~\"node|spb-node|kubelet|kube-state-metrics|xray|prometheus|spb-blackbox|spb-probes\"}",
+              "legendFormat": "{{job}} \u00b7 {{instance}}",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -2495,7 +3351,7 @@
           "type": "timeseries",
           "gridPos": {
             "x": 0,
-            "y": 57,
+            "y": 72,
             "w": 12,
             "h": 6
           },
@@ -2507,8 +3363,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by(device) (rate(node_network_receive_errs_total{job=\"node\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_errs_total{job=\"node\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
-              "legendFormat": "{{device}} errors",
+              "expr": "sum by(node,device) (rate(node_network_receive_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
+              "legendFormat": "{{node}} \u00b7 {{device}} errors",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -2519,8 +3375,8 @@
             },
             {
               "refId": "B",
-              "expr": "sum by(device) (rate(node_network_receive_drop_total{job=\"node\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_drop_total{job=\"node\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
-              "legendFormat": "{{device}} drops",
+              "expr": "sum by(node,device) (rate(node_network_receive_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
+              "legendFormat": "{{node}} \u00b7 {{device}} drops",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -2607,7 +3463,7 @@
           "type": "timeseries",
           "gridPos": {
             "x": 12,
-            "y": 57,
+            "y": 72,
             "w": 12,
             "h": 6
           },
@@ -2619,8 +3475,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(container_memory_working_set_bytes{namespace=\"hm\",container=~\"grafana|prometheus|node-exporter|online-clients|kube-state-metrics|xray-exporter\"})",
-              "legendFormat": "Monitoring total",
+              "expr": "sum by(instance) (container_memory_working_set_bytes{job=\"kubelet\",namespace=\"hm\",container=~\"grafana|prometheus|node-exporter|online-clients|kube-state-metrics|xray-exporter|blackbox\"})",
+              "legendFormat": "{{instance}} monitoring",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -2631,8 +3487,8 @@
             },
             {
               "refId": "B",
-              "expr": "node_memory_MemTotal_bytes{job=\"node\"} - node_memory_MemAvailable_bytes{job=\"node\"}",
-              "legendFormat": "Host used RAM",
+              "expr": "node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"} - node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"}",
+              "legendFormat": "{{node}} \u00b7 Host used RAM",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -2719,14 +3575,14 @@
           "type": "text",
           "gridPos": {
             "x": 0,
-            "y": 63,
+            "y": 78,
             "w": 24,
             "h": 7
           },
           "description": "",
           "options": {
             "mode": "markdown",
-            "content": "**Clients cannot connect, server checks green** \u2192 test the existing profile from the affected mobile/Wi-Fi network. This dashboard does not observe ISP/DPI blocking, transaction latency, TLS handshakes or request failures. No end-to-end SLO or error budget is calculated.\n\n**Xray API failed / proxy not ready** \u2192 inspect proxy pod logs and Kubernetes events. API failure can also be an exporter-to-Xray connection failure.\n\n**Clients UNKNOWN** \u2192 check node scraping, online-client file age and the poller logs. Zero means a successful fresh observation with no active source IPs.\n\n**Low memory / restarts** \u2192 compare container-limit utilization with host PSI and swap activity. **Disk low** \u2192 inspect space and inode use before removing data.\n\nThreshold colors are investigation guides, not paging alerts. Seven days of retention starts at Prometheus installation; gaps remain gaps."
+            "content": "**Russia probes fail, direct control succeeds** \u2192 compare REALITY, HTTPS backup and split-default checks. They perform authenticated requests and verify the exit IP. A datacenter probe does not represent every home/mobile ISP.\n\n**Direct control fails** \u2192 check the SPB host/internet before diagnosing VPN blocking. **Telemetry unavailable** \u2192 check scraping, certificates and collector logs.\n\n**Clients UNKNOWN** \u2192 check online-client file freshness and poller logs. Zero means a fresh successful observation with no active source IPs.\n\n**Low memory / restarts** \u2192 compare per-host headroom, PSI and container limits. **Disk low** \u2192 inspect space and inodes.\n\nExisting workloads run on SPB during a control-plane WAN outage, but deployments/reconciliation depend on UK. No residential SLO or notification receiver is configured."
           }
         }
       ]

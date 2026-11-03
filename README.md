@@ -132,7 +132,7 @@ The website ownership init container needs only `CHOWN`; all other capabilities 
 
 ## Grafana and Prometheus
 
-Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing dashboard username and password. The provisioned **VPN / Service Operations** dashboard is the home page. Credentials are stored in a SOPS-encrypted Secret; proxy profiles remain unchanged.
+Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing dashboard username and password. The provisioned **Infrastructure / Operations** dashboard is the home page. Credentials are stored in a SOPS-encrypted Secret; proxy profiles remain unchanged.
 
 Prometheus scrapes every 30 seconds and stores seven days of history, bounded to 750 MB of blocks on a 2 GiB volume. Grafana has a separate 1 GiB volume for its settings. Both volumes use the VPS disk, so they do not survive loss of the VPS. History starts when Prometheus is deployed; the previous SQLite history volume is retained as an archive and is not imported.
 
@@ -163,7 +163,7 @@ kubectl kustomize cluster/clusters/edge-01 >/dev/null
 
 The overview follows the incident path: server-side health, authenticated traffic, host capacity, then workload diagnostics. The Workload selector filters only workload panels; headline service health always refers to the VPN. Expand **Telemetry & failure diagnostics** to investigate missing data, collector freshness and host network errors.
 
-- **VPN fails, server checks green:** test the existing client profile from the affected ISP. Internal API health and pod readiness do not measure end-to-end reachability, latency, handshake errors or DPI blocking. These signals are not instrumented, so the dashboard does not claim a client-facing SLO or error budget.
+- **VPN fails, server checks green:** test the existing client profile from the affected ISP. Compare the authenticated Russia probes with the direct-internet control. They measure datacenter reachability and request duration, but cannot establish availability from every residential/mobile ISP or a client-facing SLO.
 - **API failed or pod not ready:** inspect `kubectl -n hm logs deployment/proxy-service` and pod events. Check collector health before interpreting missing data.
 - **Client count unknown:** inspect node-exporter and its `online-clients` container. Counts require a successful scrape, successful native API poll and a textfile younger than 60 seconds. A successful observation with no sessions shows zero. Counts remain a lower-bound IP estimate.
 - **Memory pressure:** compare MemAvailable with Linux pressure stall information (PSI), swapping and each container's working set / configured memory limit. Occupied swap alone does not prove current pressure.
@@ -182,7 +182,7 @@ Both hosts use the same Ansible `vm/playbooks/bootstrap.yml` bootstrap and Flux 
 
 The SPB gateway runs Xray plus a blackbox-exporter sidecar. `conf/spb-01/routing.json` is an explicit domain suffix allowlist for Russian egress, not a blanket `.ru` exception. Unknown destinations use the original upstream through either REALITY or HTTPS/XHTTP; failure never switches foreign traffic to Russian direct egress. SOCKS probe ports are loopback-only inside the pod; native StatsService is protected by a NetworkPolicy. Node/blackbox metrics use mTLS. TLS private material and Xray configuration are SOPS encrypted. Certificates must be renewed before November 2027.
 
-The SPB dashboard is `/status/d/hm-spb`. It includes host RAM/CPU/network, client estimate and five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
+Both hosts share one dashboard at `/status/d/hm-services`. The host selector filters capacity and client counts; workload diagnostics cover both nodes. It includes host RAM/CPU/network, client estimate and five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
 
 For client import, use the private `hm-spb-smart-routing.txt` VLESS profile provided outside Git. Existing upstream profiles remain valid. The bootstrap password is unnecessary after key-only SSH is configured.
 
