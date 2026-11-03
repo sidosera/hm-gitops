@@ -14,6 +14,7 @@ modules:
       - (?i)MyAnimeList
       fail_if_body_matches_regexp:
       - (?is)<title>\s*(Just a moment|Access Denied|Attention Required)
+      skip_resolve_phase_with_proxy: true
   website_youtube:
     prober: http
     timeout: 20s
@@ -29,6 +30,7 @@ modules:
       - (?i)YouTube
       fail_if_body_matches_regexp:
       - (?is)<title>\s*(Just a moment|Access Denied|Attention Required)
+      skip_resolve_phase_with_proxy: true
   website_facebook:
     prober: http
     timeout: 20s
@@ -44,6 +46,7 @@ modules:
       - (?i)Facebook
       fail_if_body_matches_regexp:
       - (?is)<title>\s*(Just a moment|Access Denied|Attention Required)
+      skip_resolve_phase_with_proxy: true
   website_instagram:
     prober: http
     timeout: 20s
@@ -59,6 +62,7 @@ modules:
       - (?i)Instagram
       fail_if_body_matches_regexp:
       - (?is)<title>\s*(Just a moment|Access Denied|Attention Required)
+      skip_resolve_phase_with_proxy: true
   website_x:
     prober: http
     timeout: 20s
@@ -74,6 +78,7 @@ modules:
       - (?i)(twitter|x\.com)
       fail_if_body_matches_regexp:
       - (?is)<title>\s*(Just a moment|Access Denied|Attention Required)
+      skip_resolve_phase_with_proxy: true
   exit:
     prober: http
     timeout: 20s
@@ -87,3 +92,74 @@ modules:
       body_size_limit: 64KiB
       fail_if_body_not_matches_regexp:
       - ^87\.106\.74\.217$
+      skip_resolve_phase_with_proxy: true
+  direct_website_myanimelist:
+    prober: http
+    timeout: 20s
+    http:
+      valid_status_codes:
+      - 200
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      follow_redirects: true
+      body_size_limit: 2MiB
+      fail_if_body_not_matches_regexp:
+      - (?i)MyAnimeList
+      fail_if_body_matches_regexp:
+      - (?is)<title>\s*(Just a moment|Access Denied|Attention Required)
+  direct_website_youtube:
+    prober: http
+    timeout: 20s
+    http:
+      valid_status_codes:
+      - 200
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      follow_redirects: true
+      body_size_limit: 2MiB
+      fail_if_body_not_matches_regexp:
+      - (?i)YouTube
+      fail_if_body_matches_regexp:
+      - (?is)<title>\s*(Just a moment|Access Denied|Attention Required)
+  direct_website_facebook:
+    prober: http
+    timeout: 20s
+    http:
+      valid_status_codes:
+      - 200
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      follow_redirects: true
+      body_size_limit: 2MiB
+      fail_if_body_not_matches_regexp:
+      - (?i)Facebook
+      fail_if_body_matches_regexp:
+      - (?is)<title>\s*(Just a moment|Access Denied|Attention Required)
+  direct_website_instagram:
+    prober: http
+    timeout: 20s
+    http:
+      valid_status_codes:
+      - 200
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      follow_redirects: true
+      body_size_limit: 2MiB
+      fail_if_body_not_matches_regexp:
+      - (?i)Instagram
+      fail_if_body_matches_regexp:
+      - (?is)<title>\s*(Just a moment|Access Denied|Attention Required)
+  direct_website_x:
+    prober: http
+    timeout: 20s
+    http:
+      valid_status_codes:
+      - 200
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      follow_redirects: true
+      body_size_limit: 2MiB
+      fail_if_body_not_matches_regexp:
+      - (?i)(twitter|x\.com)
+      fail_if_body_matches_regexp:
+      - (?is)<title>\s*(Just a moment|Access Denied|Attention Required)

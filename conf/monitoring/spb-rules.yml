@@ -3,15 +3,16 @@ groups:
   interval: 30s
   rules:
   - alert: GatewayTransportUnavailable
-    expr: (probe_success{job="gateway-transport-probes",check=~"primary|backup|split-default"} ==
-      0) and on(instance) (probe_success{job="gateway-transport-probes",check="internet"} == 1)
+    expr: (probe_success{job="gateway-transport-probes",check=~"primary|backup|split-default"}
+      == 0) and on(instance) (probe_success{job="gateway-transport-probes",check="internet"}
+      == 1)
     for: 3m
     labels:
       severity: warning
       service: gateway
     annotations:
-      summary: Gateway in {{ $labels.source_zone }} {{ $labels.check }} path cannot reach
-        the expected upstream exit
+      summary: Gateway in {{ $labels.source_zone }} {{ $labels.check }} path cannot
+        reach the expected upstream exit
       description: Direct internet control succeeds but this authenticated path fails.
         Check the transport and compare backup. This is a datacenter vantage point,
         not a residential ISP.
@@ -24,7 +25,8 @@ groups:
     annotations:
       summary: Gateway in {{ $labels.source_zone }} telemetry unavailable
       description: Monitoring cannot reach an mTLS endpoint; VPN blocking is not established.
-        Check the source host, certificates, source-IP firewall rules and network path.
+        Check the source host, certificates, source-IP firewall rules and network
+        path.
   - alert: GatewayInternetUnavailable
     expr: probe_success{job="gateway-transport-probes",check="internet"} == 0
     for: 3m
@@ -33,8 +35,8 @@ groups:
       service: gateway
     annotations:
       summary: Gateway in {{ $labels.source_zone }} direct-internet control failed
-      description: Do not diagnose this as a VPN transport block; check the source network
-        and the control target.
+      description: Do not diagnose this as a VPN transport block; check the source
+        network and the control target.
 - name: vpn-end-to-end
   interval: 30s
   rules:
@@ -44,16 +46,16 @@ groups:
     labels:
       severity: warning
     annotations:
-      summary: '{{ $labels.site }} failed through {{ $labels.target_region }} Gateway
-        from {{ $labels.source_region }}'
-      description: A real client using the public VPN listener could not fetch the
-        expected HTTPS page. Inspect HTTP status, matching client-exit check and transport
-        diagnostics; the destination may also reject VPN traffic.
+      summary: '{{ $labels.site }} failed through {{ $labels.target_zone }} Gateway
+        from {{ $labels.source_zone }}'
+      description: The VPN client could not fetch the expected HTTPS page. Compare
+        the direct baseline for the same site, exit-IP check and transport diagnostics.
+        A destination can also reject VPN egress.
   - alert: VPNProbeUnavailable
     expr: up{job="vpn-client-probes"} == 0
     for: 3m
     labels:
       severity: warning
     annotations:
-      summary: VPN Probe in {{ $labels.source_region }} unavailable
+      summary: VPN Probe in {{ $labels.source_zone }} unavailable
       description: Probe telemetry is unavailable; website connectivity is unknown.

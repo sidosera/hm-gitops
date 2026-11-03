@@ -56,7 +56,7 @@ class DashboardFilterTests(unittest.TestCase):
             self.assertIn('${entry_zone:regex}', target['expr'])
         path = by_id[20]['targets'][0]['expr']
         self.assertIn('${source_zone:regex}', path)
-        self.assertIn('${target_zone:regex}', path)
+        self.assertNotIn('${target_zone:regex}', path)
         self.assertNotIn('${entry_zone:regex}', path)
         self.assertIn('source_zone!=""', path)
         self.assertIn('target_zone!=""', path)

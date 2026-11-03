@@ -27,16 +27,27 @@ class VPNProbeTests(unittest.TestCase):
             self.assertFalse(http.get('tls_config', {}).get('insecure_skip_verify', False))
             self.assertEqual(http['fail_if_body_not_matches_regexp'], [site['content_match']])
 
-    def test_both_directions_test_all_sites_via_remote_public_entries(self):
+    def test_only_spb_runs_paired_direct_and_vpn_checks(self):
         config = yaml.safe_load((ROOT / 'conf/monitoring/prometheus.yml').read_text())
         job = next(j for j in config['scrape_configs'] if j['job_name'] == 'vpn-client-probes')
         web = [t for t in job['static_configs'] if t['labels']['check'] == 'client-web']
         self.assertEqual(len(web), 10)
-        for source, dest in [('ru-spb-1', 'uk-ldn-1'), ('uk-ldn-1', 'ru-spb-1')]:
-            checks = [t for t in web if t['labels']['source_zone'] == source and t['labels']['target_zone'] == dest]
-            self.assertEqual(len(checks), 5)
-            self.assertTrue(all(t['labels']['service'] == 'vpn-probe' for t in checks))
+        modules = yaml.safe_load((ROOT / 'services/vpn-probe/base/blackbox.yml').read_text())['modules']
+        for site in {t['labels']['site'] for t in web}:
+            pair = [t for t in web if t['labels']['site'] == site]
+            self.assertEqual({t['labels']['access'] for t in pair}, {'vpn', 'direct'})
+            self.assertEqual(pair[0]['targets'], pair[1]['targets'])
+            vpn = next(t for t in pair if t['labels']['access'] == 'vpn')
+            direct = next(t for t in pair if t['labels']['access'] == 'direct')
+            a = copy.deepcopy(modules[vpn['labels']['module']])
+            a['http'].pop('proxy_url')
+            self.assertTrue(a['http'].pop('skip_resolve_phase_with_proxy'))
+            self.assertEqual(a, modules[direct['labels']['module']])
+        self.assertTrue(all(t['labels']['source_zone'] == 'ru-spb-1' for t in job['static_configs']))
         self.assertEqual(job['scrape_interval'], '60s')
+        resources = yaml.safe_load((ROOT / 'cluster/clusters/hm-cluster/kustomization.yaml').read_text())['resources']
+        self.assertNotIn('../../../services/vpn-probe/overlays/uk-ldn-1', resources)
+        self.assertIn('../../../services/vpn-probe/overlays/ru-spb-1', resources)
 
     def test_regional_deployments_share_runtime_and_have_no_public_metrics_ports(self):
         images = []
@@ -48,6 +59,9 @@ class VPNProbeTests(unittest.TestCase):
             self.assertFalse(pod['automountServiceAccountToken'])
             self.assertEqual(pod['nodeSelector']['topology.kubernetes.io/zone'], region)
             self.assertEqual(len(pod['containers']), 2)
+            if region == 'ru-spb-1':
+                self.assertEqual(pod['dnsPolicy'], 'None')
+                self.assertEqual(pod['dnsConfig']['nameservers'], ['141.8.194.254', '141.8.197.254'])
             # SOCKS stays on loopback, so kubelet TCP probes to the pod IP cannot work.
             self.assertNotIn('tcpSocket', pod['containers'][0].get('readinessProbe', {}))
             for container in pod['containers']:
@@ -84,13 +98,16 @@ class VPNProbeTests(unittest.TestCase):
         self.assertEqual((remote['address'], remote['port']), ('203.0.113.10', 443))
         self.assertEqual(client['routing']['rules'][0]['outboundTag'], 'public-vpn')
 
-    def test_vpn_primary_panel_uses_public_client_results_and_site_filter(self):
+    def test_vpn_matrix_uses_one_minute_minimum_and_unknown_telemetry(self):
         d = json.loads((ROOT / 'conf/monitoring/vpn.json').read_text())
         main = next(p for p in d['panels'] if p['id'] == 30)
         expr = main['targets'][0]['expr']
-        for selector in ['${source_zone:regex}', '${target_zone:regex}', '${site:regex}', 'probe_scope="public-client"']:
+        for selector in ['${source_zone:regex}', '${site:regex}', 'min_over_time(', '[1m]', 'timestamp(up', 'time() - 60']:
             self.assertIn(selector, expr)
-        self.assertTrue(any(v['name'] == 'site' for v in d['templating']['list']))
+        self.assertEqual(main['type'], 'table')
+        self.assertTrue(main['targets'][0]['instant'])
+        self.assertEqual(main['transformations'][0]['options'], {'columnField': 'access', 'rowField': 'site', 'valueField': 'Value', 'emptyValue': 'null'})
+        self.assertNotIn('target_zone', {v['name'] for v in d['templating']['list']})
         self.assertFalse(any(p['id'] == 20 for p in d['panels']))
 
 

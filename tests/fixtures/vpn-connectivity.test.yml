@@ -1,0 +1,49 @@
+rule_files: []
+evaluation_interval: 15s
+tests:
+- interval: 15s
+  input_series:
+  - series: probe_success{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="ok",access="vpn",instance="https://ok/"}
+    values: 1 1 1 1 1
+  - series: up{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="ok",access="vpn",instance="https://ok/"}
+    values: 1 1 1 1 1
+  - series: probe_success{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="failed",access="vpn",instance="https://failed/"}
+    values: 1 1 1 0 1
+  - series: up{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="failed",access="vpn",instance="https://failed/"}
+    values: 1 1 1 1 1
+  - series: probe_success{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="missing",access="vpn",instance="https://missing/"}
+    values: 1 _ _ _ _
+  - series: up{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="missing",access="vpn",instance="https://missing/"}
+    values: 1 1 1 1 1
+  - series: probe_success{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="down",access="vpn",instance="https://down/"}
+    values: 1 1 1 1 1
+  - series: up{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="down",access="vpn",instance="https://down/"}
+    values: 1 1 1 1 0
+  - series: probe_success{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="ok",access="direct",instance="https://ok/"}
+    values: 0 0 0 0 0
+  - series: up{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="ok",access="direct",instance="https://ok/"}
+    values: 1 1 1 1 1
+  - series: probe_success{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="stale",access="vpn",instance="https://stale/"}
+    values: 1 _ _ _ _
+  - series: up{cluster="hm-cluster",job="vpn-client-probes",check="client-web",source_zone="ru-spb-1",site="stale",access="vpn",instance="https://stale/"}
+    values: 1 _ _ _ _
+  promql_expr_test:
+  - expr: min by(site,access) (min_over_time(probe_success{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}[1m])
+      and on(cluster,instance,source_zone,access,site,check) (up{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}
+      == 1) and on(cluster,instance,source_zone,access,site,check) (timestamp(up{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"})
+      > time() - 60)) or on(site,access) (0 * max by(site,access) (up{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"})
+      - 1)
+    eval_time: 1m
+    exp_samples:
+    - labels: '{site="ok",access="vpn"}'
+      value: 1
+    - labels: '{site="ok",access="direct"}'
+      value: 0
+    - labels: '{site="failed",access="vpn"}'
+      value: 0
+    - labels: '{site="missing",access="vpn"}'
+      value: -1
+    - labels: '{site="down",access="vpn"}'
+      value: -1
+    - labels: '{site="stale",access="vpn"}'
+      value: -1

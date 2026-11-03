@@ -29,3 +29,11 @@ patches:
     name: vpn-probe
   patch: "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name:\
     \ vpn-probe\nspec:\n  podSelector:\n    matchLabels:\n      hm.gitops/zone: ru-spb-1\n"
+- target:
+    kind: Deployment
+    name: vpn-probe
+  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: vpn-probe\nspec:\n\
+    \  template:\n    spec:\n      dnsPolicy: None\n      dnsConfig:\n        nameservers:\n\
+    \        - 141.8.194.254\n        - 141.8.197.254\n        options:\n        -\
+    \ name: timeout\n          value: '2'\n        - name: attempts\n          value:\
+    \ '2'\n"

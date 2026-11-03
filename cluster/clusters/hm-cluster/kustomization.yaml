@@ -7,5 +7,4 @@ resources:
   - ../../../services/gateway/overlays/uk-ldn-1
   - monitoring
   - ../../../services/gateway/overlays/ru-spb-1
-  - ../../../services/vpn-probe/overlays/uk-ldn-1
   - ../../../services/vpn-probe/overlays/ru-spb-1
