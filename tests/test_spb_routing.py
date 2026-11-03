@@ -49,8 +49,8 @@ class RoutingSafetyTests(unittest.TestCase):
         self.assertEqual(b['fallbackTag'], 'uk-backup')
         self.assertEqual(self.config['routing']['domainStrategy'], 'AsIs')
 
-    def test_diagnostic_ports_and_stats_are_loopback_only(self):
-        self.assertEqual([x['tag'] for x in self.config['inbounds'] if x['listen'] != '127.0.0.1'], ['gateway'])
+    def test_diagnostic_socks_are_loopback_and_stats_pod_bound(self):
+        self.assertEqual([x['tag'] for x in self.config['inbounds'] if x['listen'] != '127.0.0.1'], ['gateway', 'api-in'])
         self.assertEqual(self.config['api']['services'], ['StatsService'])
 
     def test_reject_broad_wildcards_in_direct_policy(self):

@@ -22,7 +22,11 @@
     _k3s_server_config: "{{ _base | combine(_ipv6_extra) }}"
   vars:
     _base:
-      write-kubeconfig-mode: "0644"
+      write-kubeconfig-mode: "0600"
+      flannel-backend: wireguard-native
+      flannel-external-ip: true
+      node-external-ip: "{{ ansible_host }}"
+      node-label: "{{ ['svccontroller.k3s.cattle.io/enablelb=true'] if hm_service_lb | default(false) else [] }}"
       tls-san: "{{ [hm_bootstrap_api_host] + ([hm_node_ipv6] if hm_node_ipv6 | length > 0 else []) }}"
     _ipv6_extra: >-
       {{
@@ -56,6 +60,7 @@
   ansible.builtin.command: /usr/local/src/k3s-install.sh
   environment:
     INSTALL_K3S_CHANNEL: "{{ hm_k3s_channel_effective }}"
+    INSTALL_K3S_VERSION: "{{ hm_k3s_version | default('') }}"
     INSTALL_K3S_EXEC: "server"
   args:
     creates: /usr/local/bin/k3s
@@ -95,18 +100,22 @@
 - name: Read cluster join token from bootstrap node
   ansible.builtin.slurp:
     src: /var/lib/rancher/k3s/server/node-token
+  no_log: true
   register: hm_k3s_node_token_raw
   when: hm_is_bootstrap | bool
 
 - name: Publish cluster join token
+  no_log: true
   ansible.builtin.set_fact:
     hm_k3s_cluster_token: "{{ hm_k3s_node_token_raw.content | b64decode | trim }}"
   when: hm_is_bootstrap | bool
 
 - name: Install additional k3s server nodes
+  no_log: true
   ansible.builtin.command: /usr/local/src/k3s-install.sh
   environment:
     INSTALL_K3S_CHANNEL: "{{ hm_k3s_channel_effective }}"
+    INSTALL_K3S_VERSION: "{{ hm_k3s_version | default('') }}"
     INSTALL_K3S_EXEC: "server --server https://{{ hm_bootstrap_api_host }}:6443"
     K3S_TOKEN: "{{ hostvars[hm_bootstrap_host].hm_k3s_cluster_token }}"
   args:

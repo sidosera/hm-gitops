@@ -61,3 +61,5 @@ spec:
           timeoutSeconds: 5
       volumes: []
       serviceAccountName: kube-state-metrics
+      nodeSelector:
+        kubernetes.io/hostname: machine

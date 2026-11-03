@@ -75,3 +75,17 @@ spec:
   resources:
     requests:
       storage: 2Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-xray-stats
+  namespace: hm
+spec:
+  selector:
+    hm.gitops/xray: 'true'
+  internalTrafficPolicy: Local
+  ports:
+  - port: 10085
+    targetPort: 10085

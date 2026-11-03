@@ -16,6 +16,7 @@ spec:
       labels:
         app.kubernetes.io/name: proxy-service
         app.kubernetes.io/component: edge
+        hm.gitops/xray: 'true'
       annotations:
         hm.gitops/config-revision: 2026-11-03-spb-relay
     spec:
@@ -24,60 +25,62 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: proxy-service
-          imagePullPolicy: IfNotPresent
-          args:
-            - run
-            - -c
-            - /usr/local/etc/xray/config.json
-          ports:
-            - name: reality
-              containerPort: 10443
-            - name: xhttp
-              containerPort: 18080
-            - name: realv2
-              containerPort: 11443
-            - name: stats-api
-              containerPort: 10085
-            - name: metrics
-              containerPort: 11111
-          startupProbe:
-            tcpSocket:
-              port: reality
-            periodSeconds: 5
-            failureThreshold: 12
-          readinessProbe:
-            tcpSocket:
-              port: reality
-            periodSeconds: 10
-          livenessProbe:
-            tcpSocket:
-              port: reality
-            periodSeconds: 20
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 65532
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              memory: 256Mi
-          volumeMounts:
-            - name: config
-              mountPath: /usr/local/etc/xray
-              readOnly: true
-      volumes:
+      - name: proxy-service
+        imagePullPolicy: IfNotPresent
+        args:
+        - run
+        - -c
+        - /usr/local/etc/xray/config.json
+        ports:
+        - name: reality
+          containerPort: 10443
+        - name: xhttp
+          containerPort: 18080
+        - name: realv2
+          containerPort: 11443
+        - name: stats-api
+          containerPort: 10085
+        - name: metrics
+          containerPort: 11111
+        startupProbe:
+          tcpSocket:
+            port: reality
+          periodSeconds: 5
+          failureThreshold: 12
+        readinessProbe:
+          tcpSocket:
+            port: reality
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: reality
+          periodSeconds: 20
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+        volumeMounts:
         - name: config
-          secret:
-            secretName: proxy-service-config-source
-            defaultMode: 292
+          mountPath: /usr/local/etc/xray
+          readOnly: true
+      volumes:
+      - name: config
+        secret:
+          secretName: proxy-service-config-source
+          defaultMode: 292
       terminationGracePeriodSeconds: 30
+      nodeSelector:
+        kubernetes.io/hostname: machine
   strategy:
     type: RollingUpdate
     rollingUpdate:

@@ -1,0 +1,64 @@
+modules:
+  uk_primary:
+    prober: http
+    timeout: 12s
+    http:
+      valid_status_codes:
+      - 200
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      proxy_url: socks5://127.0.0.1:10811
+      follow_redirects: false
+      body_size_limit: 64KiB
+      fail_if_body_not_matches_regexp:
+      - ^87\.106\.74\.217$
+  uk_backup:
+    prober: http
+    timeout: 12s
+    http:
+      valid_status_codes:
+      - 200
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      proxy_url: socks5://127.0.0.1:10812
+      follow_redirects: false
+      body_size_limit: 64KiB
+      fail_if_body_not_matches_regexp:
+      - ^87\.106\.74\.217$
+  split_default:
+    prober: http
+    timeout: 12s
+    http:
+      valid_status_codes:
+      - 200
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      proxy_url: socks5://127.0.0.1:10813
+      follow_redirects: false
+      body_size_limit: 64KiB
+      fail_if_body_not_matches_regexp:
+      - ^87\.106\.74\.217$
+  ru_direct:
+    prober: http
+    timeout: 12s
+    http:
+      valid_status_codes:
+      - 200
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      proxy_url: socks5://127.0.0.1:10814
+      follow_redirects: false
+      body_size_limit: 64KiB
+      fail_if_body_not_matches_regexp:
+      - ^212\.116\.115\.29$
+  ru_http:
+    prober: http
+    timeout: 12s
+    http:
+      valid_status_codes:
+      - 200
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      proxy_url: socks5://127.0.0.1:10813
+      follow_redirects: true
+      body_size_limit: 1MiB

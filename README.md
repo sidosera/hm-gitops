@@ -172,3 +172,18 @@ The overview follows the incident path: server-side health, authenticated traffi
 Traffic rates use Grafana's adaptive rate interval with a 30-second scrape interval; selected-window transfer totals use reset-aware increases. Missing samples remain gaps. PSI begins at this rollout; older periods have no PSI history. Recent restarts use a rolling 15-minute window and do not count pod replacements. Container limit panels omit containers without a memory limit.
 
 The layout follows [Google SRE monitoring guidance](https://sre.google/sre-book/monitoring-distributed-systems/) while making unmeasured user-path signals explicit.
+
+
+## Two-host routing and low-memory deployment
+
+Both hosts use the same Ansible `vm/playbooks/bootstrap.yml` bootstrap and Flux Git/Kustomize deployment. The original `machine` node runs the control plane and central Prometheus/Grafana. `spb-01` (212.116.115.29, 543 MiB) is a tainted K3s worker, without a second control plane or monitoring database. Shared node-exporter/online-client collectors are one DaemonSet on both nodes. Application deployments do not use standalone systemd services.
+
+`cluster/clusters/edge-01/hosts.yml` declares server and worker inventories and pins their K3s version. Flannel uses `wireguard-native` with external node addresses; only peer IPv4 addresses may reach UDP 51820/51821. ServiceLB runs on `machine`, leaving SPB TCP 443 for the gateway. SPB's taint keeps unrelated workloads off its small memory budget. The API server and Git reconciliation are central: a WAN outage interrupts reconciliation, while existing gateway containers continue running. Do not delete/restart healthy pods during a partition.
+
+The SPB gateway runs Xray plus a blackbox-exporter sidecar. `conf/spb-01/routing.json` is an explicit domain suffix allowlist for Russian egress, not a blanket `.ru` exception. Unknown destinations use the original upstream through either REALITY or HTTPS/XHTTP; failure never switches foreign traffic to Russian direct egress. SOCKS probe ports are loopback-only inside the pod; native StatsService is protected by a NetworkPolicy. Node/blackbox metrics use mTLS. TLS private material and Xray configuration are SOPS encrypted. Certificates must be renewed before November 2027.
+
+The SPB dashboard is `/status/d/hm-spb`. It includes host RAM/CPU/network, client estimate and five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
+
+For client import, use the private `hm-spb-smart-routing.txt` VLESS profile provided outside Git. Existing upstream profiles remain valid. The bootstrap password is unnecessary after key-only SSH is configured.
+
+On small hosts: only source-controller and kustomize-controller are needed by Flux; unused Helm/notification controllers are suspended. Xray/node-exporter/blackbox/online collectors have bounded memory. The node-exporter init container streams its checksum-verified stats-client archive to disk, avoiding an archive-sized RAM allocation. Optional desktop/update GUI daemons are disabled; unattended security upgrades remain enabled. No swap is enabled on the SPB Kubernetes worker.

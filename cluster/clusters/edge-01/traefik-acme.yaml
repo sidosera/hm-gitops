@@ -5,6 +5,8 @@ metadata:
   namespace: kube-system
 spec:
   valuesContent: |
+    nodeSelector:
+      kubernetes.io/hostname: machine
     additionalArguments:
       - --entrypoints.websecure.address=[::]:8443
       - --certificatesresolvers.le.acme.email=admin@hackamonth.io

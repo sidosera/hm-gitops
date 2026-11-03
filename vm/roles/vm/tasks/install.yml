@@ -3,4 +3,8 @@
 - name: Host hardening (UFW, SSH snippet, etc.)
   ansible.builtin.include_tasks: security.yml
   when: (hm_machine_profile.apply_security | default(hm_apply_security)) | bool
+- ansible.builtin.include_tasks: low-memory.yml
 - ansible.builtin.include_tasks: k3s.yml
+  when: not (hm_is_agent | default(false) | bool)
+- ansible.builtin.include_tasks: k3s-agent.yml
+  when: hm_is_agent | default(false) | bool

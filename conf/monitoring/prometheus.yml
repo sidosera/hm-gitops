@@ -3,46 +3,123 @@ global:
   evaluation_interval: 30s
   scrape_timeout: 8s
 scrape_configs:
-  - job_name: prometheus
-    static_configs:
-      - targets:
-          - localhost:9090
-    metric_relabel_configs:
-      - source_labels:
-          - __name__
-        regex: prometheus_tsdb_head_series|prometheus_tsdb_storage_blocks_bytes|process_resident_memory_bytes
-        action: keep
-  - job_name: node
-    static_configs:
-      - targets:
-          - 87.106.74.217:9100
-        labels:
-          node: machine
-    sample_limit: 1500
-  - job_name: kubelet
-    scheme: https
-    metrics_path: /metrics/resource
-    authorization:
-      credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-    tls_config:
-      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-    static_configs:
-      - targets:
-          - 87.106.74.217:10250
-    metric_relabel_configs:
-      - source_labels:
-          - __name__
-        regex: node_cpu_usage_seconds_total|node_memory_working_set_bytes|container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_start_time_seconds|pod_cpu_usage_seconds_total|pod_memory_working_set_bytes
-        action: keep
-    sample_limit: 2000
-  - job_name: kube-state-metrics
-    static_configs:
-      - targets:
-          - kube-state-metrics.hm.svc.cluster.local:8080
-    sample_limit: 1500
-  - job_name: xray
-    metrics_path: /scrape
-    static_configs:
-      - targets:
-          - xray-exporter.hm.svc.cluster.local:9550
-    sample_limit: 500
+- job_name: prometheus
+  static_configs:
+  - targets:
+    - localhost:9090
+  metric_relabel_configs:
+  - source_labels:
+    - __name__
+    regex: prometheus_tsdb_head_series|prometheus_tsdb_storage_blocks_bytes|process_resident_memory_bytes
+    action: keep
+- job_name: node
+  static_configs:
+  - targets:
+    - 87.106.74.217:9100
+    labels:
+      node: machine
+  sample_limit: 1500
+  scheme: https
+  tls_config: &id001
+    ca_file: /etc/prometheus/spb-tls/ca.crt
+    cert_file: /etc/prometheus/spb-tls/tls.crt
+    key_file: /etc/prometheus/spb-tls/tls.key
+- job_name: kubelet
+  scheme: https
+  metrics_path: /metrics/resource
+  authorization:
+    credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+  tls_config:
+    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  static_configs:
+  - targets:
+    - 87.106.74.217:10250
+  - targets:
+    - 212.116.115.29:10250
+  metric_relabel_configs:
+  - source_labels:
+    - __name__
+    regex: node_cpu_usage_seconds_total|node_memory_working_set_bytes|container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_start_time_seconds|pod_cpu_usage_seconds_total|pod_memory_working_set_bytes
+    action: keep
+  sample_limit: 2000
+- job_name: kube-state-metrics
+  static_configs:
+  - targets:
+    - kube-state-metrics.hm.svc.cluster.local:8080
+  sample_limit: 1500
+- job_name: xray
+  metrics_path: /scrape
+  static_configs:
+  - targets:
+    - xray-exporter.hm.svc.cluster.local:9550
+  sample_limit: 500
+- job_name: spb-node
+  scheme: https
+  tls_config: *id001
+  static_configs:
+  - targets:
+    - 212.116.115.29:9100
+    labels:
+      node: spb-01
+      region: spb
+  sample_limit: 1500
+- job_name: spb-blackbox
+  scheme: https
+  tls_config: *id001
+  static_configs:
+  - targets:
+    - 212.116.115.29:9115
+    labels:
+      node: spb-01
+  sample_limit: 500
+- job_name: spb-probes
+  scheme: https
+  metrics_path: /probe
+  scrape_interval: 30s
+  scrape_timeout: 15s
+  tls_config: *id001
+  static_configs:
+  - targets:
+    - https://api.ipify.org
+    labels:
+      check: primary
+      module: uk_primary
+      node: spb-01
+  - targets:
+    - https://api.ipify.org
+    labels:
+      check: backup
+      module: uk_backup
+      node: spb-01
+  - targets:
+    - https://api.ipify.org
+    labels:
+      check: internet
+      module: ru_direct
+      node: spb-01
+  - targets:
+    - https://api.ipify.org
+    labels:
+      check: split-default
+      module: split_default
+      node: spb-01
+  - targets:
+    - https://ya.ru
+    labels:
+      check: ru-site
+      module: ru_http
+      node: spb-01
+  relabel_configs:
+  - source_labels:
+    - __address__
+    target_label: __param_target
+  - source_labels:
+    - module
+    target_label: __param_module
+  - target_label: instance
+    replacement: spb-01
+  - target_label: __address__
+    replacement: 212.116.115.29:9115
+  sample_limit: 100
+rule_files:
+- /etc/prometheus/spb-rules.yml

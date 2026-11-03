@@ -21,85 +21,97 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: prometheus
-          image: docker.io/prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
-          args:
-            - --config.file=/etc/prometheus/prometheus.yml
-            - --storage.tsdb.path=/prometheus
-            - --storage.tsdb.retention.time=7d
-            - --storage.tsdb.retention.size=750MB
-            - --query.max-concurrency=4
-            - --query.max-samples=500000
-            - --query.timeout=15s
-          env:
-            - name: GOMEMLIMIT
-              value: 192MiB
-          ports:
-            - name: http
-              containerPort: 9090
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          resources:
-            requests:
-              cpu: 50m
-              memory: 96Mi
-            limits:
-              memory: 256Mi
-          volumeMounts:
-            - name: config
-              mountPath: /etc/prometheus
-              readOnly: true
-            - name: data
-              mountPath: /prometheus
-          readinessProbe:
-            httpGet:
-              path: /-/ready
-              port: http
-            initialDelaySeconds: 5
-          livenessProbe:
-            httpGet:
-              path: /-/healthy
-              port: http
-            initialDelaySeconds: 30
-      volumes:
+      - name: prometheus
+        image: docker.io/prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+        args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=7d
+        - --storage.tsdb.retention.size=750MB
+        - --query.max-concurrency=4
+        - --query.max-samples=500000
+        - --query.timeout=15s
+        env:
+        - name: GOMEMLIMIT
+          value: 192MiB
+        ports:
+        - name: http
+          containerPort: 9090
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 96Mi
+          limits:
+            memory: 256Mi
+        volumeMounts:
         - name: config
-          configMap:
-            name: prometheus-config
+          mountPath: /etc/prometheus
+          readOnly: true
         - name: data
-          persistentVolumeClaim:
-            claimName: prometheus-data
+          mountPath: /prometheus
+        - name: spb-tls
+          mountPath: /etc/prometheus/spb-tls
+          readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: http
+          initialDelaySeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: http
+          initialDelaySeconds: 30
+      volumes:
+      - name: config
+        configMap:
+          name: prometheus-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: prometheus-data
+      - name: spb-tls
+        secret:
+          secretName: spb-monitoring-client-tls
+          defaultMode: 288
       serviceAccountName: prometheus
       initContainers:
-        - name: validate-config
-          image: docker.io/prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
-          command:
-            - /bin/promtool
-            - check
-            - config
-            - /etc/prometheus/prometheus.yml
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          resources:
-            requests:
-              cpu: 10m
-              memory: 32Mi
-            limits:
-              memory: 96Mi
-          volumeMounts:
-            - name: config
-              mountPath: /etc/prometheus
-              readOnly: true
+      - name: validate-config
+        image: docker.io/prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+        command:
+        - /bin/promtool
+        - check
+        - config
+        - /etc/prometheus/prometheus.yml
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 96Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+          readOnly: true
+        - name: spb-tls
+          mountPath: /etc/prometheus/spb-tls
+          readOnly: true
+      nodeSelector:
+        kubernetes.io/hostname: machine

@@ -1,0 +1,30 @@
+---
+- name: Keep IPv6 router advertisements while forwarding pod traffic
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/90-hm-kubernetes.conf
+    mode: '0644'
+    content: |
+      net.ipv6.conf.all.accept_ra=2
+      net.ipv6.conf.default.accept_ra=2
+- name: Apply IPv6 router advertisement setting
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+- name: Enable WireGuard kernel module
+  ansible.builtin.command: modprobe wireguard
+  changed_when: false
+- name: Stop optional desktop and redundant host daemons
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+    masked: true
+  loop:
+    - fwupd.service
+    - fwupd-refresh.service
+    - fwupd-refresh.timer
+    - packagekit.service
+    - multipathd.service
+    - multipathd.socket
+    - fail2ban.service
+  failed_when: false
+  when: not (hm_machine_profile.auto_fail2ban | default(true) | bool)

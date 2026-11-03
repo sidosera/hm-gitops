@@ -6,5 +6,6 @@ resources:
   - www-service
   - proxy-service
   - monitoring
+  - spb-gateway
 components:
   - ../../../conf/spb-01

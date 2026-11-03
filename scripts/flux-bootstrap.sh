@@ -36,7 +36,26 @@ if ! command -v flux >/dev/null 2>&1; then
 fi
 
 kubectl create namespace flux-system --dry-run=client -o yaml | kubectl apply -f -
-flux install
+# Only the controllers required for Git + Kustomize reconciliation on this small host.
+# Opt in explicitly if HelmRelease or notification resources are introduced later.
+FLUX_COMPONENTS="${HM_FLUX_COMPONENTS:-source-controller,kustomize-controller}"
+flux install --components="$FLUX_COMPONENTS"
+for controller in helm-controller notification-controller; do
+  if [[ ",$FLUX_COMPONENTS," != *",$controller,"* ]]; then
+    if [[ "$controller" == helm-controller ]]; then
+      resources="helmreleases.helm.toolkit.fluxcd.io"
+    else
+      resources="alerts.notification.toolkit.fluxcd.io,providers.notification.toolkit.fluxcd.io,receivers.notification.toolkit.fluxcd.io"
+    fi
+    if [[ -n "$(kubectl get "$resources" -A --no-headers 2>/dev/null)" ]]; then
+      echo "Refusing to suspend $controller: managed resources still exist." >&2
+      exit 1
+    fi
+    if kubectl -n flux-system get deployment "$controller" >/dev/null 2>&1; then
+      kubectl -n flux-system scale deployment "$controller" --replicas=0
+    fi
+  fi
+done
 kubectl -n flux-system create secret generic sops-age \
   --from-file=age.agekey="$AGE_KEY_FILE" \
   --dry-run=client -o yaml | kubectl apply -f -

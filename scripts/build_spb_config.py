@@ -23,7 +23,7 @@ def build(primary, backup, identity, policy):
     # The first outbound also supplies Xray's unmatched fallback. Never put freedom first.
     outbounds += [{'tag': 'ru-direct', 'protocol': 'freedom', 'settings': {}},
                   {'tag': 'blocked', 'protocol': 'blackhole', 'settings': {}}]
-    inbound = {'tag': 'gateway', 'listen': '0.0.0.0', 'port': 443, 'protocol': 'vless',
+    inbound = {'tag': 'gateway', 'listen': '0.0.0.0', 'port': 14443, 'protocol': 'vless',
                'settings': {'clients': [{'id': identity['client_id'], 'email': 'primary@local',
                                         'flow': 'xtls-rprx-vision'}], 'decryption': 'none'},
                'streamSettings': {'network': 'raw', 'security': 'reality', 'realitySettings': {
@@ -36,7 +36,7 @@ def build(primary, backup, identity, policy):
                       ('probe-split', 10813), ('probe-direct', 10814)]:
         inbounds.append({'tag': tag, 'listen': '127.0.0.1', 'port': port, 'protocol': 'socks',
                          'settings': {'auth': 'noauth', 'udp': False}})
-    inbounds.append({'tag': 'api-in', 'listen': '127.0.0.1', 'port': 10085,
+    inbounds.append({'tag': 'api-in', 'listen': '0.0.0.0', 'port': 10085,
                      'protocol': 'dokodemo-door', 'settings': {'address': '127.0.0.1'}})
     rules = [{'type': 'field', 'inboundTag': ['api-in'], 'outboundTag': 'api'},
              {'type': 'field', 'ip': blocked, 'outboundTag': 'blocked'},

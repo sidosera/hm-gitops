@@ -1,0 +1,36 @@
+groups:
+- name: spb-connectivity
+  interval: 30s
+  rules:
+  - alert: SPBTransportUnavailable
+    expr: (probe_success{job="spb-probes",check=~"primary|backup|split-default"} ==
+      0) and on(instance) (probe_success{job="spb-probes",check="internet"} == 1)
+    for: 3m
+    labels:
+      severity: warning
+      region: spb
+    annotations:
+      summary: SPB {{ $labels.check }} path cannot reach the expected upstream exit
+      description: Direct internet control succeeds but this authenticated path fails.
+        Check the transport and compare backup. This is a datacenter vantage point,
+        not a residential ISP.
+  - alert: SPBProbeUnavailable
+    expr: up{job=~"spb-node|spb-blackbox|spb-probes"} == 0
+    for: 3m
+    labels:
+      severity: warning
+      region: spb
+    annotations:
+      summary: SPB telemetry unavailable
+      description: Monitoring cannot reach an mTLS endpoint; VPN blocking is not established.
+        Check SPB host, certificates, source-IP firewall rules and network path.
+  - alert: SPBInternetUnavailable
+    expr: probe_success{job="spb-probes",check="internet"} == 0
+    for: 3m
+    labels:
+      severity: warning
+      region: spb
+    annotations:
+      summary: SPB direct-internet control failed
+      description: Do not diagnose this as a VPN transport block; check the SPB network
+        and the control target.

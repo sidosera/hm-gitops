@@ -36,7 +36,7 @@
       - item is match('^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')
     fail_msg: >-
       vm_hosts must contain only IPv4 addresses. Set vm_node_ipv6 separately for IPv6.
-  loop: "{{ vm_hosts }}"
+  loop: "{{ vm_hosts + (vm_agent_hosts | default([])) }}"
   when: hm_action in ['deploy', 'teardown']
 
 - name: Resolve bootstrap host
@@ -50,11 +50,18 @@
     groups:
       - vm
     ansible_host: "{{ item }}"
-    ansible_user: "{{ ansible_user }}"
+    ansible_user: "{{ vm_node_settings[item].user | default(ansible_user) }}"
     hm_bootstrap_host: "{{ hm_bootstrap_host_name }}"
     hm_bootstrap_api_host: "{{ hm_bootstrap_host_name }}"
     hm_is_bootstrap: "{{ item == hm_bootstrap_host_name }}"
-    hm_node_ipv6: "{{ vm_node_ipv6 | default('') }}"
+    hm_node_ipv6: "{{ vm_node_settings[item].ipv6 | default(vm_node_ipv6 | default('')) }}"
+    hm_node_name: "{{ vm_node_settings[item].name | default('') }}"
+    hm_is_agent: "{{ item in (vm_agent_hosts | default([])) }}"
+    hm_edge_node: "{{ vm_node_settings[item].edge | default(false) }}"
+    hm_service_lb: "{{ vm_node_settings[item].service_lb | default(false) }}"
+    hm_cluster_peer_ipv6: "{{ vm_node_settings.values() | map(attribute='ipv6') | list }}"
+    hm_cluster_peers: "{{ vm_hosts + (vm_agent_hosts | default([])) }}"
+    hm_k3s_version: "{{ vm_k3s_version | default('') }}"
     hm_machine_profile:
       apply_security: "{{ vm_apply_security | default(true) }}"
       auto_firewall: "{{ vm_auto_firewall | default(true) }}"
@@ -65,5 +72,5 @@
       extra_packages: "{{ vm_extra_packages | default([]) }}"
       k3s_channel: "{{ vm_k3s_channel | default('stable') }}"
     hm_action: "{{ hm_action }}"
-  loop: "{{ vm_hosts }}"
+  loop: "{{ vm_hosts + (vm_agent_hosts | default([])) }}"
   when: hm_action in ['deploy', 'teardown']

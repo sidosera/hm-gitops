@@ -6,6 +6,7 @@ configMapGenerator:
   - name: prometheus-config
     files:
       - prometheus.yml
+      - spb-rules.yml
   - name: grafana-datasources
     files:
       - datasources.yaml
@@ -15,6 +16,7 @@ configMapGenerator:
   - name: grafana-dashboards
     files:
       - overview.json
+      - spb.json
   - name: online-client-code
     files:
       - online_clients.py

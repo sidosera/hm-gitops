@@ -37,6 +37,12 @@
   "fiscalYearStartMonth": 0,
   "links": [
     {
+      "title": "SPB routing & probes",
+      "type": "link",
+      "url": "/status/d/hm-spb",
+      "targetBlank": false
+    },
+    {
       "title": "Triage guide",
       "url": "https://github.com/sidosera/hm-gitops#operating-the-dashboard",
       "type": "link",

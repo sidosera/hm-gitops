@@ -1,8 +1,0 @@
----
-# Independent gateway, not a member of the WAN-separated Kubernetes cluster.
-- name: Configure Saint Petersburg gateway and connectivity probe
-  hosts: spb
-  become: true
-  gather_facts: true
-  roles:
-    - role: spb

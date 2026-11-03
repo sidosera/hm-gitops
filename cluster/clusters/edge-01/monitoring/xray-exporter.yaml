@@ -21,33 +21,35 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: xray-exporter
-          image: ghcr.io/compassvpn/xray-exporter:v0.6.9
-          args:
-            - --xray-endpoint=proxy-service.hm.svc.cluster.local:10085
-            - --listen=:9550
-            - --log-path=
-            - --scrape-timeout=5
-          ports:
-            - name: http
-              containerPort: 9550
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              memory: 64Mi
-          readinessProbe:
-            tcpSocket:
-              port: http
-            initialDelaySeconds: 5
+      - name: xray-exporter
+        image: ghcr.io/compassvpn/xray-exporter:v0.6.9
+        args:
+        - --xray-endpoint=proxy-service.hm.svc.cluster.local:10085
+        - --listen=:9550
+        - --log-path=
+        - --scrape-timeout=5
+        ports:
+        - name: http
+          containerPort: 9550
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            memory: 64Mi
+        readinessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: 5
       volumes: []
+      nodeSelector:
+        kubernetes.io/hostname: machine
