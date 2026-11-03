@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Inspect only ciphertext prefixes, never serialize Secret payloads."""
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 path = Path('/var/lib/rancher/k3s/server/db/state.db')
 if not path.exists():
     print('SQLite verification skipped: datastore is not embedded SQLite')
     raise SystemExit(0)
-with sqlite3.connect('file:' + str(path) + '?mode=ro', uri=True) as connection:
+with closing(sqlite3.connect('file:' + str(path) + '?mode=ro', uri=True)) as connection:
     rows = connection.execute('''
         SELECT k.value FROM kine k
         JOIN (SELECT name, MAX(id) id FROM kine WHERE name LIKE ? GROUP BY name) latest

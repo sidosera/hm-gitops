@@ -1,6 +1,9 @@
+from contextlib import closing
 """Preserve application identities while encrypting and reconciling their storage."""
 import importlib.util
 import json
+import sqlite3
+from types import SimpleNamespace
 from pathlib import Path
 import subprocess
 import tempfile
@@ -53,6 +56,45 @@ class EncryptionLifecycleTests(unittest.TestCase):
                  patch.object(migration, 'command', return_value=json.dumps(nodes)), patch.object(migration, 'backup') as backup:
                 with self.assertRaises(RuntimeError):migration.migrate('public-recipient')
                 backup.assert_not_called()
+
+    def test_legacy_rewrite_changes_only_metadata_and_preserves_secret_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            server = Path(directory);(server / 'db').mkdir()
+            database = server / 'db/state.db'
+            with closing(sqlite3.connect(database)) as connection, connection:
+                connection.execute('CREATE TABLE kine(id INTEGER PRIMARY KEY,name TEXT,value BLOB,old_value BLOB,deleted INTEGER)')
+                connection.execute('INSERT INTO kine VALUES(1,?,?,?,0)', ('/registry/secrets/hm/example', b'k8s:enc:current', b'legacy'))
+            secret = {'metadata': {'uid': 'stable-object', 'resourceVersion': '7'}, 'type': 'Opaque', 'data': {'config': 'dGVzdA=='}}
+            def patch_secret(*args, **kwargs):
+                operations = json.loads(kwargs['input'])
+                self.assertEqual(operations[0], {'op': 'test', 'path': '/metadata/resourceVersion', 'value': '7'})
+                self.assertEqual(operations[1]['path'], '/metadata/annotations')
+                self.assertEqual(set(operations[1]['value']), {'hm.gitops/storage-encrypted-at'})
+                self.assertNotIn('--all', args[0])
+                with closing(sqlite3.connect(database)) as connection, connection:
+                    connection.execute('UPDATE kine SET old_value=?', (b'k8s:enc:previous',))
+                return SimpleNamespace(returncode=0)
+            with patch.object(migration, 'SERVER', server), patch.object(migration, 'command', return_value=json.dumps(secret)), \
+                 patch.object(migration.subprocess, 'run', side_effect=patch_secret):
+                self.assertTrue(migration.rewrite_legacy_predecessors())
+                self.assertFalse(migration.rewrite_legacy_predecessors())
+
+    def test_online_cleanup_preserves_records_and_never_stops_services(self):
+        with tempfile.TemporaryDirectory() as directory:
+            server = Path(directory);(server / 'db').mkdir()
+            database = server / 'db/state.db'
+            with closing(sqlite3.connect(database)) as connection, connection:
+                connection.execute('PRAGMA journal_mode=WAL')
+                connection.execute('CREATE TABLE kine(id INTEGER PRIMARY KEY,name TEXT,value BLOB,old_value BLOB,deleted INTEGER)')
+                connection.execute('INSERT INTO kine VALUES(1,?,?,?,0)', ('/registry/secrets/hm/example', b'k8s:enc:current', b'k8s:enc:previous'))
+            marker = server / '.hm-plaintext-secret-pages';marker.write_text('pending')
+            with patch.object(migration, 'SERVER', server), patch.object(migration, 'command') as command:
+                self.assertTrue(migration.finish_sqlite_history())
+                self.assertFalse(migration.finish_sqlite_history())
+                command.assert_not_called()
+            self.assertFalse(marker.exists())
+            with closing(sqlite3.connect(database)) as connection, connection:
+                self.assertEqual(connection.execute('SELECT value,old_value FROM kine').fetchall(), [(b'k8s:enc:current', b'k8s:enc:previous')])
 
     def test_new_servers_enable_encryption_from_first_start(self):
         tasks = yaml.safe_load((ROOT / 'vm/roles/vm/tasks/k3s.yml').read_text())
