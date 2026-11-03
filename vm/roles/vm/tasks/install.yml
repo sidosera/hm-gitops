@@ -8,3 +8,6 @@
   when: not (hm_is_agent | default(false) | bool)
 - ansible.builtin.include_tasks: k3s-agent.yml
   when: hm_is_agent | default(false) | bool
+
+- name: Label node placement independently of service identity
+  ansible.builtin.include_tasks: node-labels.yml

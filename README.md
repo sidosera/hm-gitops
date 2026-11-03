@@ -132,7 +132,7 @@ The website ownership init container needs only `CHOWN`; all other capabilities 
 
 ## Grafana and Prometheus
 
-Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing dashboard username and password. The provisioned **Infrastructure / Operations** dashboard is the home page. Credentials are stored in a SOPS-encrypted Secret; proxy profiles remain unchanged.
+Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing dashboard username and password. The provisioned **Services / Operations** dashboard is the home page. Credentials are stored in a SOPS-encrypted Secret; proxy profiles remain unchanged.
 
 Prometheus scrapes every 30 seconds and stores seven days of history, bounded to 750 MB of blocks on a 2 GiB volume. Grafana has a separate 1 GiB volume for its settings. Both volumes use the VPS disk, so they do not survive loss of the VPS. History starts when Prometheus is deployed; the previous SQLite history volume is retained as an archive and is not imported.
 
@@ -187,3 +187,12 @@ Both hosts share one dashboard at `/status/d/hm-services`. The host selector fil
 For client import, use the private `hm-spb-smart-routing.txt` VLESS profile provided outside Git. Existing upstream profiles remain valid. The bootstrap password is unnecessary after key-only SSH is configured.
 
 On small hosts: only source-controller and kustomize-controller are needed by Flux; unused Helm/notification controllers are suspended. Xray/node-exporter/blackbox/online collectors have bounded memory. The node-exporter init container streams its checksum-verified stats-client archive to disk, avoiding an archive-sized RAM allocation. Optional desktop/update GUI daemons are disabled; unattended security upgrades remain enabled. No swap is enabled on the SPB Kubernetes worker.
+
+
+## Service model
+
+Use [the glossary](GLOSSARY.md) for infrastructure terminology. **Gateway** is one service with deployments in the `uk` and `spb` regions. Its regional roles differ: SPB provides client ingress, regional egress and upstream routing; UK provides upstream egress and keeps existing client ingress. `proxy-service` and `spb-gateway` are deployment resource names, not different service identities. The Website and Observability services are separate from Gateway.
+
+Region, provider availability zone and host are separate placement dimensions. `machine` and `spb-01` are hosts; control-plane/worker are cluster roles. Inventory records region and optionally zone. No availability-zone or failover independence is inferred from a region name. `uk` is the existing operational region name, not a new assertion about provider geography.
+
+Prometheus carries `service` and `region` labels. Host/kubelet metrics belong to infrastructure; gateway client metrics retain their Gateway identity even when collected by node-exporter. The single dashboard presents Gateway health and regional paths first, then infrastructure capacity and service diagnostics. Regional deployment resource names and existing client credentials remain stable.

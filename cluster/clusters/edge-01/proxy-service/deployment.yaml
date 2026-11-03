@@ -5,6 +5,8 @@ metadata:
   labels:
     app.kubernetes.io/name: proxy-service
     app.kubernetes.io/component: edge
+    hm.gitops/region: uk
+    hm.gitops/service: gateway
 spec:
   replicas: 1
   revisionHistoryLimit: 2

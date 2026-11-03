@@ -55,6 +55,8 @@
     hm_bootstrap_api_host: "{{ hm_bootstrap_host_name }}"
     hm_is_bootstrap: "{{ item == hm_bootstrap_host_name }}"
     hm_node_ipv6: "{{ vm_node_settings[item].ipv6 | default(vm_node_ipv6 | default('')) }}"
+    hm_node_region: "{{ vm_node_settings[item].region | default('') }}"
+    hm_node_zone: "{{ vm_node_settings[item].zone | default('') }}"
     hm_node_name: "{{ vm_node_settings[item].name | default('') }}"
     hm_is_agent: "{{ item in (vm_agent_hosts | default([])) }}"
     hm_edge_node: "{{ vm_node_settings[item].edge | default(false) }}"

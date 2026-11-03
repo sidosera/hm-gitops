@@ -7,6 +7,9 @@ scrape_configs:
   static_configs:
   - targets:
     - localhost:9090
+    labels:
+      service: observability
+      region: uk
   metric_relabel_configs:
   - source_labels:
     - __name__
@@ -18,12 +21,20 @@ scrape_configs:
     - 87.106.74.217:9100
     labels:
       node: machine
+      service: infrastructure
+      region: uk
   sample_limit: 1500
   scheme: https
   tls_config: &id001
     ca_file: /etc/prometheus/spb-tls/ca.crt
     cert_file: /etc/prometheus/spb-tls/tls.crt
     key_file: /etc/prometheus/spb-tls/tls.key
+  metric_relabel_configs:
+  - source_labels:
+    - __name__
+    regex: xray_.*
+    target_label: service
+    replacement: gateway
 - job_name: kubelet
   scheme: https
   metrics_path: /metrics/resource
@@ -34,8 +45,16 @@ scrape_configs:
   static_configs:
   - targets:
     - 87.106.74.217:10250
+    labels:
+      service: infrastructure
+      region: uk
+      node: machine
   - targets:
     - 212.116.115.29:10250
+    labels:
+      service: infrastructure
+      region: spb
+      node: spb-01
   metric_relabel_configs:
   - source_labels:
     - __name__
@@ -46,12 +65,18 @@ scrape_configs:
   static_configs:
   - targets:
     - kube-state-metrics.hm.svc.cluster.local:8080
+    labels:
+      service: kubernetes
+      region: uk
   sample_limit: 1500
 - job_name: xray
   metrics_path: /scrape
   static_configs:
   - targets:
     - xray-exporter.hm.svc.cluster.local:9550
+    labels:
+      service: gateway
+      region: uk
   sample_limit: 500
 - job_name: spb-node
   scheme: https
@@ -62,7 +87,14 @@ scrape_configs:
     labels:
       node: spb-01
       region: spb
+      service: infrastructure
   sample_limit: 1500
+  metric_relabel_configs:
+  - source_labels:
+    - __name__
+    regex: xray_.*
+    target_label: service
+    replacement: gateway
 - job_name: spb-blackbox
   scheme: https
   tls_config: *id001
@@ -71,6 +103,8 @@ scrape_configs:
     - 212.116.115.29:9115
     labels:
       node: spb-01
+      service: observability
+      region: spb
   sample_limit: 500
 - job_name: spb-probes
   scheme: https
@@ -85,30 +119,40 @@ scrape_configs:
       check: primary
       module: uk_primary
       node: spb-01
+      service: gateway
+      region: spb
   - targets:
     - https://api.ipify.org
     labels:
       check: backup
       module: uk_backup
       node: spb-01
+      service: gateway
+      region: spb
   - targets:
     - https://api.ipify.org
     labels:
       check: internet
       module: ru_direct
       node: spb-01
+      service: gateway
+      region: spb
   - targets:
     - https://api.ipify.org
     labels:
       check: split-default
       module: split_default
       node: spb-01
+      service: gateway
+      region: spb
   - targets:
     - https://ya.ru
     labels:
       check: ru-site
       module: ru_http
       node: spb-01
+      service: gateway
+      region: spb
   relabel_configs:
   - source_labels:
     - __address__

@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: spb-gateway
   namespace: hm
+  labels:
+    hm.gitops/region: spb
+    hm.gitops/service: gateway
 spec:
   replicas: 1
   strategy:

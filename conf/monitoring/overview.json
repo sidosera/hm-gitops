@@ -1,7 +1,7 @@
 {
   "uid": "hm-services",
-  "title": "Infrastructure / Operations",
-  "description": "One Kubernetes cluster and one Prometheus/Grafana: UK primary and SPB worker, host capacity, client estimates, routing and authenticated connectivity probes from Russia. Seven days retention.",
+  "title": "Services / Operations",
+  "description": "Service health and regional deployments. Gateway runs in uk and spb; one shared Kubernetes/Flux control plane and Prometheus/Grafana. Region, availability zone and host are placement dimensions.",
   "tags": [
     "hackamonth",
     "operations",
@@ -9,7 +9,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 3,
+  "version": 4,
   "refresh": "30s",
   "time": {
     "from": "now-3h",
@@ -47,6 +47,39 @@
   "templating": {
     "list": [
       {
+        "name": "region",
+        "label": "Region",
+        "type": "custom",
+        "query": "uk,spb",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "uk|spb",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [
+          {
+            "text": "All",
+            "value": "$__all",
+            "selected": true
+          },
+          {
+            "text": "uk",
+            "value": "uk",
+            "selected": false
+          },
+          {
+            "text": "spb",
+            "value": "spb",
+            "selected": false
+          }
+        ],
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
         "name": "node",
         "label": "Host capacity & clients",
         "type": "custom",
@@ -80,10 +113,10 @@
         "skipUrlSync": false
       },
       {
-        "name": "workload",
-        "label": "Workload",
+        "name": "service",
+        "label": "Service diagnostics",
         "type": "custom",
-        "query": "proxy-service,www-service,grafana,prometheus,node-exporter,kube-state-metrics,xray-exporter,spb-gateway",
+        "query": "Gateway : proxy-service|spb-gateway,Website : www-service,Observability : grafana|prometheus|node-exporter|kube-state-metrics|xray-exporter",
         "multi": false,
         "includeAll": true,
         "allValue": ".*",
@@ -99,43 +132,18 @@
             "selected": true
           },
           {
-            "text": "proxy-service",
-            "value": "proxy-service",
+            "text": "Gateway",
+            "value": "proxy-service|spb-gateway",
             "selected": false
           },
           {
-            "text": "www-service",
+            "text": "Website",
             "value": "www-service",
             "selected": false
           },
           {
-            "text": "grafana",
-            "value": "grafana",
-            "selected": false
-          },
-          {
-            "text": "prometheus",
-            "value": "prometheus",
-            "selected": false
-          },
-          {
-            "text": "node-exporter",
-            "value": "node-exporter",
-            "selected": false
-          },
-          {
-            "text": "kube-state-metrics",
-            "value": "kube-state-metrics",
-            "selected": false
-          },
-          {
-            "text": "xray-exporter",
-            "value": "xray-exporter",
-            "selected": false
-          },
-          {
-            "text": "spb-gateway",
-            "value": "spb-gateway",
+            "text": "Observability",
+            "value": "grafana|prometheus|node-exporter|kube-state-metrics|xray-exporter",
             "selected": false
           }
         ],
@@ -150,7 +158,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "HACKAMONTH / INFRASTRUCTURE OPERATIONS",
+      "title": "SERVICES / REGIONAL OPERATIONS",
       "type": "text",
       "gridPos": {
         "x": 0,
@@ -161,12 +169,12 @@
       "description": "",
       "options": {
         "mode": "markdown",
-        "content": "**One K3s cluster \u00b7 one Flux deployment \u00b7 one Prometheus/Grafana \u00b7 30 s collection \u00b7 7 d retention**\n\n**machine (UK)** hosts the control plane, monitoring and upstream VPN exit. **spb-01** is the worker, Russian entry/exit and probe vantage point. The host selector filters capacity/client panels; workload panels cover the whole cluster."
+        "content": "**Gateway service \u00b7 deployments in UK and SPB \u00b7 shared control plane and observability**\n\nGateway is one service: its SPB deployment accepts clients and selects regional/upstream egress; its UK deployment supplies upstream egress and accepts existing profiles. Region/host filters apply to capacity and client panels. Service diagnostics selects Gateway, Website or Observability. Availability zones are unset until provider failure domains are known."
       }
     },
     {
       "id": 2,
-      "title": "Upstream Xray API",
+      "title": "Gateway \u00b7 upstream control API",
       "type": "stat",
       "gridPos": {
         "x": 0,
@@ -262,7 +270,7 @@
     },
     {
       "id": 3,
-      "title": "Gateway pod readiness",
+      "title": "Gateway \u00b7 deployment readiness",
       "type": "stat",
       "gridPos": {
         "x": 4,
@@ -454,7 +462,7 @@
     },
     {
       "id": 5,
-      "title": "Client IPs \u00b7 lower bound",
+      "title": "Gateway clients \u00b7 by deployment",
       "type": "stat",
       "gridPos": {
         "x": 12,
@@ -470,8 +478,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "xray_active_client_ips{job=~\"node|spb-node\",node=~\"${node:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
-          "legendFormat": "{{node}} \u00b7 Client IPs \u00b7 lower bound",
+          "expr": "xray_active_client_ips{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Client IPs \u00b7 lower bound",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -549,8 +557,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"} / node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"}",
-          "legendFormat": "{{node}} \u00b7 Memory headroom",
+          "expr": "100 * node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} / node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Memory headroom",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -638,8 +646,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-          "legendFormat": "{{node}} \u00b7 Root disk available",
+          "expr": "100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Root disk available",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -712,7 +720,7 @@
     {
       "id": 100,
       "type": "row",
-      "title": "RUSSIA \u2192 UPSTREAM / ROUTING & CONNECTIVITY",
+      "title": "GATEWAY SERVICE \u00b7 CONNECTIVITY FROM REGION SPB",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -724,7 +732,7 @@
     },
     {
       "id": 101,
-      "title": "SPB internet",
+      "title": "Gateway \u00b7 direct internet control",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -826,7 +834,7 @@
     },
     {
       "id": 102,
-      "title": "REALITY \u2192 upstream",
+      "title": "Gateway \u00b7 REALITY path",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -928,7 +936,7 @@
     },
     {
       "id": 103,
-      "title": "HTTPS \u2192 upstream",
+      "title": "Gateway \u00b7 HTTPS backup path",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -1030,7 +1038,7 @@
     },
     {
       "id": 104,
-      "title": "Default route \u2192 upstream",
+      "title": "Gateway \u00b7 default routing",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -1132,7 +1140,7 @@
     },
     {
       "id": 105,
-      "title": "Russian site via SPB",
+      "title": "Gateway \u00b7 regional routing",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -1234,7 +1242,7 @@
     },
     {
       "id": 106,
-      "title": "Firing connectivity alerts",
+      "title": "Gateway \u00b7 firing alerts",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -1521,7 +1529,7 @@
     {
       "id": 120,
       "type": "text",
-      "title": "Routing & probe scope",
+      "title": "Gateway deployment roles & probe scope",
       "gridPos": {
         "x": 0,
         "y": 19,
@@ -1530,12 +1538,12 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Client \u2192 SPB \u2192 Russian domain allowlist: SPB exit; everything else: upstream exit.** No direct-Russia fallback for other destinations. Checks run from the SPB Kubernetes pod and verify REALITY, HTTPS backup, default-route exit IP, local internet and a Russian site. Probe failures and missing telemetry are distinct; external notifications are not configured."
+        "content": "**One Gateway service, two regional deployments.** Client \u2192 gateway in SPB \u2192 explicit Russian domain allowlist exits in SPB; other destinations use the gateway in UK. Foreign traffic has no direct-Russia fallback. Probes originate in region SPB and verify actual exit IPs. Their location is an observation dimension, not a separate service. A datacenter probe does not represent every mobile/home network."
       }
     },
     {
       "id": 8,
-      "title": "01  /  DEMAND & SERVICE BEHAVIOR",
+      "title": "01 / GATEWAY SERVICE \u00b7 DEMAND & TRAFFIC",
       "type": "row",
       "gridPos": {
         "x": 0,
@@ -1765,8 +1773,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "xray_active_client_ips{job=~\"node|spb-node\",node=~\"${node:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
-          "legendFormat": "{{node}} \u00b7 Distinct IPs \u00b7 deduplicated",
+          "expr": "xray_active_client_ips{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Distinct IPs \u00b7 deduplicated",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1777,8 +1785,8 @@
         },
         {
           "refId": "B",
-          "expr": "xray_active_profile_clients{job=~\"node|spb-node\",node=~\"${node:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
-          "legendFormat": "{{node}} \u00b7 {{profile}} profile \u00b7 IP estimate",
+          "expr": "xray_active_profile_clients{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
+          "legendFormat": "{{region}} / {{node}} \u00b7 {{profile}} profile \u00b7 IP estimate",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -1952,7 +1960,7 @@
     },
     {
       "id": 13,
-      "title": "02  /  HOST CAPACITY & CONTENTION",
+      "title": "02 / INFRASTRUCTURE CAPACITY \u00b7 REGION / HOST",
       "type": "row",
       "gridPos": {
         "x": 0,
@@ -1982,8 +1990,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * avg by (node,mode) (rate(node_cpu_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",mode!=\"idle\"}[$__rate_interval]))",
-          "legendFormat": "{{node}} \u00b7 {{mode}}",
+          "expr": "100 * avg by (node,mode) (rate(node_cpu_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mode!=\"idle\"}[$__rate_interval]))",
+          "legendFormat": "{{region}} / {{node}} \u00b7 {{mode}}",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2084,8 +2092,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"}",
-          "legendFormat": "{{node}} \u00b7 Available RAM",
+          "expr": "node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Available RAM",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2096,8 +2104,8 @@
         },
         {
           "refId": "B",
-          "expr": "node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"}",
-          "legendFormat": "{{node}} \u00b7 Total RAM",
+          "expr": "node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Total RAM",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2108,8 +2116,8 @@
         },
         {
           "refId": "C",
-          "expr": "node_memory_SwapTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"} - node_memory_SwapFree_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"}",
-          "legendFormat": "{{node}} \u00b7 Swap occupied",
+          "expr": "node_memory_SwapTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} - node_memory_SwapFree_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Swap occupied",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2208,8 +2216,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-          "legendFormat": "{{node}} \u00b7 Available space",
+          "expr": "100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Available space",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2220,8 +2228,8 @@
         },
         {
           "refId": "B",
-          "expr": "100 * node_filesystem_files_free{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{job=~\"node|spb-node\",node=~\"${node:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-          "legendFormat": "{{node}} \u00b7 Free inodes",
+          "expr": "100 * node_filesystem_files_free{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Free inodes",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2330,8 +2338,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * rate(node_pressure_cpu_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\"}[$__rate_interval])",
-          "legendFormat": "{{node}} \u00b7 CPU",
+          "expr": "100 * rate(node_pressure_cpu_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{region}} / {{node}} \u00b7 CPU",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2342,8 +2350,8 @@
         },
         {
           "refId": "B",
-          "expr": "100 * rate(node_pressure_memory_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\"}[$__rate_interval])",
-          "legendFormat": "{{node}} \u00b7 Memory",
+          "expr": "100 * rate(node_pressure_memory_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Memory",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2354,8 +2362,8 @@
         },
         {
           "refId": "C",
-          "expr": "100 * rate(node_pressure_io_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\"}[$__rate_interval])",
-          "legendFormat": "{{node}} \u00b7 I/O",
+          "expr": "100 * rate(node_pressure_io_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{region}} / {{node}} \u00b7 I/O",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2456,8 +2464,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (node,device) (rate(node_network_receive_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
-          "legendFormat": "{{node}} \u00b7 {{device}} receive",
+          "expr": "sum by (node,device) (rate(node_network_receive_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
+          "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} receive",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2468,8 +2476,8 @@
         },
         {
           "refId": "B",
-          "expr": "sum by (node,device) (rate(node_network_transmit_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
-          "legendFormat": "{{node}} \u00b7 {{device}} send",
+          "expr": "sum by (node,device) (rate(node_network_transmit_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
+          "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} send",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2568,8 +2576,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(node_vmstat_pswpin{job=~\"node|spb-node\",node=~\"${node:regex}\"}[$__rate_interval])",
-          "legendFormat": "{{node}} \u00b7 Pages swapped in",
+          "expr": "rate(node_vmstat_pswpin{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Pages swapped in",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2580,8 +2588,8 @@
         },
         {
           "refId": "B",
-          "expr": "rate(node_vmstat_pswpout{job=~\"node|spb-node\",node=~\"${node:regex}\"}[$__rate_interval])",
-          "legendFormat": "{{node}} \u00b7 Pages swapped out",
+          "expr": "rate(node_vmstat_pswpout{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}[$__rate_interval])",
+          "legendFormat": "{{region}} / {{node}} \u00b7 Pages swapped out",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2664,7 +2672,7 @@
     },
     {
       "id": 20,
-      "title": "03  /  WORKLOAD DIAGNOSTICS  \u00b7  filtered by Workload",
+      "title": "03 / SERVICE DIAGNOSTICS",
       "type": "row",
       "gridPos": {
         "x": 0,
@@ -2694,7 +2702,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * max by (namespace,pod,container) (container_memory_working_set_bytes{job=\"kubelet\",namespace=\"hm\",pod=~\"(${workload:regex})-.*\",container!=\"\"}) / on(namespace,pod,container) (max by(namespace,pod,container) (kube_pod_container_resource_limits{namespace=\"hm\",pod=~\"(${workload:regex})-.*\",resource=\"memory\",unit=\"byte\"}) > 0)",
+          "expr": "100 * max by (namespace,pod,container) (container_memory_working_set_bytes{job=\"kubelet\",namespace=\"hm\",pod=~\"(${service:raw})-.*\",container!=\"\"}) / on(namespace,pod,container) (max by(namespace,pod,container) (kube_pod_container_resource_limits{namespace=\"hm\",pod=~\"(${service:raw})-.*\",resource=\"memory\",unit=\"byte\"}) > 0)",
           "legendFormat": "{{pod}} / {{container}}",
           "editorMode": "code",
           "instant": false,
@@ -2804,7 +2812,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(pod) (rate(container_cpu_usage_seconds_total{job=\"kubelet\",namespace=\"hm\",pod=~\"(${workload:regex})-.*\",container!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(pod) (rate(container_cpu_usage_seconds_total{job=\"kubelet\",namespace=\"hm\",pod=~\"(${service:raw})-.*\",container!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{pod}}",
           "editorMode": "code",
           "instant": false,
@@ -2904,7 +2912,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "kube_pod_status_ready{namespace=\"hm\",pod=~\"(${workload:regex})-.*\",condition=\"true\"} and on(namespace,pod) (kube_pod_status_phase{namespace=\"hm\",pod=~\"(${workload:regex})-.*\",phase!~\"Succeeded|Failed\"} == 1) and on() (min(up{job=\"kube-state-metrics\"}) == 1)",
+          "expr": "kube_pod_status_ready{namespace=\"hm\",pod=~\"(${service:raw})-.*\",condition=\"true\"} and on(namespace,pod) (kube_pod_status_phase{namespace=\"hm\",pod=~\"(${service:raw})-.*\",phase!~\"Succeeded|Failed\"} == 1) and on() (min(up{job=\"kube-state-metrics\"}) == 1)",
           "legendFormat": "{{pod}}",
           "editorMode": "code",
           "instant": true,
@@ -3036,7 +3044,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(pod,container) (increase(kube_pod_container_status_restarts_total{namespace=\"hm\",pod=~\"(${workload:regex})-.*\"}[15m]))",
+          "expr": "sum by(pod,container) (increase(kube_pod_container_status_restarts_total{namespace=\"hm\",pod=~\"(${service:raw})-.*\"}[15m]))",
           "legendFormat": "{{pod}} / {{container}}",
           "editorMode": "code",
           "instant": false,
@@ -3251,8 +3259,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",file=\"/textfile/xray_online.prom\"}",
-              "legendFormat": "{{node}} \u00b7 Online-client file age",
+              "expr": "time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",file=\"/textfile/xray_online.prom\"}",
+              "legendFormat": "{{region}} / {{node}} \u00b7 Online-client file age",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -3363,8 +3371,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by(node,device) (rate(node_network_receive_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
-              "legendFormat": "{{node}} \u00b7 {{device}} errors",
+              "expr": "sum by(node,device) (rate(node_network_receive_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
+              "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} errors",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -3375,8 +3383,8 @@
             },
             {
               "refId": "B",
-              "expr": "sum by(node,device) (rate(node_network_receive_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
-              "legendFormat": "{{node}} \u00b7 {{device}} drops",
+              "expr": "sum by(node,device) (rate(node_network_receive_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
+              "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} drops",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -3487,8 +3495,8 @@
             },
             {
               "refId": "B",
-              "expr": "node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"} - node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\"}",
-              "legendFormat": "{{node}} \u00b7 Host used RAM",
+              "expr": "node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} - node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
+              "legendFormat": "{{region}} / {{node}} \u00b7 Host used RAM",
               "editorMode": "code",
               "instant": false,
               "range": true,

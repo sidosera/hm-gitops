@@ -1,0 +1,25 @@
+---
+- name: Record region on the cluster node
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - label
+      - node
+      - "{{ hm_node_name }}"
+      - "topology.kubernetes.io/region={{ hm_node_region }}"
+      - --overwrite
+  delegate_to: "{{ hm_bootstrap_host }}"
+  changed_when: false
+  when: hm_node_region | default('') | length > 0
+- name: Record provider availability zone when supplied
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - label
+      - node
+      - "{{ hm_node_name }}"
+      - "topology.kubernetes.io/zone={{ hm_node_zone }}"
+      - --overwrite
+  delegate_to: "{{ hm_bootstrap_host }}"
+  changed_when: false
+  when: hm_node_zone | default('') | length > 0
