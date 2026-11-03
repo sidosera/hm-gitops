@@ -9,6 +9,12 @@
   changed_when: false
   failed_when: false
 
+- name: Migrate an existing control plane to encrypted Secret storage
+  ansible.builtin.include_tasks: secrets-encryption.yml
+  when:
+    - hm_is_bootstrap | bool
+    - hm_k3s_probe.rc == 0
+
 - name: Ensure /etc/rancher/k3s directory exists
   ansible.builtin.file:
     path: /etc/rancher/k3s
@@ -24,6 +30,7 @@
     _base:
       node-name: "{{ hm_node_name }}"
       write-kubeconfig-mode: "0600"
+      secrets-encryption: true
       flannel-backend: wireguard-native
       flannel-external-ip: true
       node-external-ip: "{{ ansible_host }}"

@@ -2,7 +2,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - ../../base
-- credentials-secret.sops.yaml
 - probe-server-secret.sops.yaml
 namespace: hm
 labels:
@@ -16,36 +15,21 @@ patches:
 - target:
     kind: Deployment
     name: gateway
-  patch: |
-    - op: replace
-      path: /metadata/name
-      value: spb-gateway
-    - op: replace
-      path: /spec/selector/matchLabels/app.kubernetes.io~1name
-      value: spb-gateway
-    - op: replace
-      path: /spec/template/metadata/labels/app.kubernetes.io~1name
-      value: spb-gateway
+  patch: "- op: replace\n  path: /metadata/name\n  value: spb-gateway\n- op: replace\n\
+    \  path: /spec/selector/matchLabels/app.kubernetes.io~1name\n  value: spb-gateway\n\
+    - op: replace\n  path: /spec/template/metadata/labels/app.kubernetes.io~1name\n\
+    \  value: spb-gateway\n"
 - target:
     kind: Service
     name: gateway
-  patch: |
-    - op: replace
-      path: /metadata/name
-      value: spb-gateway
-    - op: replace
-      path: /spec/selector/app.kubernetes.io~1name
-      value: spb-gateway
+  patch: "- op: replace\n  path: /metadata/name\n  value: spb-gateway\n- op: replace\n\
+    \  path: /spec/selector/app.kubernetes.io~1name\n  value: spb-gateway\n"
 - target:
     kind: NetworkPolicy
     name: gateway-ingress
-  patch: |
-    - op: replace
-      path: /metadata/name
-      value: spb-gateway-ingress
-    - op: replace
-      path: /spec/podSelector/matchLabels/app.kubernetes.io~1name
-      value: spb-gateway
+  patch: "- op: replace\n  path: /metadata/name\n  value: spb-gateway-ingress\n- op:\
+    \ replace\n  path: /spec/podSelector/matchLabels/app.kubernetes.io~1name\n  value:\
+    \ spb-gateway\n"
 configMapGenerator:
 - name: gateway-spb-config
   files:

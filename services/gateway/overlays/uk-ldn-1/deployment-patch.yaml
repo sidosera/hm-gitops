@@ -33,9 +33,9 @@ spec:
         projected:
           sources:
           - secret:
-              name: proxy-service-config-source
+              name: xray-credentials
               items:
-              - key: credentials.json
+              - key: uk-ldn-1.gateway.json
                 path: 00-credentials.json
           - configMap:
               name: gateway-uk-config
@@ -43,5 +43,4 @@ spec:
               - key: config.json
                 path: 10-config-tail.json
     metadata:
-      annotations:
-        hm.gitops/credentials-revision: '2026-11-03T18:22:44Z'
+      annotations: {}

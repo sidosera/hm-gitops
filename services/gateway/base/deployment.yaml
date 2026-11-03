@@ -4,6 +4,7 @@ metadata:
   name: gateway
   labels:
     hm.gitops/service: gateway
+    hm.gitops/xray: 'true'
 spec:
   replicas: 1
   revisionHistoryLimit: 2
@@ -16,8 +17,6 @@ spec:
         hm.gitops/service: gateway
         app.kubernetes.io/name: gateway
         hm.gitops/xray: 'true'
-      annotations:
-        hm.gitops/credentials-revision: '2026-11-03'
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -75,7 +74,7 @@ spec:
           defaultMode: 292
           sources:
           - secret:
-              name: gateway-credentials
+              name: xray-credentials
               items:
               - key: credentials.json
                 path: 00-credentials.json

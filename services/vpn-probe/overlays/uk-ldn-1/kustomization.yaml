@@ -4,7 +4,6 @@ namespace: hm
 namePrefix: uk-ldn-1-
 resources:
 - ../../base
-- client-secret.sops.yaml
 labels:
 - pairs:
     hm.gitops/zone: uk-ldn-1
@@ -17,7 +16,8 @@ patches:
   patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: vpn-probe\nspec:\n\
     \  template:\n    spec:\n      nodeSelector:\n        topology.kubernetes.io/zone:\
     \ uk-ldn-1\n      volumes:\n      - name: client-config\n        secret:\n   \
-    \       secretName: uk-ldn-1-vpn-probe-client\n          defaultMode: 292\n  selector:\n\
+    \       secretName: xray-credentials\n          defaultMode: 292\n          items:\n\
+    \          - key: uk-ldn-1.probe.json\n            path: config.json\n  selector:\n\
     \    matchLabels:\n      hm.gitops/zone: uk-ldn-1\n"
 - target:
     kind: Service

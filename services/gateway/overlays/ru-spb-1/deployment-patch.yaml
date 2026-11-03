@@ -62,9 +62,9 @@ spec:
         projected:
           sources:
           - secret:
-              name: spb-gateway-config-source
+              name: xray-credentials
               items:
-              - key: credentials.json
+              - key: ru-spb-1.gateway.json
                 path: 00-credentials.json
           - configMap:
               name: gateway-spb-config
@@ -83,8 +83,7 @@ spec:
         value: spb
         effect: NoSchedule
     metadata:
-      annotations:
-        hm.gitops/credentials-revision: '2026-11-03T18:22:44Z'
+      annotations: {}
   strategy:
     type: Recreate
     rollingUpdate: null

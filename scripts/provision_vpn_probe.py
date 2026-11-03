@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare SOPS-encrypted accounts for VPN Probe. Run only after access approval.
+"""Prepare SOPS-encrypted accounts for VPN Probe in the canonical Xray Secret.
 
 Requires SOPS_AGE_KEY_FILE, sops, PyYAML and cryptography. Never prints credentials.
 No cluster/API writes: resulting GitOps changes must be reviewed and published.
@@ -7,7 +7,6 @@ No cluster/API writes: resulting GitOps changes must be reviewed and published.
 import argparse
 import base64
 import copy
-import datetime
 import json
 import os
 from pathlib import Path
@@ -20,14 +19,16 @@ PROBE_EMAIL = 'probe-e2e@local'
 ENTRIES = {'uk-ldn-1': ('87.106.74.217', 'reality-legacy'), 'ru-spb-1': ('212.116.115.29', 'gateway')}
 
 
-def add_account(config, candidate):
+def add_account(config, candidate=None):
     result = copy.deepcopy(config)
     existing = {c['id'] for inbound in result['inbounds']
                 for c in inbound.get('settings', {}).get('clients', [])
                 if c.get('email') == PROBE_EMAIL}
     if len(existing) > 1:
         raise ValueError('Inconsistent probe accounts; inspect encrypted source')
-    ident = next(iter(existing), candidate)
+    ident = next(iter(existing), None)
+    if ident is None:
+        ident = candidate or str(uuid.uuid4())
     for inbound in result['inbounds']:
         if inbound.get('streamSettings', {}).get('security') == 'reality':
             users = inbound['settings']['clients']
@@ -65,37 +66,30 @@ def main():
     parser.add_argument('--write', action='store_true', help='Create/update the approved encrypted accounts and manifests')
     args = parser.parse_args()
     if not args.write:
-        parser.error('Explicit --write is required after approving probe credential access')
+        parser.error('Explicit --write is required')
     if not os.environ.get('SOPS_AGE_KEY_FILE'):
         parser.error('Set SOPS_AGE_KEY_FILE to the existing private age identity')
-    staged, entries = {}, {}
+    source = ROOT / 'conf/xray/credentials-secret.sops.yaml'
+    document = yaml.safe_load(subprocess.check_output(['sops', '--decrypt', str(source)]))
+    original = copy.deepcopy(document['data'])
+    entries = {}
     for zone, (address, tag) in ENTRIES.items():
-        source = ROOT / 'services/gateway/overlays' / zone / 'credentials-secret.sops.yaml'
-        document = yaml.safe_load(subprocess.check_output(['sops', '--decrypt', str(source)]))
-        config, ident = add_account(json.loads(document['stringData']['credentials.json']), str(uuid.uuid4()))
+        key = zone + '.gateway.json'
+        old = json.loads(base64.b64decode(document['data'][key]))
+        config, ident = add_account(old)
         chosen = next(i for i in config['inbounds'] if i['tag'] == tag)
         entries[zone] = client_config(chosen, ident, address)
-        document['stringData']['credentials.json'] = json.dumps(config, indent=2)
-        staged[source] = encrypt(document, source)
-    for source, target in [('ru-spb-1', 'uk-ldn-1'), ('uk-ldn-1', 'ru-spb-1')]:
-        overlay = ROOT / 'services/vpn-probe/overlays' / source
-        path = overlay / 'client-secret.sops.yaml'
-        doc = {'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {'name': 'vpn-probe-client', 'namespace': 'hm'},
-               'type': 'Opaque', 'stringData': {'config.json': json.dumps(entries[target], indent=2)}}
-        staged[path] = encrypt(doc, path)
-        kpath = overlay / 'kustomization.yaml'
-        kustomization = yaml.safe_load(kpath.read_text())
-        if 'client-secret.sops.yaml' not in kustomization['resources']:
-            kustomization['resources'].append('client-secret.sops.yaml')
-        staged[kpath] = yaml.safe_dump(kustomization, sort_keys=False).encode()
-    revision = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-    for zone in ENTRIES:
-        path = ROOT / 'services/gateway/overlays' / zone / 'deployment-patch.yaml'
-        doc = yaml.safe_load(path.read_text())
-        doc['spec']['template'].setdefault('metadata', {}).setdefault('annotations', {})['hm.gitops/credentials-revision'] = revision
-        staged[path] = yaml.safe_dump(doc, sort_keys=False).encode()
-    for path, data in staged.items():
-        path.write_bytes(data)
+        if config != old:
+            document['data'][key] = base64.b64encode(json.dumps(config, indent=2).encode()).decode()
+    for observer, entry in [('ru-spb-1', 'uk-ldn-1'), ('uk-ldn-1', 'ru-spb-1')]:
+        key = observer + '.probe.json'
+        old_client = json.loads(base64.b64decode(document['data'][key])) if key in document['data'] else {}
+        if old_client != entries[entry]:
+            document['data'][key] = base64.b64encode(json.dumps(entries[entry], indent=2).encode()).decode()
+    if document['data'] == original:
+        print('Probe accounts already match Git; no UUIDs, encrypted files or workloads changed.')
+        return
+    source.write_bytes(encrypt(document, source))
     print('Prepared encrypted probe accounts and client secrets. No credentials printed; no cluster changes made.')
 
 

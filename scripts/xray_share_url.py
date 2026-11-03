@@ -2,6 +2,7 @@
 """Export VLESS profiles from the SOPS-encrypted source; never commit exports."""
 from __future__ import annotations
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
@@ -47,17 +48,24 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     repo_default = Path(__file__).resolve().parent.parent
     parser.add_argument('--repo', type=Path, default=repo_default)
+    parser.add_argument('--zone', default='uk-ldn-1', help='Gateway zone to export')
     parser.add_argument('--host', action='append', help='Direct VPS address; repeat for both address families')
     parser.add_argument('--https-host', default='www.hackamonth.io')
     parser.add_argument('--xray', default='xray', help='Xray executable used to derive the public key')
     parser.add_argument('--output-dir', type=Path, help='Write private profile files instead of stdout')
     args = parser.parse_args()
     repo = args.repo.resolve()
-    source = repo / 'services/gateway/overlays/uk-ldn-1/credentials-secret.sops.yaml'
+    source = repo / 'conf/xray/credentials-secret.sops.yaml'
     decrypted = subprocess.run(['sops', '--decrypt', str(source)], check=True,
                                capture_output=True, text=True).stdout
     secret = yaml.safe_load(decrypted)
-    config = json.loads(secret['stringData']['credentials.json'])
+    key = args.zone + '.gateway.json'
+    if key not in secret['data']:
+        raise SystemExit('No Gateway credentials configured for this zone')
+    config = json.loads(base64.b64decode(secret['data'][key]))
+    # The UK public TCP route serves reality-legacy; avoid exporting the private parallel listener.
+    public_tag = 'reality-legacy' if any(i.get('tag') == 'reality-legacy' for i in config['inbounds']) else 'gateway'
+    config['inbounds'] = [i for i in config['inbounds'] if i.get('tag') == public_tag or i.get('streamSettings', {}).get('network') == 'xhttp']
     reality = next(i['streamSettings']['realitySettings'] for i in config['inbounds']
                    if i['streamSettings'].get('security') == 'reality')
     key_output = subprocess.run([args.xray, 'x25519', '-i', reality['privateKey']],
@@ -68,8 +76,12 @@ def main() -> None:
     hosts = args.host or []
     if not hosts:
         inventory = yaml.safe_load((repo / 'cluster/clusters/hm-cluster/hosts.yml').read_text())
-        hosts.extend(inventory['vm_hosts'])
-        ipv6 = inventory.get('vm_node_settings', {}).get(inventory['vm_hosts'][0], {}).get('ipv6', inventory.get('vm_node_ipv6'))
+        machines = [(address, machine) for address, machine in inventory['vm_node_settings'].items() if machine.get('zone') == args.zone]
+        if len(machines) != 1:
+            raise SystemExit('Specify --host when a zone has multiple or no Gateway machines')
+        address, machine = machines[0]
+        hosts.append(address)
+        ipv6 = machine.get('ipv6')
         if ipv6:
             hosts.append(ipv6)
     profiles = export_profiles(config, hosts, match.group(1), args.https_host)

@@ -25,11 +25,13 @@ class PublicGatewayConfigTests(unittest.TestCase):
                 check(json.loads((ROOT / 'services/gateway/overlays' / region / 'config.json').read_text()))
 
     def test_credentials_remain_sops_encrypted(self):
-        for region in ['uk-ldn-1', 'ru-spb-1']:
-            secret = yaml.safe_load((ROOT / 'services/gateway/overlays' / region / 'credentials-secret.sops.yaml').read_text())
-            self.assertIn('sops', secret)
-            self.assertEqual(set(secret['stringData']), {'credentials.json'})
-            self.assertTrue(all(value.startswith('ENC[') for value in secret['stringData'].values()))
+        secret = yaml.safe_load((ROOT / 'conf/xray/credentials-secret.sops.yaml').read_text())
+        self.assertIn('sops', secret)
+        self.assertEqual(secret['metadata']['name'], 'xray-credentials')
+        self.assertEqual(set(secret['data']), {zone + '.' + role + '.json'
+                         for zone in ['uk-ldn-1', 'ru-spb-1'] for role in ['gateway', 'probe']})
+        self.assertTrue(all(value.startswith('ENC[') for value in secret['data'].values()))
+
 
 
 @unittest.skipUnless(shutil.which('kubectl'), 'kubectl is required to render Kustomize overlays')
@@ -57,6 +59,8 @@ class GatewayOverlayTests(unittest.TestCase):
                 self.assertEqual(len(names), len(set(names)))
                 images.append(xray['image'])
                 volume = next(v for v in pod['spec']['volumes'] if v['name'] == 'config')['projected']
+                self.assertEqual(volume['sources'][0]['secret']['name'], 'xray-credentials')
+                self.assertEqual(volume['sources'][0]['secret']['items'][0]['key'], region + '.gateway.json')
                 paths = [item['path'] for source in volume['sources'] for obj in source.values() for item in obj['items']]
                 self.assertEqual(paths, ['00-credentials.json', '10-config-tail.json'])
         self.assertEqual(images[0], images[1])

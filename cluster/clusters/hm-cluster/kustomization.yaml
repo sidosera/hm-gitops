@@ -1,10 +1,24 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ../../base
-  - traefik-acme.yaml
-  - www-service
-  - ../../../services/gateway/overlays/uk-ldn-1
-  - monitoring
-  - ../../../services/gateway/overlays/ru-spb-1
-  - ../../../services/vpn-probe/overlays/ru-spb-1
+- ../../base
+- traefik-acme.yaml
+- www-service
+- ../../../services/gateway/overlays/uk-ldn-1
+- monitoring
+- ../../../services/gateway/overlays/ru-spb-1
+- ../../../services/vpn-probe/overlays/ru-spb-1
+- ../../../conf/xray
+replacements:
+- source:
+    kind: Secret
+    name: xray-credentials
+    fieldPath: sops.lastmodified
+  targets:
+  - select:
+      kind: Deployment
+      labelSelector: hm.gitops/xray=true
+    fieldPaths:
+    - spec.template.metadata.annotations.[hm.gitops/credentials-revision]
+    options:
+      create: true

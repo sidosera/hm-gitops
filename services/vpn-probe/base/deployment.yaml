@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: vpn-probe
+  labels:
+    hm.gitops/xray: 'true'
 spec:
   replicas: 1
   revisionHistoryLimit: 2
@@ -84,7 +86,7 @@ spec:
       volumes:
       - name: client-config
         secret:
-          secretName: vpn-probe-client
+          secretName: xray-credentials
           defaultMode: 292
       - name: checks
         configMap:

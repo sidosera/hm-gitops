@@ -72,13 +72,36 @@ After that, Flux reconciles:
 Runtime secrets are committed as SOPS-encrypted manifests:
 
 - [.sops.yaml](/Users/sidosera/dist/hackamonth-gitops/.sops.yaml#L1)
-- [services/gateway/overlays/uk-ldn-1/credentials-secret.sops.yaml](services/gateway/overlays/uk-ldn-1/credentials-secret.sops.yaml#L1)
+- `conf/xray/credentials-secret.sops.yaml` — the canonical Xray Secret `hm/xray-credentials`
 
 Flux decrypts them using the `sops-age` Secret in `flux-system`.
 
-The proxy Secret contains the final `config.json`. SOPS encrypts the complete `stringData` payload; matching `_secret` names inside a YAML block does not encrypt those nested values. Xray mounts the Secret directly. Never commit decrypted config, profile exports, or age identities.
+Git is the source of truth for application credentials. The canonical Xray Secret contains four runtime keys: `uk-ldn-1.gateway.json`, `ru-spb-1.gateway.json`, `ru-spb-1.probe.json`, and the retained standby `uk-ldn-1.probe.json`. It includes the existing user UUIDs, service UUIDs, REALITY private keys and authenticated upstream settings. These are ordinary Kubernetes Secret `data` keys, with their complete values encrypted by SOPS in Git. Base64 alone is not encryption. Gateway/probe volumes project only the selected runtime key; applications have no API token or permission to list the rest.
 
-The credentials exposed by the previous block-string format were replaced on 2 November 2026. Old profiles must be replaced.
+Public routing and probe targets remain in ConfigMaps. There is no database, custom secret controller, init renderer or key generation during deployment. Flux applies the values already committed to Git. Reapplying the same commit neither replaces nor regenerates UUIDs. Adding access is an explicit encrypted Git edit; revocation is an explicit Git edit removing that account. Never commit decrypted config, profile exports or private age identities.
+
+Edit credentials with `SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey sops conf/xray/credentials-secret.sops.yaml`, validate the complete cluster, then commit/push. SOPS updates its `lastmodified` metadata. A native Kustomize replacement copies that revision into the three Xray workload pod templates, so Flux rolls them without a manual revision bump. Direct live edits are not the source of truth and are reconciled from Git. The consolidation retained all existing values and client profiles.
+
+The credentials exposed by the previous block-string format were replaced on 2 November 2026; profiles from before that rotation are obsolete. The 3 November consolidation does not rotate credentials.
+
+## Secrets encryption and recovery
+
+K3s server provisioning enables `secrets-encryption: true` from first start. Existing single-server clusters use the shared Ansible migration, following [the K3s existing-cluster procedure](https://docs.k3s.io/cli/secrets-encrypt#enable-secrets-encryption-on-an-existing-cluster):
+
+```bash
+ANSIBLE_CONFIG=vm/ansible.cfg ansible-playbook -i vm/inventory/localhost.yml \
+  vm/playbooks/secrets-encryption.yml \
+  -e vm_hosts_file="$PWD/cluster/clusters/hm-cluster/hosts.yml" \
+  --private-key ~/.ssh/hm-gitops
+```
+
+The migration takes an age-encrypted SQLite/token/config backup, enables encryption, restarts the single control plane, rewrites existing Secrets, verifies the resulting state and backs it up again. Repeated convergence does not rotate keys or regenerate identities. Existing HA clusters are deliberately rejected by this single-server procedure and need the coordinated procedure in the K3s docs. Existing Gateway processes continue running while the control-plane API restarts.
+
+Verify with `sudo k3s secrets-encrypt status`; expect `Enabled`, `reencrypt_finished` and matching hashes. `vm/roles/vm/files/verify-secrets-encryption.py` checks ciphertext prefixes in SQLite without printing Secret payloads. Historical revisions and SQLite free pages must also be compacted/reclaimed when migrating a previously plaintext datastore; an Enabled flag alone does not erase old copies.
+
+Encrypted recovery archives live under `/var/backups/hm-k3s`, mode 0600 in a root-only directory. Backups are produced through tmpfs and an age pipe so no plaintext archive is written to disk. Keep the private age identity separately, and copy encrypted backups off the server. A backup contains `server/db/state.db`, `server/token`, `config.yaml`, and, once enabled, `server/cred/encryption-config.json`. Restore them together while K3s is stopped, preserving ownership/permissions; the server token and matching encryption configuration are essential. The pre-migration archive restores the pre-encryption state. The encrypted archive requires its matching encryption configuration. Git can rebuild application desired state, but is not a backup of monitoring volumes or Kubernetes runtime state.
+
+The K3s encryption key is stored root-only in `/var/lib/rancher/k3s/server/cred/encryption-config.json`. It protects a copied datastore; it does not protect against an attacker with root access to the running control-plane host. SOPS age private keys and K3s bootstrap keys are recovery roots, not application credentials, and must never be committed in plaintext.
 
 ## Current Cluster
 
@@ -117,7 +140,7 @@ Export profiles privately (Python with PyYAML, SOPS, and Xray are required):
 
 ```sh
 SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey python3 scripts/xray_share_url.py \
-  --output-dir /secure/path/proxy-profiles
+  --zone uk-ldn-1 --output-dir /secure/path/proxy-profiles
 ```
 
 The exporter refuses to write profiles inside this repository. Imports include IPv4 and IPv6 variants with Chrome, Firefox, and Safari TLS fingerprints, plus the HTTPS backup. Fingerprint variants require client support. The backup requires XHTTP support; “V2Ray” alone does not identify a compatible iOS app or core version. Keep the current installed app until the replacement profile works.
@@ -221,11 +244,11 @@ Gateway is one service with deployments in both zones. The SPB deployment suppli
 
 `services/gateway/base` owns the shared Deployment, Service and ingress NetworkPolicy. `services/gateway/overlays/uk-ldn-1` and `services/gateway/overlays/ru-spb-1` reference that base and supply zone placement, resource budgets, exposed ports, authenticated connection settings and routing. The cluster root references both overlays directly; Flux remains the only workload deployment path.
 
-Each zone-specific `config.json` is a public ConfigMap input. It contains routing, private-address blocks, statistics, observation settings and non-authenticated local diagnostic listeners. `credentials-secret.sops.yaml` contains authenticated VLESS inbounds and, for SPB, its credential-bearing upstream outbounds. Those sections stay encrypted together so private keys/client IDs never enter ConfigMaps. Node/metrics TLS Secrets live under shared monitoring configuration; the SPB probe server certificate lives beside its overlay.
+Each zone-specific `config.json` is a public ConfigMap input. It contains routing, private-address blocks, statistics, observation settings and non-authenticated local diagnostic listeners. `conf/xray/credentials-secret.sops.yaml` contains authenticated VLESS inbounds and, for SPB, its credential-bearing upstream outbounds, as zone-named keys in the shared `xray-credentials` Secret. Those sections stay encrypted together so private keys/client IDs never enter ConfigMaps. Node/metrics TLS Secrets live under shared monitoring configuration; the SPB probe server certificate lives beside its overlay.
 
-The same Xray image starts with `run -confdir /etc/xray` in both zones. A read-only projected volume exposes encrypted Secret data as `00-credentials.json` and the public ConfigMap as `10-config-tail.json`. Xray natively merges the files. The `tail` filename is intentional: direct/blocked outbounds are appended after credential-bearing upstream outbounds, preserving the fail-closed default in SPB. No init renderer or runtime templating process is involved.
+The same Xray image starts with `run -confdir /etc/xray` in both zones. A read-only projected volume exposes the selected decrypted Secret key as `00-credentials.json` and the public ConfigMap as `10-config-tail.json`. Xray natively merges the files. The `tail` filename is intentional: direct/blocked outbounds are appended after credential-bearing upstream outbounds, preserving the fail-closed default in SPB. No init renderer or runtime templating process is involved.
 
-Change routing in the zone-specific public JSON and validate with `kubectl kustomize services/gateway/overlays/ZONE` and the routing tests. Kustomize hashes ConfigMaps, so a routing update triggers a rollout. For credential rotation, edit the SOPS Secret and override/bump `hm.gitops/credentials-revision` in the zone-specific Deployment patch so Xray reloads its credentials. Keep stable Deployment/Service names, client identities, listener ports and Traefik routes during structural refactors. The SPB overlay uses Recreate because its fixed public host port cannot be shared by two pods; UK uses a rolling update.
+Change routing in the zone-specific public JSON and validate with `kubectl kustomize services/gateway/overlays/ZONE` and the routing tests. Kustomize hashes ConfigMaps, so a routing update triggers a rollout. For credential changes, edit the canonical SOPS Secret. The cluster root derives `hm.gitops/credentials-revision` from SOPS metadata and rolls all Xray consumers automatically. Do not override it in individual zone patches. Keep stable Deployment/Service names, client identities, listener ports and Traefik routes during structural refactors. The SPB overlay uses Recreate because its fixed public host port cannot be shared by two pods; UK uses a rolling update.
 
 Validate routing and overlay boundaries with `python -m unittest discover -s tests -v` (Python, PyYAML and kubectl required). The checks cover private-network blocks, fail-closed routing, credential isolation, stable selectors, unchanged source selectors in ingress policies, and shared runtime/image configuration.
 
@@ -257,7 +280,7 @@ The VPN dashboard displays a colored matrix: websites as rows, Direct and VPN as
 
 Probe workloads use `hm.gitops/service: vpn-probe`, so they appear independently in the generic Services view. Probe accounts use `probe-e2e@local` and are excluded from end-user client estimates. Credentials are distinct from existing user profiles and relay accounts; each observer receives only the credential for the public entry it tests. They are SOPS encrypted. The account grants normal authenticated VPN egress to that dedicated probe client; it does not grant host or Kubernetes administration.
 
-Dedicated probe accounts and regional encrypted Secrets are provisioned through the same GitOps path as Gateway. The credential maintenance command is `SOPS_AGE_KEY_FILE=/secure/path/age.key python3 scripts/provision_vpn_probe.py --write`. It preserves existing users, adds/reuses one dedicated account on each Gateway, derives the matching public-listener client configuration, encrypts each regional client Secret and updates workload revisions. It makes no cluster writes. Before publishing, render the cluster, run tests, inspect only encrypted changes and verify direct and VPN results from SPB. Keep both regional client Secrets present before deploying the overlays. Notifications still require an Alertmanager receiver.
+Dedicated probe accounts and their runtime configs are keys in the same canonical Secret as Gateway. The credential maintenance command is `SOPS_AGE_KEY_FILE=/secure/path/age.key python3 scripts/provision_vpn_probe.py --write`. It preserves existing users, adds/reuses one dedicated account on each Gateway, derives the matching public-listener client configuration, updates the canonical encrypted Secret only when the account/config data changes. An unchanged run is a no-op, and existing users are retained. Kustomize derives workload revisions from SOPS metadata. It makes no cluster writes. Before publishing, render the cluster, run tests, inspect only encrypted changes and verify direct and VPN results from SPB. Keep all referenced runtime keys in the canonical Secret before deploying overlays. Notifications still require an Alertmanager receiver.
 
 
 Cluster configuration lives in `cluster/clusters/hm-cluster`; Gateway and VPN Probe overlays are named by zone. Bootstrap defaults to `hm-cluster`. Node placement uses `topology.kubernetes.io/zone`, and central services use the `hm.gitops/control-plane` role label. VM or bare-metal machine identity does not change this deployment path. Inventory keeps stable Kubernetes registration IDs explicitly so naming changes do not require draining/rejoining a healthy cluster or regenerating VPN profiles.

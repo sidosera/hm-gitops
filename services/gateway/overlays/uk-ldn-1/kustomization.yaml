@@ -2,7 +2,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - ../../base
-- credentials-secret.sops.yaml
 - pdb.yaml
 - ingressroute.yaml
 - https-ingressroute.yaml
@@ -18,36 +17,21 @@ patches:
 - target:
     kind: Deployment
     name: gateway
-  patch: |
-    - op: replace
-      path: /metadata/name
-      value: proxy-service
-    - op: replace
-      path: /spec/selector/matchLabels/app.kubernetes.io~1name
-      value: proxy-service
-    - op: replace
-      path: /spec/template/metadata/labels/app.kubernetes.io~1name
-      value: proxy-service
+  patch: "- op: replace\n  path: /metadata/name\n  value: proxy-service\n- op: replace\n\
+    \  path: /spec/selector/matchLabels/app.kubernetes.io~1name\n  value: proxy-service\n\
+    - op: replace\n  path: /spec/template/metadata/labels/app.kubernetes.io~1name\n\
+    \  value: proxy-service\n"
 - target:
     kind: Service
     name: gateway
-  patch: |
-    - op: replace
-      path: /metadata/name
-      value: proxy-service
-    - op: replace
-      path: /spec/selector/app.kubernetes.io~1name
-      value: proxy-service
+  patch: "- op: replace\n  path: /metadata/name\n  value: proxy-service\n- op: replace\n\
+    \  path: /spec/selector/app.kubernetes.io~1name\n  value: proxy-service\n"
 - target:
     kind: NetworkPolicy
     name: gateway-ingress
-  patch: |
-    - op: replace
-      path: /metadata/name
-      value: proxy-service-ingress
-    - op: replace
-      path: /spec/podSelector/matchLabels/app.kubernetes.io~1name
-      value: proxy-service
+  patch: "- op: replace\n  path: /metadata/name\n  value: proxy-service-ingress\n\
+    - op: replace\n  path: /spec/podSelector/matchLabels/app.kubernetes.io~1name\n\
+    \  value: proxy-service\n"
 configMapGenerator:
 - name: gateway-uk-config
   files:
