@@ -4,15 +4,15 @@ evaluation_interval: 30s
 tests:
 - interval: 30s
   input_series:
-  - series: node_uname_info{host="uk-ldn-1/1",cluster="hm-cluster",zone="uk-ldn-1",job="node",node="machine",country="uk"}
+  - series: up{host="uk-ldn-1/1",cluster="hm-cluster",zone="uk-ldn-1",job="kubelet",node="machine",country="uk"}
     values: 1+0x6
-  - series: node_uname_info{host="ru-spb-1/1",cluster="hm-cluster",zone="ru-spb-1",job="node",node="spb-01",country="ru"}
+  - series: up{host="ru-spb-1/1",cluster="hm-cluster",zone="ru-spb-1",job="kubelet",node="spb-01",country="ru"}
     values: 1+0x6
   - series: kube_pod_info{namespace="hm",pod="proxy-service-fixture",node="machine",country="uk",service="kubernetes"}
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="proxy-service-fixture",phase="Running"}
     values: 1+0x6
-  - series: kube_pod_status_ready{namespace="hm",pod="proxy-service-fixture",condition="true"}
+  - series: kube_pod_status_ready{job="kube-state-metrics",instance="ksm",namespace="hm",pod="proxy-service-fixture",condition="true"}
     values: 1+0x6
   - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="proxy-service-fixture"}
     values: 100+0x6
@@ -24,7 +24,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="spb-gateway-fixture",phase="Running"}
     values: 1+0x6
-  - series: kube_pod_status_ready{namespace="hm",pod="spb-gateway-fixture",condition="true"}
+  - series: kube_pod_status_ready{job="kube-state-metrics",instance="ksm",namespace="hm",pod="spb-gateway-fixture",condition="true"}
     values: 0+0x6
   - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="spb-gateway-fixture"}
     values: 50+0x6
@@ -36,7 +36,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="www-service-fixture",phase="Running"}
     values: 1+0x6
-  - series: kube_pod_status_ready{namespace="hm",pod="www-service-fixture",condition="true"}
+  - series: kube_pod_status_ready{job="kube-state-metrics",instance="ksm",namespace="hm",pod="www-service-fixture",condition="true"}
     values: 1+0x6
   - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="www-service-fixture"}
     values: 20+0x6
@@ -48,7 +48,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="prometheus-fixture",phase="Running"}
     values: 1+0x6
-  - series: kube_pod_status_ready{namespace="hm",pod="prometheus-fixture",condition="true"}
+  - series: kube_pod_status_ready{job="kube-state-metrics",instance="ksm",namespace="hm",pod="prometheus-fixture",condition="true"}
     values: 1+0x6
   - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="prometheus-fixture"}
     values: 60+0x6
@@ -60,7 +60,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="node-exporter-fixture",phase="Running"}
     values: 1+0x6
-  - series: kube_pod_status_ready{namespace="hm",pod="node-exporter-fixture",condition="true"}
+  - series: kube_pod_status_ready{job="kube-state-metrics",instance="ksm",namespace="hm",pod="node-exporter-fixture",condition="true"}
     values: 1+0x6
   - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="node-exporter-fixture"}
     values: 10+0x6
@@ -78,7 +78,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_labels{namespace="hm",pod="node-exporter-fixture",label_hm_gitops_service="observability",label_app_kubernetes_io_name="node-exporter",service="kubernetes"}
     values: 1+0x6
-  - series: node_uname_info{host="de-fra-1/1",cluster="hm-cluster",zone="de-fra-1",job="bare-metal-exporter",node="rack-17",country="de"}
+  - series: up{host="de-fra-1/1",cluster="hm-cluster",zone="de-fra-1",job="kubelet",node="rack-17",country="de"}
     values: 1+0x6
   - series: kube_pod_info{namespace="hm",pod="arbitrary-new-workload-xyz",node="rack-17",country="uk",service="kubernetes"}
     values: 1+0x6
@@ -86,12 +86,20 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="arbitrary-new-workload-xyz",phase="Running"}
     values: 1+0x6
-  - series: kube_pod_status_ready{namespace="hm",pod="arbitrary-new-workload-xyz",condition="true"}
+  - series: kube_pod_status_ready{job="kube-state-metrics",instance="ksm",namespace="hm",pod="arbitrary-new-workload-xyz",condition="true"}
     values: 1+0x6
   - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="arbitrary-new-workload-xyz"}
     values: 25+0x6
   - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="www-service-fixture",container="completed-init"}
     values: 999999999+0x6
+  - series: kube_node_status_condition{cluster="hm-cluster",node="machine",condition="Ready",status="true",job="kube-state-metrics",instance="ksm"}
+    values: 1+0x6
+  - series: kube_node_status_condition{cluster="hm-cluster",node="spb-01",condition="Ready",status="true",job="kube-state-metrics",instance="ksm"}
+    values: 1+0x6
+  - series: kube_node_status_condition{cluster="hm-cluster",node="rack-17",condition="Ready",status="true",job="kube-state-metrics",instance="ksm"}
+    values: 1+0x6
+  - series: up{job="kube-state-metrics",instance="ksm"}
+    values: 1+0x120
   promql_expr_test:
   - expr: count(hm:service_instance:info{service="gateway",zone="ru-spb-1"})
     eval_time: 3m
@@ -123,8 +131,7 @@ tests:
     exp_samples:
     - labels: '{}'
       value: 0
-  - expr: round(sum(hm:service_instance:cpu_cores{service="gateway",zone="ru-spb-1"}),
-      0.001)
+  - expr: round(sum(hm:service_instance:cpu_cores{service="gateway",zone="ru-spb-1"}), 0.001)
     eval_time: 3m
     exp_samples:
     - labels: '{}'
@@ -145,14 +152,14 @@ tests:
     exp_samples:
     - labels: '{}'
       value: 1
-  - expr: count(node_uname_info{cluster="hm-cluster",host=~`ru-spb-1\/1`})
+  - expr: count(hm:node:info{cluster="hm-cluster",host=~`ru-spb-1\/1`})
     eval_time: 3m
     exp_samples:
     - labels: '{}'
       value: 1
 - interval: 30s
   input_series:
-  - series: node_uname_info{cluster="test",zone="zone-a",node="node-a"}
+  - series: up{job="kubelet",cluster="test",zone="zone-a",node="node-a"}
     values: 1+0x10
   - series: kube_pod_info{namespace="hm",pod="current",node="node-a"}
     values: 1+0x10
@@ -166,10 +173,14 @@ tests:
     values: 1+0x10
   - series: kube_pod_status_phase{namespace="hm",pod="retired",phase="Running"}
     values: 1+0x10
-  - series: kube_pod_status_ready{namespace="hm",pod="current",condition="true"}
+  - series: kube_pod_status_ready{job="kube-state-metrics",instance="ksm",namespace="hm",pod="current",condition="true"}
     values: 1+0x10
-  - series: kube_pod_status_ready{namespace="hm",pod="retired",condition="true"}
+  - series: kube_pod_status_ready{job="kube-state-metrics",instance="ksm",namespace="hm",pod="retired",condition="true"}
     values: 1+0x10
+  - series: kube_node_status_condition{cluster="test",node="node-a",condition="Ready",status="true",job="kube-state-metrics",instance="ksm"}
+    values: 1+0x10
+  - series: up{job="kube-state-metrics",instance="ksm"}
+    values: 1+0x120
   promql_expr_test:
   - expr: sum(hm:service_instance:ready{service="gateway",zone="zone-a"})
     eval_time: 5m

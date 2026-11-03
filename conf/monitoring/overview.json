@@ -74,10 +74,10 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(node_uname_info{cluster!=\"\"}, cluster)",
+          "query": "label_values(hm:node:info{cluster!=\"\"}, cluster)",
           "refId": "cluster"
         },
-        "definition": "label_values(node_uname_info{cluster!=\"\"}, cluster)",
+        "definition": "label_values(hm:node:info{cluster!=\"\"}, cluster)",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -169,7 +169,7 @@
     },
     {
       "id": 2,
-      "title": "Ready instances",
+      "title": "Service instances \u00b7 Ready / Down",
       "type": "stat",
       "gridPos": {
         "x": 0,
@@ -177,7 +177,7 @@
         "w": 8,
         "h": 4
       },
-      "description": "Ready / scheduled non-terminal pods for the selected service and zone. This is workload readiness, not end-to-end availability.",
+      "description": "Scheduled instances remain visible when their host is down. Ready requires fresh Kubernetes pod and node readiness plus a successful kubelet scrape. Down counts scheduled instances that are not ready; this does not prove end-to-end connectivity.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -187,6 +187,18 @@
           "refId": "A",
           "expr": "sum(hm:service_instance:ready{cluster=~\"${cluster:regex}\",service=~\"${service_name:regex}\",zone=~\"${zone:regex}\"})",
           "legendFormat": "Ready",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "sum(hm:service_instance:down{cluster=~\"${cluster:regex}\",service=~\"${service_name:regex}\",zone=~\"${zone:regex}\"})",
+          "legendFormat": "Down",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -214,11 +226,45 @@
           "decimals": 0,
           "noValue": "No instances",
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
-          "mappings": []
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^Down(?: \u00b7 .*)?$"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
       },
       "maxDataPoints": 600,
       "interval": "30s",
@@ -231,7 +277,7 @@
           "values": false
         },
         "orientation": "auto",
-        "colorMode": "none",
+        "colorMode": "value",
         "graphMode": "none",
         "textMode": "value_and_name",
         "wideLayout": true,
@@ -521,7 +567,7 @@
                   "type": "value",
                   "options": {
                     "0": {
-                      "text": "Not ready",
+                      "text": "Down",
                       "color": "red"
                     },
                     "1": {

@@ -62,6 +62,18 @@ class DashboardFilterTests(unittest.TestCase):
             self.assertIn('by(cluster,zone,target)', target['expr'])
             self.assertNotIn('${entry_zone:regex}', target['expr'])
 
+    def test_unavailable_hosts_and_services_have_explicit_status(self):
+        inventory = load('inventory.json')
+        status = next(p for p in inventory['panels'] if p['title'] == 'Host availability')
+        self.assertIn('hm:node:up', status['targets'][0]['expr'])
+        self.assertEqual(status['fieldConfig']['defaults']['mappings'][0]['options']['0']['text'], 'Down')
+        for variable in inventory['templating']['list']:
+            self.assertIn('hm:node:info', variable['query']['query'])
+        for name in ['overview.json', 'vpn.json', 'proxy.json']:
+            summary = next(p for p in load(name)['panels'] if p['id'] == 2)
+            self.assertTrue(any('hm:service_instance:down' in q['expr'] for q in summary['targets']))
+            self.assertIn('Down', summary['title'])
+
     def test_no_current_topology_constants_in_dashboards(self):
         for name in ['overview.json', 'inventory.json', 'vpn.json']:
             dashboard = json.dumps(load(name))
