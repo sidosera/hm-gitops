@@ -42,3 +42,6 @@ spec:
               items:
               - key: config.json
                 path: 10-config-tail.json
+    metadata:
+      annotations:
+        hm.gitops/credentials-revision: '2026-11-03T18:22:44Z'

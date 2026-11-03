@@ -4,6 +4,7 @@ namespace: hm
 namePrefix: spb-
 resources:
 - ../../base
+- client-secret.sops.yaml
 labels:
 - pairs:
     hm.gitops/region: spb

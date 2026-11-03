@@ -4,6 +4,7 @@ namespace: hm
 namePrefix: uk-
 resources:
 - ../../base
+- client-secret.sops.yaml
 labels:
 - pairs:
     hm.gitops/region: uk
