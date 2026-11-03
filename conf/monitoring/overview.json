@@ -1,7 +1,7 @@
 {
   "uid": "hm-services",
-  "title": "Services / Operations",
-  "description": "Service health and regional deployments. Gateway runs in uk and spb; one shared Kubernetes/Flux control plane and Prometheus/Grafana. Region, availability zone and host are placement dimensions.",
+  "title": "Services / Overview",
+  "description": "A compact service view. Service and Region apply consistently to all panels; detailed Gateway checks and traffic are collapsed.",
   "tags": [
     "hackamonth",
     "operations",
@@ -9,10 +9,10 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 4,
+  "version": 5,
   "refresh": "30s",
   "time": {
-    "from": "now-3h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -47,11 +47,49 @@
   "templating": {
     "list": [
       {
+        "name": "service_name",
+        "label": "Service",
+        "type": "custom",
+        "query": "Gateway : gateway,Website : website,Observability : observability",
+        "multi": false,
+        "includeAll": true,
+        "allValue": "gateway|website|observability",
+        "current": {
+          "selected": true,
+          "text": "Gateway",
+          "value": "gateway"
+        },
+        "options": [
+          {
+            "text": "All",
+            "value": "$__all",
+            "selected": false
+          },
+          {
+            "text": "Gateway",
+            "value": "gateway",
+            "selected": true
+          },
+          {
+            "text": "Website",
+            "value": "website",
+            "selected": false
+          },
+          {
+            "text": "Observability",
+            "value": "observability",
+            "selected": false
+          }
+        ],
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
         "name": "region",
         "label": "Region",
         "type": "custom",
         "query": "uk,spb",
-        "multi": true,
+        "multi": false,
         "includeAll": true,
         "allValue": "uk|spb",
         "current": {
@@ -78,77 +116,6 @@
         ],
         "hide": 0,
         "skipUrlSync": false
-      },
-      {
-        "name": "node",
-        "label": "Host capacity & clients",
-        "type": "custom",
-        "query": "machine,spb-01",
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "options": [
-          {
-            "text": "All",
-            "value": "$__all",
-            "selected": true
-          },
-          {
-            "text": "machine",
-            "value": "machine",
-            "selected": false
-          },
-          {
-            "text": "spb-01",
-            "value": "spb-01",
-            "selected": false
-          }
-        ],
-        "hide": 0,
-        "skipUrlSync": false
-      },
-      {
-        "name": "service",
-        "label": "Service diagnostics",
-        "type": "custom",
-        "query": "Gateway : proxy-service|spb-gateway,Website : www-service,Observability : grafana|prometheus|node-exporter|kube-state-metrics|xray-exporter",
-        "multi": false,
-        "includeAll": true,
-        "allValue": ".*",
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "options": [
-          {
-            "text": "All",
-            "value": "$__all",
-            "selected": true
-          },
-          {
-            "text": "Gateway",
-            "value": "proxy-service|spb-gateway",
-            "selected": false
-          },
-          {
-            "text": "Website",
-            "value": "www-service",
-            "selected": false
-          },
-          {
-            "text": "Observability",
-            "value": "grafana|prometheus|node-exporter|kube-state-metrics|xray-exporter",
-            "selected": false
-          }
-        ],
-        "hide": 0,
-        "skipUrlSync": false
       }
     ]
   },
@@ -158,31 +125,30 @@
   "panels": [
     {
       "id": 1,
-      "title": "SERVICES / REGIONAL OPERATIONS",
       "type": "text",
+      "title": "Service overview",
       "gridPos": {
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 3
+        "h": 2
       },
-      "description": "",
       "options": {
         "mode": "markdown",
-        "content": "**Gateway service \u00b7 deployments in UK and SPB \u00b7 shared control plane and observability**\n\nGateway is one service: its SPB deployment accepts clients and selects regional/upstream egress; its UK deployment supplies upstream egress and accepts existing profiles. Region/host filters apply to capacity and client panels. Service diagnostics selects Gateway, Website or Observability. Availability zones are unset until provider failure domains are known."
+        "content": "Select a **service** and **region**. All panels follow that selection. Clients and transport checks apply to Gateway; **N/A** means that signal is not collected for the selection."
       }
     },
     {
       "id": 2,
-      "title": "Gateway \u00b7 upstream control API",
+      "title": "Ready instances",
       "type": "stat",
       "gridPos": {
         "x": 0,
-        "y": 3,
-        "w": 4,
+        "y": 2,
+        "w": 6,
         "h": 4
       },
-      "description": "Native StatsService responsiveness, gated by the Xray exporter scrape. Confirms server control-plane health only. If failed, inspect proxy and exporter logs. Missing series stays UNKNOWN.",
+      "description": "Ready / scheduled non-terminal pods for the selected service and region. This is workload readiness, not end-to-end availability.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -190,8 +156,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min(xray_up{job=\"xray\",service=\"gateway\"} * on(instance,service,region) up{job=\"xray\",service=\"gateway\"})",
-          "legendFormat": "Xray control API",
+          "expr": "sum(hm:service_instance:ready{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "legendFormat": "Ready",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -199,287 +165,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            },
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "FAILED",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "HEALTHY",
-                  "color": "green"
-                }
-              }
-            }
-          ]
         },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "wideLayout": true,
-        "justifyMode": "auto"
-      }
-    },
-    {
-      "id": 3,
-      "title": "Gateway \u00b7 deployment readiness",
-      "type": "stat",
-      "gridPos": {
-        "x": 4,
-        "y": 3,
-        "w": 4,
-        "h": 4
-      },
-      "description": "Current proxy pods must all be Ready. A failed kube-state-metrics scrape produces UNKNOWN. Readiness is not a VPN transaction.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
         {
-          "refId": "A",
-          "expr": "min(kube_pod_status_ready{namespace=\"hm\",condition=\"true\",pod=~\"(proxy-service|spb-gateway)-.*\"} and on(namespace,pod) (kube_pod_status_phase{namespace=\"hm\",phase=\"Running\"} == 1)) and on() (min(up{job=\"kube-state-metrics\"}) == 1)",
-          "legendFormat": "Proxy pod readiness",
-          "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            },
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "NOT READY",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "READY",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "wideLayout": true,
-        "justifyMode": "auto"
-      }
-    },
-    {
-      "id": 4,
-      "title": "Telemetry coverage",
-      "type": "stat",
-      "gridPos": {
-        "x": 8,
-        "y": 3,
-        "w": 4,
-        "h": 4
-      },
-      "description": "All configured Prometheus targets, including both hosts, both kubelets and Russia connectivity checks. Failed probes are shown separately from scrape availability.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "min(up{service!=\"\"})",
-          "legendFormat": "Telemetry coverage",
-          "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            },
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "DEGRADED",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "5 / 5 UP",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "wideLayout": true,
-        "justifyMode": "auto"
-      }
-    },
-    {
-      "id": 5,
-      "title": "Gateway clients \u00b7 by deployment",
-      "type": "stat",
-      "gridPos": {
-        "x": 12,
-        "y": 3,
-        "w": 4,
-        "h": 4
-      },
-      "description": "Separate per-host lower-bound IP estimates. Infrastructure relay/probe users are excluded; do not sum across hosts as a unique-person count.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "xray_active_client_ips{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Client IPs \u00b7 lower bound",
+          "refId": "B",
+          "expr": "count(hm:service_instance:info{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "legendFormat": "Scheduled",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -493,31 +183,11 @@
         "defaults": {
           "unit": "short",
           "decimals": 0,
-          "noValue": "UNKNOWN",
+          "noValue": "No instances",
           "color": {
             "mode": "palette-classic"
           },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ]
+          "mappings": []
         },
         "overrides": []
       },
@@ -532,7 +202,184 @@
           "values": false
         },
         "orientation": "auto",
-        "colorMode": "value",
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Connected clients",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 2,
+        "w": 6,
+        "h": 4
+      },
+      "description": "Gateway only: fresh authenticated source-IP estimates, shown separately by region. Shared IPs make this a lower bound; do not sum across regions as unique people.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "xray_active_client_ips{service=~\"${service_name:regex}\",region=~\"${region:regex}\"} and on(instance) (xray_online_scrape_success{service=~\"${service_name:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",region=~\"${region:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",region=~\"${region:regex}\",file=\"/textfile/xray_online.prom\"}) < 60)",
+          "legendFormat": "{{region}}",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "N/A",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Service memory",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 2,
+        "w": 6,
+        "h": 4
+      },
+      "description": "Memory working set of selected service pods, including sidecars.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(hm:service_instance:memory_bytes{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "legendFormat": "Working set",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "noValue": "No instances",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Host RAM available",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 2,
+        "w": 6,
+        "h": 4
+      },
+      "description": "Available RAM on hosts running the selected service. Shared host capacity, not memory allocated to this service.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(100 * node_memory_MemAvailable_bytes{job=~\"node|spb-node\",region=~\"${region:regex}\"} / node_memory_MemTotal_bytes{job=~\"node|spb-node\",region=~\"${region:regex}\"}) and on(node) hm:service_instance:info{service=~\"${service_name:regex}\",region=~\"${region:regex}\"}",
+          "legendFormat": "{{region}}",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "noValue": "No instances",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "none",
         "graphMode": "none",
         "textMode": "value_and_name",
         "wideLayout": true,
@@ -541,1231 +388,15 @@
     },
     {
       "id": 6,
-      "title": "Memory headroom",
-      "type": "stat",
-      "gridPos": {
-        "x": 16,
-        "y": 3,
-        "w": 4,
-        "h": 4
-      },
-      "description": "MemAvailable / MemTotal. Includes reclaimable cache; low free RAM alone is not a fault. <20% investigate, <10% urgent. Correlate with memory pressure and container limits.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "100 * node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} / node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Memory headroom",
-          "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 10
-              },
-              {
-                "color": "green",
-                "value": 20
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "min": 0,
-          "max": 100
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "wideLayout": true,
-        "justifyMode": "auto"
-      }
-    },
-    {
-      "id": 7,
-      "title": "Root disk available",
-      "type": "stat",
-      "gridPos": {
-        "x": 20,
-        "y": 3,
-        "w": 4,
-        "h": 4
-      },
-      "description": "Space available to unprivileged processes on /. <20% investigate, <10% urgent. Thresholds are triage hints, not an SLO.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Root disk available",
-          "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 10
-              },
-              {
-                "color": "green",
-                "value": 20
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "min": 0,
-          "max": 100
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "wideLayout": true,
-        "justifyMode": "auto"
-      }
-    },
-    {
-      "id": 100,
-      "type": "row",
-      "title": "GATEWAY SERVICE \u00b7 CONNECTIVITY FROM REGION SPB",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 7,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 101,
-      "title": "Gateway \u00b7 direct internet control",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 8,
-        "w": 4,
-        "h": 4
-      },
-      "description": "An authenticated HTTPS request is tested every 30 s. Exit-IP checks validate the expected VPS address. UNKNOWN means telemetry is missing. Not a residential ISP measurement.",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "probe_success{job=\"spb-probes\",check=\"internet\"} and on(instance,check) (up{job=\"spb-probes\",check=\"internet\"} == 1)",
-          "legendFormat": "{{check}}",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "FAILED",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green"
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "gray"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "maxDataPoints": 600,
-      "interval": "30s"
-    },
-    {
-      "id": 102,
-      "title": "Gateway \u00b7 REALITY path",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 4,
-        "y": 8,
-        "w": 4,
-        "h": 4
-      },
-      "description": "An authenticated HTTPS request is tested every 30 s. Exit-IP checks validate the expected VPS address. UNKNOWN means telemetry is missing. Not a residential ISP measurement.",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "probe_success{job=\"spb-probes\",check=\"primary\"} and on(instance,check) (up{job=\"spb-probes\",check=\"primary\"} == 1)",
-          "legendFormat": "{{check}}",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "FAILED",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green"
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "gray"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "maxDataPoints": 600,
-      "interval": "30s"
-    },
-    {
-      "id": 103,
-      "title": "Gateway \u00b7 HTTPS backup path",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 8,
-        "y": 8,
-        "w": 4,
-        "h": 4
-      },
-      "description": "An authenticated HTTPS request is tested every 30 s. Exit-IP checks validate the expected VPS address. UNKNOWN means telemetry is missing. Not a residential ISP measurement.",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "probe_success{job=\"spb-probes\",check=\"backup\"} and on(instance,check) (up{job=\"spb-probes\",check=\"backup\"} == 1)",
-          "legendFormat": "{{check}}",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "FAILED",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green"
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "gray"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "maxDataPoints": 600,
-      "interval": "30s"
-    },
-    {
-      "id": 104,
-      "title": "Gateway \u00b7 default routing",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 8,
-        "w": 4,
-        "h": 4
-      },
-      "description": "An authenticated HTTPS request is tested every 30 s. Exit-IP checks validate the expected VPS address. UNKNOWN means telemetry is missing. Not a residential ISP measurement.",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "probe_success{job=\"spb-probes\",check=\"split-default\"} and on(instance,check) (up{job=\"spb-probes\",check=\"split-default\"} == 1)",
-          "legendFormat": "{{check}}",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "FAILED",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green"
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "gray"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "maxDataPoints": 600,
-      "interval": "30s"
-    },
-    {
-      "id": 105,
-      "title": "Gateway \u00b7 regional routing",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 16,
-        "y": 8,
-        "w": 4,
-        "h": 4
-      },
-      "description": "An authenticated HTTPS request is tested every 30 s. Exit-IP checks validate the expected VPS address. UNKNOWN means telemetry is missing. Not a residential ISP measurement.",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "probe_success{job=\"spb-probes\",check=\"ru-site\"} and on(instance,check) (up{job=\"spb-probes\",check=\"ru-site\"} == 1)",
-          "legendFormat": "{{check}}",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "FAILED",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green"
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "gray"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "maxDataPoints": 600,
-      "interval": "30s"
-    },
-    {
-      "id": 106,
-      "title": "Gateway \u00b7 firing alerts",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 20,
-        "y": 8,
-        "w": 4,
-        "h": 4
-      },
-      "description": "Prometheus evaluates failures for 3 minutes, separating transport failures from control/telemetry failures. No notification destination is configured.",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "count(ALERTS{alertstate=\"firing\",region=\"spb\"}) or vector(0)",
-          "legendFormat": "Firing SPB alerts",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "gray"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "maxDataPoints": 600,
-      "interval": "30s"
-    },
-    {
-      "id": 114,
-      "title": "Connection checks over time",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 12,
-        "w": 12,
-        "h": 7
-      },
-      "description": "1 = expected response and exit IP, 0 = failed. Scrape failure leaves a gap.",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "probe_success{job=\"spb-probes\"}",
-          "legendFormat": "{{check}}",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "FAILED",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green"
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "gray"
-                }
-              }
-            }
-          ],
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 6,
-            "spanNulls": false,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "maxDataPoints": 600,
-      "interval": "30s"
-    },
-    {
-      "id": 115,
-      "title": "End-to-end request duration",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 12,
-        "w": 12,
-        "h": 7
-      },
-      "description": "Synthetic HTTP request duration via each path, not user-request latency. Failed probes can be short or time out.",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "probe_duration_seconds{job=\"spb-probes\"}",
-          "legendFormat": "{{check}}",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "gray"
-                }
-              }
-            }
-          ],
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 6,
-            "spanNulls": false,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "maxDataPoints": 600,
-      "interval": "30s"
-    },
-    {
-      "id": 120,
-      "type": "text",
-      "title": "Gateway deployment roles & probe scope",
-      "gridPos": {
-        "x": 0,
-        "y": 19,
-        "w": 24,
-        "h": 3
-      },
-      "options": {
-        "mode": "markdown",
-        "content": "**One Gateway service, two regional deployments.** Client \u2192 gateway in SPB \u2192 explicit Russian domain allowlist exits in SPB; other destinations use the gateway in UK. Foreign traffic has no direct-Russia fallback. Probes originate in region SPB and verify actual exit IPs. Their location is an observation dimension, not a separate service. A datacenter probe does not represent every mobile/home network."
-      }
-    },
-    {
-      "id": 8,
-      "title": "01 / GATEWAY SERVICE \u00b7 DEMAND & TRAFFIC",
-      "type": "row",
-      "gridPos": {
-        "x": 0,
-        "y": 22,
-        "w": 24,
-        "h": 1
-      },
-      "description": "",
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "id": 9,
-      "title": "Upstream client download by transport",
+      "title": "Service CPU",
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 23,
-        "w": 12,
-        "h": 7
-      },
-      "description": "Authenticated inbound traffic. reality-legacy is the current primary; reality is the parallel listener; https-backup is the HTTPS fallback. Zero throughput may mean idle clients. Gaps are not bridged.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (target) (rate(xray_traffic_downlink_bytes_total{service=\"gateway\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__rate_interval])) * 8",
-          "legendFormat": "{{target}}",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bps",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 10,
-      "title": "Upstream client upload by transport",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 12,
-        "y": 23,
-        "w": 12,
-        "h": 7
-      },
-      "description": "Authenticated inbound traffic. reality-legacy is the current primary; reality is the parallel listener; https-backup is the HTTPS fallback. Zero throughput may mean idle clients. Gaps are not bridged.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (target) (rate(xray_traffic_uplink_bytes_total{service=\"gateway\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__rate_interval])) * 8",
-          "legendFormat": "{{target}}",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bps",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 11,
-      "title": "Authenticated client IPs",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 0,
-        "y": 30,
+        "y": 6,
         "w": 12,
         "h": 6
       },
-      "description": "Per-host authenticated source-IP estimates; addresses can be masked by ingress. These are not exact unique people and must not be summed across hosts.",
+      "description": "CPU cores used by the selected service; two-minute rates.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1773,1047 +404,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "xray_active_client_ips{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Distinct IPs \u00b7 deduplicated",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "B",
-          "expr": "xray_active_profile_clients{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} and on(instance) ((xray_online_scrape_success{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) (up{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
-          "legendFormat": "{{region}} / {{node}} \u00b7 {{profile}} profile \u00b7 IP estimate",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 12,
-      "title": "Transfer in selected window",
-      "type": "stat",
-      "gridPos": {
-        "x": 12,
-        "y": 30,
-        "w": 12,
-        "h": 6
-      },
-      "description": "Estimated transferred bytes within the selected dashboard time window. Prometheus increase handles counter resets and extrapolates sample boundaries.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(increase(xray_traffic_downlink_bytes_total{service=\"gateway\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__range]))",
-          "legendFormat": "Downloaded by clients",
-          "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "B",
-          "expr": "sum(increase(xray_traffic_uplink_bytes_total{service=\"gateway\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__range]))",
-          "legendFormat": "Uploaded by clients",
-          "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "wideLayout": true,
-        "justifyMode": "auto"
-      }
-    },
-    {
-      "id": 13,
-      "title": "02 / INFRASTRUCTURE CAPACITY \u00b7 REGION / HOST",
-      "type": "row",
-      "gridPos": {
-        "x": 0,
-        "y": 36,
-        "w": 24,
-        "h": 1
-      },
-      "description": "",
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "id": 14,
-      "title": "CPU utilization by mode",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 0,
-        "y": 37,
-        "w": 8,
-        "h": 7
-      },
-      "description": "Average across CPU cores. Steal indicates hypervisor contention; iowait is time waiting for I/O, not CPU compute. Use PSI below to confirm waiting work.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "100 * avg by (region,node,mode) (rate(node_cpu_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mode!=\"idle\"}[$__rate_interval]))",
-          "legendFormat": "{{region}} / {{node}} \u00b7 {{mode}}",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "min": 0,
-          "max": 100,
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 15,
-      "title": "Memory availability & swap residency",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 8,
-        "y": 37,
-        "w": 8,
-        "h": 7
-      },
-      "description": "MemAvailable accounts for reclaimable memory. Occupied swap can remain after past pressure; use memory PSI and swap activity to identify current contention.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Available RAM",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "B",
-          "expr": "node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Total RAM",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "C",
-          "expr": "node_memory_SwapTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} - node_memory_SwapFree_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Swap occupied",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 16,
-      "title": "Root filesystem headroom",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 16,
-        "y": 37,
-        "w": 8,
-        "h": 7
-      },
-      "description": "Data blocks and inodes can run out independently. Filesystem shares disk with Grafana, Prometheus and the archived dashboard. Both lines should stay above 20%.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Available space",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "B",
-          "expr": "100 * node_filesystem_files_free{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Free inodes",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 10
-              },
-              {
-                "color": "green",
-                "value": 20
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "min": 0,
-          "max": 100,
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "dashed"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 17,
-      "title": "Pressure stalls \u00b7 waiting work",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 0,
-        "y": 44,
-        "w": 8,
-        "h": 7
-      },
-      "description": "Linux PSI: percentage of elapsed time with at least one task stalled on a resource. Sustained memory or I/O pressure can explain slow service even when CPU is low. Collection begins with this dashboard rollout.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "100 * rate(node_pressure_cpu_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}[$__rate_interval])",
-          "legendFormat": "{{region}} / {{node}} \u00b7 CPU",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "B",
-          "expr": "100 * rate(node_pressure_memory_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}[$__rate_interval])",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Memory",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "C",
-          "expr": "100 * rate(node_pressure_io_waiting_seconds_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}[$__rate_interval])",
-          "legendFormat": "{{region}} / {{node}} \u00b7 I/O",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "min": 0,
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            },
-            "axisSoftMax": 10
-          }
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 18,
-      "title": "Host network \u00b7 physical interfaces",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 8,
-        "y": 44,
-        "w": 8,
-        "h": 7
-      },
-      "description": "Physical interface traffic includes all host services and transport overhead. It will differ from authenticated Xray payload rates.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (region,node,device) (rate(node_network_receive_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
-          "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} receive",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "B",
-          "expr": "sum by (region,node,device) (rate(node_network_transmit_bytes_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval])) * 8",
-          "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} send",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bps",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 19,
-      "title": "Swap activity",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 16,
-        "y": 44,
-        "w": 8,
-        "h": 7
-      },
-      "description": "Pages per second. Sustained swapping plus memory or I/O pressure is actionable. Nonzero swap residency by itself is not.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(node_vmstat_pswpin{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}[$__rate_interval])",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Pages swapped in",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        },
-        {
-          "refId": "B",
-          "expr": "rate(node_vmstat_pswpout{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}[$__rate_interval])",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Pages swapped out",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 20,
-      "title": "03 / SERVICE DIAGNOSTICS",
-      "type": "row",
-      "gridPos": {
-        "x": 0,
-        "y": 51,
-        "w": 24,
-        "h": 1
-      },
-      "description": "",
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "id": 21,
-      "title": "Container memory / configured limit",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 0,
-        "y": 52,
-        "w": 12,
-        "h": 7
-      },
-      "description": "Working set / individual container memory limit. Unbounded containers are omitted. High values risk a container OOM even when host headroom is healthy. These are container limits, not pod-level effective limits.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "100 * max by (namespace,pod,container) (container_memory_working_set_bytes{job=\"kubelet\",service=\"infrastructure\",namespace=\"hm\",pod=~\"(${service:raw})-.*\",container!=\"\"}) / on(namespace,pod,container) (max by(namespace,pod,container) (kube_pod_container_resource_limits{namespace=\"hm\",pod=~\"(${service:raw})-.*\",resource=\"memory\",unit=\"byte\"}) > 0)",
-          "legendFormat": "{{pod}} / {{container}}",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 1,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 80
-              },
-              {
-                "color": "red",
-                "value": 95
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "min": 0,
-          "max": 100,
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "dashed"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 22,
-      "title": "CPU by pod",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 12,
-        "y": 52,
-        "w": 12,
-        "h": 7
-      },
-      "description": "CPU seconds per second, in CPU cores. Host has two virtual CPUs. Workload selector changes only this diagnostics section.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by(pod) (rate(container_cpu_usage_seconds_total{job=\"kubelet\",service=\"infrastructure\",namespace=\"hm\",pod=~\"(${service:raw})-.*\",container!=\"\"}[$__rate_interval]))",
-          "legendFormat": "{{pod}}",
+          "expr": "sum by(region) (hm:service_instance:cpu_cores{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "legendFormat": "{{region}}",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -2826,54 +418,12 @@
       "fieldConfig": {
         "defaults": {
           "unit": "cores",
-          "decimals": 3,
-          "noValue": "UNKNOWN",
+          "decimals": 1,
+          "noValue": "No data",
           "color": {
             "mode": "palette-classic"
           },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
+          "mappings": []
         },
         "overrides": []
       },
@@ -2881,12 +431,9 @@
       "interval": "30s",
       "options": {
         "legend": {
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": []
         },
         "tooltip": {
           "mode": "multi",
@@ -2895,16 +442,16 @@
       }
     },
     {
-      "id": 23,
-      "title": "Current pod readiness",
-      "type": "table",
+      "id": 7,
+      "title": "Service memory over time",
+      "type": "timeseries",
       "gridPos": {
-        "x": 0,
-        "y": 59,
+        "x": 12,
+        "y": 6,
         "w": 12,
         "h": 6
       },
-      "description": "Ready state of active pods. Completed and failed jobs are excluded. UNKNOWN indicates missing telemetry. Inspect Kubernetes events if a pod stays NOT READY.",
+      "description": "",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2912,8 +459,63 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "kube_pod_status_ready{namespace=\"hm\",pod=~\"(${service:raw})-.*\",condition=\"true\"} and on(namespace,pod) (kube_pod_status_phase{namespace=\"hm\",pod=~\"(${service:raw})-.*\",phase!~\"Succeeded|Failed\"} == 1) and on() (min(up{job=\"kube-state-metrics\"}) == 1)",
-          "legendFormat": "{{pod}}",
+          "expr": "sum by(region) (hm:service_instance:memory_bytes{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "legendFormat": "{{region}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Regional instances",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 5
+      },
+      "description": "Only the selected service and region; Ready is Kubernetes pod readiness.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "hm:service_instance:ready{service=~\"${service_name:regex}\",region=~\"${region:regex}\"}",
+          "legendFormat": "",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -2928,43 +530,20 @@
         "defaults": {
           "unit": "none",
           "decimals": 0,
-          "noValue": "UNKNOWN",
+          "noValue": "No instances",
           "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
+            "mode": "palette-classic"
           },
           "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            },
             {
               "type": "value",
               "options": {
                 "0": {
-                  "text": "NOT READY",
+                  "text": "Not ready",
                   "color": "red"
                 },
                 "1": {
-                  "text": "READY",
+                  "text": "Ready",
                   "color": "green"
                 }
               }
@@ -2975,7 +554,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Status"
+              "options": "Ready"
             },
             "properties": [
               {
@@ -2983,10 +562,6 @@
                 "value": {
                   "type": "color-text"
                 }
-              },
-              {
-                "id": "custom.width",
-                "value": 110
               }
             ]
           }
@@ -3008,158 +583,47 @@
             "excludeByName": {
               "Time": true,
               "__name__": true,
-              "instance": true,
-              "job": true,
               "namespace": true,
-              "condition": true,
-              "uid": true
+              "service": true,
+              "node": true
             },
             "indexByName": {
-              "pod": 0,
-              "Value": 1
+              "region": 0,
+              "pod": 1,
+              "Value": 2
             },
             "renameByName": {
-              "pod": "Pod",
-              "Value": "Status"
+              "region": "Region",
+              "pod": "Instance",
+              "Value": "Ready"
             }
           }
         }
       ]
     },
     {
-      "id": 24,
-      "title": "Restarts \u00b7 rolling 15 minutes",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 12,
-        "y": 59,
-        "w": 12,
-        "h": 6
-      },
-      "description": "Recent restarts, not lifetime totals. A pod replacement changes its identity and is not counted as a restart. Inspect last termination reason and events for the cause.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by(pod,container) (increase(kube_pod_container_status_restarts_total{namespace=\"hm\",pod=~\"(${service:raw})-.*\"}[15m]))",
-          "legendFormat": "{{pod}} / {{container}}",
-          "editorMode": "code",
-          "instant": false,
-          "range": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "noValue": "UNKNOWN",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "UNKNOWN",
-                  "color": "#8e8e8e"
-                }
-              }
-            }
-          ],
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": false,
-            "axisPlacement": "auto",
-            "axisBorderShow": false,
-            "axisColorMode": "text",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "thresholdsStyle": {
-              "mode": "dashed"
-            },
-            "axisSoftMax": 3
-          },
-          "min": 0
-        },
-        "overrides": []
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 25,
-      "title": "04  /  TELEMETRY & FAILURE DIAGNOSTICS",
+      "id": 10,
       "type": "row",
+      "title": "Details \u00b7 connectivity, traffic & capacity",
+      "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 65,
+        "y": 17,
         "w": 24,
         "h": 1
       },
-      "description": "",
-      "collapsed": true,
       "panels": [
         {
-          "id": 26,
-          "title": "Collector availability",
+          "id": 20,
+          "title": "Gateway paths \u00b7 checked from SPB",
           "type": "state-timeline",
           "gridPos": {
             "x": 0,
-            "y": 66,
+            "y": 18,
             "w": 12,
             "h": 6
           },
-          "description": "Successful scrapes only; this is monitoring availability, not user-facing VPN availability. Missing history stays blank.",
+          "description": "Authenticated checks from SPB. Region filters the Gateway deployment under test: REALITY/HTTPS target UK; direct control and routing checks target SPB. N/A for other services.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -3167,8 +631,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "up{job=~\"node|spb-node|kubelet|kube-state-metrics|xray|prometheus|spb-blackbox|spb-probes\"}",
-              "legendFormat": "{{job}} \u00b7 {{instance}}",
+              "expr": "probe_success{service=~\"${service_name:regex}\",target_region=~\"${region:regex}\"} and on(instance,check) (up{job=\"spb-probes\",service=~\"${service_name:regex}\",target_region=~\"${region:regex}\"} == 1)",
+              "legendFormat": "{{target_region}} \u00b7 {{check}}",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -3180,45 +644,22 @@
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "none",
-              "decimals": 0,
-              "noValue": "UNKNOWN",
+              "unit": "short",
+              "decimals": 1,
+              "noValue": "N/A",
               "color": {
-                "mode": "thresholds"
-              },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "red",
-                    "value": null
-                  },
-                  {
-                    "color": "green",
-                    "value": 1
-                  }
-                ]
+                "mode": "palette-classic"
               },
               "mappings": [
-                {
-                  "type": "special",
-                  "options": {
-                    "match": "null",
-                    "result": {
-                      "text": "UNKNOWN",
-                      "color": "#8e8e8e"
-                    }
-                  }
-                },
                 {
                   "type": "value",
                   "options": {
                     "0": {
-                      "text": "DOWN",
+                      "text": "Failed",
                       "color": "red"
                     },
                     "1": {
-                      "text": "UP",
+                      "text": "Passed",
                       "color": "green"
                     }
                   }
@@ -3230,28 +671,30 @@
           "maxDataPoints": 600,
           "interval": "30s",
           "options": {
-            "showValue": "never",
-            "rowHeight": 0.75,
+            "showValue": "auto",
+            "alignValue": "left",
             "mergeValues": true,
+            "rowHeight": 0.8,
             "legend": {
               "showLegend": false
             },
             "tooltip": {
-              "mode": "single"
+              "mode": "single",
+              "sort": "none"
             }
           }
         },
         {
-          "id": 27,
-          "title": "Collector age & scrape duration",
+          "id": 21,
+          "title": "Gateway traffic \u00b7 UK measurement",
           "type": "timeseries",
           "gridPos": {
             "x": 12,
-            "y": 66,
+            "y": 18,
             "w": 12,
             "h": 6
           },
-          "description": "The online-client file should be updated every 15 s. At 60 s the client panels stop showing counts. Scrapes time out at 8 s; a longer file age can mean the poller stopped.",
+          "description": "Traffic counters are currently collected at the UK Gateway only. SPB or another service shows N/A; these are not fleet-wide totals.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -3259,8 +702,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "time() - node_textfile_mtime_seconds{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",file=\"/textfile/xray_online.prom\"}",
-              "legendFormat": "{{region}} / {{node}} \u00b7 Online-client file age",
+              "expr": "sum(rate(xray_traffic_downlink_bytes_total{service=~\"${service_name:regex}\",region=~\"${region:regex}\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__rate_interval])) * 8",
+              "legendFormat": "Download",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -3271,8 +714,8 @@
             },
             {
               "refId": "B",
-              "expr": "scrape_duration_seconds{job=~\"node|spb-node|kubelet|kube-state-metrics|xray|prometheus|spb-blackbox|spb-probes\"}",
-              "legendFormat": "{{job}} \u00b7 {{instance}}",
+              "expr": "sum(rate(xray_traffic_uplink_bytes_total{service=~\"${service_name:regex}\",region=~\"${region:regex}\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__rate_interval])) * 8",
+              "legendFormat": "Upload",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -3284,55 +727,13 @@
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "s",
+              "unit": "bps",
               "decimals": 1,
-              "noValue": "UNKNOWN",
+              "noValue": "N/A",
               "color": {
                 "mode": "palette-classic"
               },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "blue",
-                    "value": null
-                  }
-                ]
-              },
-              "mappings": [
-                {
-                  "type": "special",
-                  "options": {
-                    "match": "null",
-                    "result": {
-                      "text": "UNKNOWN",
-                      "color": "#8e8e8e"
-                    }
-                  }
-                }
-              ],
-              "custom": {
-                "drawStyle": "line",
-                "lineInterpolation": "linear",
-                "lineWidth": 2,
-                "fillOpacity": 8,
-                "showPoints": "never",
-                "spanNulls": false,
-                "axisPlacement": "auto",
-                "axisBorderShow": false,
-                "axisColorMode": "text",
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              }
+              "mappings": []
             },
             "overrides": []
           },
@@ -3340,12 +741,9 @@
           "interval": "30s",
           "options": {
             "legend": {
-              "displayMode": "table",
+              "displayMode": "list",
               "placement": "bottom",
-              "calcs": [
-                "lastNotNull",
-                "max"
-              ]
+              "calcs": []
             },
             "tooltip": {
               "mode": "multi",
@@ -3354,16 +752,16 @@
           }
         },
         {
-          "id": 28,
-          "title": "Network errors & dropped packets",
+          "id": 22,
+          "title": "Service restarts \u00b7 last hour",
           "type": "timeseries",
           "gridPos": {
             "x": 0,
-            "y": 72,
+            "y": 24,
             "w": 12,
             "h": 6
           },
-          "description": "Host interface counters, not proxy request errors. ISP blocking may leave these at zero.",
+          "description": "Restarts for currently scheduled instances of the selected service.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -3371,20 +769,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by(region,node,device) (rate(node_network_receive_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_errs_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
-              "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} errors",
-              "editorMode": "code",
-              "instant": false,
-              "range": true,
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              }
-            },
-            {
-              "refId": "B",
-              "expr": "sum by(region,node,device) (rate(node_network_receive_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]) + rate(node_network_transmit_drop_total{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\",device=~\"ens.*|enp.*|eth.*\"}[$__rate_interval]))",
-              "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} drops",
+              "expr": "sum by(region) (hm:service_instance:restarts_1h{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+              "legendFormat": "{{region}}",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -3396,55 +782,13 @@
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "pps",
+              "unit": "short",
               "decimals": 1,
-              "noValue": "UNKNOWN",
+              "noValue": "No data",
               "color": {
                 "mode": "palette-classic"
               },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "blue",
-                    "value": null
-                  }
-                ]
-              },
-              "mappings": [
-                {
-                  "type": "special",
-                  "options": {
-                    "match": "null",
-                    "result": {
-                      "text": "UNKNOWN",
-                      "color": "#8e8e8e"
-                    }
-                  }
-                }
-              ],
-              "custom": {
-                "drawStyle": "line",
-                "lineInterpolation": "linear",
-                "lineWidth": 2,
-                "fillOpacity": 8,
-                "showPoints": "never",
-                "spanNulls": false,
-                "axisPlacement": "auto",
-                "axisBorderShow": false,
-                "axisColorMode": "text",
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              }
+              "mappings": []
             },
             "overrides": []
           },
@@ -3452,12 +796,9 @@
           "interval": "30s",
           "options": {
             "legend": {
-              "displayMode": "table",
+              "displayMode": "list",
               "placement": "bottom",
-              "calcs": [
-                "lastNotNull",
-                "max"
-              ]
+              "calcs": []
             },
             "tooltip": {
               "mode": "multi",
@@ -3466,16 +807,16 @@
           }
         },
         {
-          "id": 29,
-          "title": "Memory used by monitoring",
-          "type": "timeseries",
+          "id": 23,
+          "title": "Disk available on service hosts",
+          "type": "stat",
           "gridPos": {
             "x": 12,
-            "y": 72,
+            "y": 24,
             "w": 12,
             "h": 6
           },
-          "description": "Monitoring overhead relative to host memory use. Working set and MemAvailable are different accounting views and are not additive.",
+          "description": "Shared host filesystem capacity on the selected service hosts.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -3483,23 +824,11 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by(instance) (container_memory_working_set_bytes{job=\"kubelet\",service=\"infrastructure\",namespace=\"hm\",container=~\"grafana|prometheus|node-exporter|online-clients|kube-state-metrics|xray-exporter|blackbox\"})",
-              "legendFormat": "{{instance}} monitoring",
+              "expr": "(100 * node_filesystem_avail_bytes{job=~\"node|spb-node\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"node|spb-node\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}) and on(node) hm:service_instance:info{service=~\"${service_name:regex}\",region=~\"${region:regex}\"}",
+              "legendFormat": "{{region}}",
               "editorMode": "code",
-              "instant": false,
-              "range": true,
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              }
-            },
-            {
-              "refId": "B",
-              "expr": "node_memory_MemTotal_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"} - node_memory_MemAvailable_bytes{job=~\"node|spb-node\",node=~\"${node:regex}\",region=~\"${region:regex}\"}",
-              "legendFormat": "{{region}} / {{node}} \u00b7 Host used RAM",
-              "editorMode": "code",
-              "instant": false,
-              "range": true,
+              "instant": true,
+              "range": false,
               "datasource": {
                 "type": "prometheus",
                 "uid": "prometheus"
@@ -3508,89 +837,32 @@
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "bytes",
+              "unit": "percent",
               "decimals": 1,
-              "noValue": "UNKNOWN",
+              "noValue": "No data",
               "color": {
                 "mode": "palette-classic"
               },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "blue",
-                    "value": null
-                  }
-                ]
-              },
-              "mappings": [
-                {
-                  "type": "special",
-                  "options": {
-                    "match": "null",
-                    "result": {
-                      "text": "UNKNOWN",
-                      "color": "#8e8e8e"
-                    }
-                  }
-                }
-              ],
-              "custom": {
-                "drawStyle": "line",
-                "lineInterpolation": "linear",
-                "lineWidth": 2,
-                "fillOpacity": 8,
-                "showPoints": "never",
-                "spanNulls": false,
-                "axisPlacement": "auto",
-                "axisBorderShow": false,
-                "axisColorMode": "text",
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              }
+              "mappings": []
             },
             "overrides": []
           },
           "maxDataPoints": 600,
           "interval": "30s",
           "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "bottom",
+            "reduceOptions": {
               "calcs": [
-                "lastNotNull",
-                "max"
-              ]
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
             },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
-          "id": 30,
-          "title": "WHEN SOMETHING FAILS",
-          "type": "text",
-          "gridPos": {
-            "x": 0,
-            "y": 78,
-            "w": 24,
-            "h": 7
-          },
-          "description": "",
-          "options": {
-            "mode": "markdown",
-            "content": "**Russia probes fail, direct control succeeds** \u2192 compare REALITY, HTTPS backup and split-default checks. They perform authenticated requests and verify the exit IP. A datacenter probe does not represent every home/mobile ISP.\n\n**Direct control fails** \u2192 check the SPB host/internet before diagnosing VPN blocking. **Telemetry unavailable** \u2192 check scraping, certificates and collector logs.\n\n**Clients UNKNOWN** \u2192 check online-client file freshness and poller logs. Zero means a fresh successful observation with no active source IPs.\n\n**Low memory / restarts** \u2192 compare per-host headroom, PSI and container limits. **Disk low** \u2192 inspect space and inodes.\n\nExisting workloads run on SPB during a control-plane WAN outage, but deployments/reconciliation depend on UK. No residential SLO or notification receiver is configured."
+            "orientation": "auto",
+            "colorMode": "none",
+            "graphMode": "none",
+            "textMode": "value_and_name",
+            "wideLayout": true,
+            "justifyMode": "auto"
           }
         }
       ]

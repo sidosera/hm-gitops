@@ -121,6 +121,8 @@ scrape_configs:
       node: spb-01
       service: gateway
       region: spb
+      source_region: spb
+      target_region: uk
   - targets:
     - https://api.ipify.org
     labels:
@@ -129,6 +131,8 @@ scrape_configs:
       node: spb-01
       service: gateway
       region: spb
+      source_region: spb
+      target_region: uk
   - targets:
     - https://api.ipify.org
     labels:
@@ -137,6 +141,8 @@ scrape_configs:
       node: spb-01
       service: gateway
       region: spb
+      source_region: spb
+      target_region: spb
   - targets:
     - https://api.ipify.org
     labels:
@@ -145,6 +151,8 @@ scrape_configs:
       node: spb-01
       service: gateway
       region: spb
+      source_region: spb
+      target_region: spb
   - targets:
     - https://ya.ru
     labels:
@@ -153,6 +161,8 @@ scrape_configs:
       node: spb-01
       service: gateway
       region: spb
+      source_region: spb
+      target_region: spb
   relabel_configs:
   - source_labels:
     - __address__
@@ -167,3 +177,4 @@ scrape_configs:
   sample_limit: 100
 rule_files:
 - /etc/prometheus/spb-rules.yml
+- /etc/prometheus/service-rules.yml

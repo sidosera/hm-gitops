@@ -1,0 +1,110 @@
+rule_files:
+- ../../conf/monitoring/service-rules.yml
+evaluation_interval: 30s
+tests:
+- interval: 30s
+  input_series:
+  - series: node_uname_info{job="node",node="machine",region="uk"}
+    values: 1+0x6
+  - series: node_uname_info{job="node",node="spb-01",region="spb"}
+    values: 1+0x6
+  - series: kube_pod_info{namespace="hm",pod="proxy-service-fixture",node="machine",region="uk",service="kubernetes"}
+    values: 1+0x6
+  - series: kube_pod_status_phase{namespace="hm",pod="proxy-service-fixture",phase="Running"}
+    values: 1+0x6
+  - series: kube_pod_status_ready{namespace="hm",pod="proxy-service-fixture",condition="true"}
+    values: 1+0x6
+  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="proxy-service-fixture",container="app"}
+    values: 100+0x6
+  - series: container_cpu_usage_seconds_total{job="kubelet",namespace="hm",pod="proxy-service-fixture",container="app"}
+    values: 0+30x6
+  - series: kube_pod_container_status_restarts_total{namespace="hm",pod="proxy-service-fixture",container="app"}
+    values: 0+0x6
+  - series: kube_pod_info{namespace="hm",pod="spb-gateway-fixture",node="spb-01",region="uk",service="kubernetes"}
+    values: 1+0x6
+  - series: kube_pod_status_phase{namespace="hm",pod="spb-gateway-fixture",phase="Running"}
+    values: 1+0x6
+  - series: kube_pod_status_ready{namespace="hm",pod="spb-gateway-fixture",condition="true"}
+    values: 0+0x6
+  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="spb-gateway-fixture",container="app"}
+    values: 50+0x6
+  - series: container_cpu_usage_seconds_total{job="kubelet",namespace="hm",pod="spb-gateway-fixture",container="app"}
+    values: 0+30x6
+  - series: kube_pod_container_status_restarts_total{namespace="hm",pod="spb-gateway-fixture",container="app"}
+    values: 0+0x6
+  - series: kube_pod_info{namespace="hm",pod="www-service-fixture",node="machine",region="uk",service="kubernetes"}
+    values: 1+0x6
+  - series: kube_pod_status_phase{namespace="hm",pod="www-service-fixture",phase="Running"}
+    values: 1+0x6
+  - series: kube_pod_status_ready{namespace="hm",pod="www-service-fixture",condition="true"}
+    values: 1+0x6
+  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="www-service-fixture",container="app"}
+    values: 20+0x6
+  - series: container_cpu_usage_seconds_total{job="kubelet",namespace="hm",pod="www-service-fixture",container="app"}
+    values: 0+30x6
+  - series: kube_pod_container_status_restarts_total{namespace="hm",pod="www-service-fixture",container="app"}
+    values: 0+0x6
+  - series: kube_pod_info{namespace="hm",pod="prometheus-fixture",node="machine",region="uk",service="kubernetes"}
+    values: 1+0x6
+  - series: kube_pod_status_phase{namespace="hm",pod="prometheus-fixture",phase="Running"}
+    values: 1+0x6
+  - series: kube_pod_status_ready{namespace="hm",pod="prometheus-fixture",condition="true"}
+    values: 1+0x6
+  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="prometheus-fixture",container="app"}
+    values: 60+0x6
+  - series: container_cpu_usage_seconds_total{job="kubelet",namespace="hm",pod="prometheus-fixture",container="app"}
+    values: 0+30x6
+  - series: kube_pod_container_status_restarts_total{namespace="hm",pod="prometheus-fixture",container="app"}
+    values: 0+0x6
+  - series: kube_pod_info{namespace="hm",pod="node-exporter-fixture",node="spb-01",region="uk",service="kubernetes"}
+    values: 1+0x6
+  - series: kube_pod_status_phase{namespace="hm",pod="node-exporter-fixture",phase="Running"}
+    values: 1+0x6
+  - series: kube_pod_status_ready{namespace="hm",pod="node-exporter-fixture",condition="true"}
+    values: 1+0x6
+  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="node-exporter-fixture",container="app"}
+    values: 10+0x6
+  - series: container_cpu_usage_seconds_total{job="kubelet",namespace="hm",pod="node-exporter-fixture",container="app"}
+    values: 0+30x6
+  - series: kube_pod_container_status_restarts_total{namespace="hm",pod="node-exporter-fixture",container="app"}
+    values: 0+0x6
+  promql_expr_test:
+  - expr: count(hm:service_instance:info{service="gateway",region="spb"})
+    eval_time: 3m
+    exp_samples:
+    - labels: '{}'
+      value: 1
+  - expr: sum(hm:service_instance:memory_bytes{service="gateway",region="spb"})
+    eval_time: 3m
+    exp_samples:
+    - labels: '{}'
+      value: 50
+  - expr: sum(hm:service_instance:memory_bytes{service="gateway"})
+    eval_time: 3m
+    exp_samples:
+    - labels: '{}'
+      value: 150
+  - expr: sum(hm:service_instance:memory_bytes{service="website",region="uk"})
+    eval_time: 3m
+    exp_samples:
+    - labels: '{}'
+      value: 20
+  - expr: sum(hm:service_instance:memory_bytes{service="observability"})
+    eval_time: 3m
+    exp_samples:
+    - labels: '{}'
+      value: 70
+  - expr: sum(hm:service_instance:ready{service="gateway",region="spb"})
+    eval_time: 3m
+    exp_samples:
+    - labels: '{}'
+      value: 0
+  - expr: round(sum(hm:service_instance:cpu_cores{service="gateway",region="spb"}),
+      0.001)
+    eval_time: 3m
+    exp_samples:
+    - labels: '{}'
+      value: 1
+  - expr: hm:service_instance:info{service="website",region="spb"}
+    eval_time: 3m
+    exp_samples: []

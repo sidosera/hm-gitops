@@ -132,7 +132,7 @@ The website ownership init container needs only `CHOWN`; all other capabilities 
 
 ## Grafana and Prometheus
 
-Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing dashboard username and password. The provisioned **Services / Operations** dashboard is the home page. Credentials are stored in a SOPS-encrypted Secret; proxy profiles remain unchanged.
+Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing dashboard username and password. The provisioned **Services / Overview** dashboard is the home page. Credentials are stored in a SOPS-encrypted Secret; proxy profiles remain unchanged.
 
 Prometheus scrapes every 30 seconds and stores seven days of history, bounded to 750 MB of blocks on a 2 GiB volume. Grafana has a separate 1 GiB volume for its settings. Both volumes use the VPS disk, so they do not survive loss of the VPS. History starts when Prometheus is deployed; the previous SQLite history volume is retained as an archive and is not imported.
 
@@ -182,7 +182,7 @@ Both hosts use the same Ansible `vm/playbooks/bootstrap.yml` bootstrap and Flux 
 
 The SPB gateway runs Xray plus a blackbox-exporter sidecar. `services/gateway/overlays/spb/config.json` is an explicit domain suffix allowlist for Russian egress, not a blanket `.ru` exception. Unknown destinations use the original upstream through either REALITY or HTTPS/XHTTP; failure never switches foreign traffic to Russian direct egress. SOCKS probe ports are loopback-only inside the pod; native StatsService is protected by a NetworkPolicy. Node/blackbox metrics use mTLS. TLS private material and authenticated Xray connection settings are SOPS encrypted; public routing settings are ConfigMaps. Certificates must be renewed before November 2027.
 
-Both hosts share one dashboard at `/status/d/hm-services`. The host selector filters capacity and client counts; workload diagnostics cover both nodes. It includes host RAM/CPU/network, client estimate and five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
+Both hosts share one dashboard at `/status/d/hm-services`. Service and Region filter every panel. The default view shows ready instances, clients, service memory, host RAM headroom, CPU and regional instances; specialist signals are in a collapsed Details row. It includes host RAM/CPU/network, client estimate and five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
 
 For client import, use the private `hm-spb-smart-routing.txt` VLESS profile provided outside Git. Existing upstream profiles remain valid. The bootstrap password is unnecessary after key-only SSH is configured.
 
@@ -209,3 +209,8 @@ The same Xray image starts with `run -confdir /etc/xray` in both regions. A read
 Change routing in the regional public JSON and validate with `kubectl kustomize services/gateway/overlays/REGION` and the routing tests. Kustomize hashes ConfigMaps, so a routing update triggers a rollout. For credential rotation, edit the SOPS Secret and override/bump `hm.gitops/credentials-revision` in the regional Deployment patch so Xray reloads its credentials. Keep stable Deployment/Service names, client identities, listener ports and Traefik routes during structural refactors. The SPB overlay uses Recreate because its fixed public host port cannot be shared by two pods; UK uses a rolling update.
 
 Validate routing and overlay boundaries with `python -m unittest discover -s tests -v` (Python, PyYAML and kubectl required). The checks cover private-network blocks, fail-closed routing, credential isolation, stable selectors, unchanged source selectors in ingress policies, and shared runtime/image configuration.
+
+
+The service dashboard uses `service_name` and `region` variables with literal service identifiers, not pod-name regexes. Lightweight Prometheus recording rules map current pod identities to Gateway, Website and Observability, and derive placement from node metrics; service workload queries use those dimensions consistently. Gateway-only signals show N/A for other services. Transport probes retain their SPB observation origin and carry a separate target_region for filtering. Gateway byte counters are currently UK-only and are labelled accordingly in the collapsed Details section.
+
+Filter regression checks: `python -m unittest discover -s tests -v`; with Prometheus tooling installed, `promtool test rules tests/fixtures/dashboard-filters.test.yml` checks service/region isolation, memory attribution, unready pods and empty regions against synthetic source metrics.
