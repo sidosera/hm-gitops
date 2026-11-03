@@ -1,0 +1,33 @@
+[Unit]
+Description=Hackamonth hm-xray
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=hm-xray
+Group=hm-xray
+ExecStart=/usr/local/bin/xray run -c /etc/hm-spb/config.json
+Restart=on-failure
+RestartSec=5
+MemoryMax=192M
+TasksMax=128
+LimitNOFILE=65536
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+Environment=GOMEMLIMIT=160MiB
+
+[Install]
+WantedBy=multi-user.target

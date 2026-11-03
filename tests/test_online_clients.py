@@ -24,6 +24,10 @@ class OnlineClientTests(unittest.TestCase):
         self.assertNotIn('192.0.2.1', text)
         self.assertNotIn('2001:db8', text)
 
+    def test_relay_and_probe_sessions_are_not_counted_as_end_users(self):
+        text = self.collect([{'email': 'spb-relay@local', 'ips': [{'ip': '192.0.2.1'}]}])
+        self.assertIn('xray_active_client_ips 0', text)
+
     def test_empty_sessions_are_zero(self):
         self.assertIn('xray_active_client_ips 0', self.collect([]))
 

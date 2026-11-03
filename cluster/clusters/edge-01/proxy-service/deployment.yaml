@@ -17,7 +17,7 @@ spec:
         app.kubernetes.io/name: proxy-service
         app.kubernetes.io/component: edge
       annotations:
-        hm.gitops/config-revision: 2026-11-02-metrics-stage1
+        hm.gitops/config-revision: 2026-11-03-spb-relay
     spec:
       automountServiceAccountToken: false
       securityContext:

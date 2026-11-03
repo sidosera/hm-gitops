@@ -1,0 +1,6 @@
+- name: Restart SPB services
+  ansible.builtin.systemd:
+    name: '{{ item }}'
+    state: restarted
+    daemon_reload: true
+  loop: [hm-xray, hm-node-exporter, hm-blackbox-exporter, hm-online-clients]

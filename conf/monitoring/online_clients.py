@@ -6,17 +6,22 @@ from pathlib import Path
 import subprocess
 import time
 
-OUTPUT = Path('/textfile/xray_online.prom')
+OUTPUT = Path(os.environ.get('METRICS_OUTPUT', '/textfile/xray_online.prom'))
+CLI = os.environ.get('XRAY_CLI', '/tools/xray')
+SERVER = os.environ.get('XRAY_STATS_SERVER', 'proxy-service.hm.svc.cluster.local:10085')
 
 
 def collect():
-    response = subprocess.run(['/tools/xray', 'api', 'statsonlineiplist',
-                               '--server=proxy-service.hm.svc.cluster.local:10085',
+    response = subprocess.run([CLI, 'api', 'statsonlineiplist',
+                               '--server=' + SERVER,
                                '-timeout', '3', '-all'], check=True, capture_output=True,
                               text=True, timeout=5)
     clients = set()
     profiles = {}
     for user in json.loads(response.stdout).get('users', []):
+        # Relay/probe sessions are infrastructure, not end-user clients.
+        if user.get('email') == 'spb-relay@local':
+            continue
         addresses = set()
         for item in user.get('ips', []):
             try:

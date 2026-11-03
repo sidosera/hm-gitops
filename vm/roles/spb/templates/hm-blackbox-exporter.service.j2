@@ -1,0 +1,32 @@
+[Unit]
+Description=Hackamonth hm-blackbox-exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=hm-monitor
+Group=hm-monitor
+ExecStart=/usr/local/bin/blackbox_exporter --config.file=/etc/hm-spb/blackbox.yml --web.listen-address={{ ansible_host }}:9115 --web.config.file=/etc/hm-spb/monitoring/web.yml
+Restart=on-failure
+RestartSec=5
+MemoryMax=96M
+TasksMax=128
+LimitNOFILE=65536
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+CapabilityBoundingSet=
+Environment=GOMEMLIMIT=72MiB
+
+[Install]
+WantedBy=multi-user.target

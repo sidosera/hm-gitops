@@ -1,0 +1,9 @@
+all:
+  children:
+    spb:
+      hosts:
+        spb-01:
+          ansible_host: 212.116.115.29
+          ansible_user: root
+          spb_metrics_source: 87.106.74.217
+          spb_secrets_ssh_target: sidosera@87.106.74.217

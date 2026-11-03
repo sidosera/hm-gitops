@@ -6,3 +6,5 @@ resources:
   - www-service
   - proxy-service
   - monitoring
+components:
+  - ../../../conf/spb-01

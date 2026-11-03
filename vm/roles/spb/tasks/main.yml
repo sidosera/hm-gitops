@@ -1,0 +1,231 @@
+---
+- name: Verify supported host
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.architecture == 'x86_64'
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.memtotal_mb >= 450
+
+- name: Install small runtime and security packages
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, unzip, ufw, fail2ban, unattended-upgrades]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create service identities
+  ansible.builtin.user:
+    name: '{{ item }}'
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+  loop: [hm-xray, hm-monitor]
+
+- name: Create configuration and download directories
+  ansible.builtin.file:
+    path: '{{ item.path }}'
+    state: directory
+    owner: '{{ item.owner | default("root") }}'
+    group: '{{ item.group | default("root") }}'
+    mode: '{{ item.mode }}'
+  loop:
+    - {path: /etc/hm-spb, mode: '0755'}
+    - {path: /etc/hm-spb/monitoring, group: hm-monitor, mode: '0750'}
+    - {path: /usr/local/lib/hm-spb, mode: '0755'}
+    - {path: /var/cache/hm-spb, mode: '0700'}
+    - {path: /var/lib/hm-spb/textfile, owner: hm-monitor, group: hm-monitor, mode: '0750'}
+
+- name: Download checksum-pinned official binaries
+  ansible.builtin.get_url:
+    url: '{{ item.url }}'
+    dest: '/var/cache/hm-spb/{{ item.file }}'
+    checksum: 'sha256:{{ item.sha }}'
+    mode: '0600'
+  loop:
+    - url: 'https://github.com/XTLS/Xray-core/releases/download/v{{ spb_xray_version }}/Xray-linux-64.zip'
+      file: 'xray-{{ spb_xray_version }}.zip'
+      sha: '{{ spb_xray_sha256 }}'
+    - url: 'https://github.com/prometheus/node_exporter/releases/download/v{{ spb_node_version }}/node_exporter-{{ spb_node_version }}.linux-amd64.tar.gz'
+      file: 'node-{{ spb_node_version }}.tar.gz'
+      sha: '{{ spb_node_sha256 }}'
+    - url: 'https://github.com/prometheus/blackbox_exporter/releases/download/v{{ spb_blackbox_version }}/blackbox_exporter-{{ spb_blackbox_version }}.linux-amd64.tar.gz'
+      file: 'blackbox-{{ spb_blackbox_version }}.tar.gz'
+      sha: '{{ spb_blackbox_sha256 }}'
+
+- name: Unpack runtimes
+  ansible.builtin.unarchive:
+    src: '/var/cache/hm-spb/{{ item }}'
+    dest: /usr/local/lib/hm-spb
+    remote_src: true
+  loop:
+    - 'xray-{{ spb_xray_version }}.zip'
+    - 'node-{{ spb_node_version }}.tar.gz'
+    - 'blackbox-{{ spb_blackbox_version }}.tar.gz'
+
+- name: Install binary paths
+  ansible.builtin.file:
+    src: '/usr/local/lib/hm-spb/{{ item.src }}'
+    dest: '/usr/local/bin/{{ item.name }}'
+    state: link
+  loop:
+    - {name: xray, src: xray}
+    - {name: node_exporter, src: 'node_exporter-{{ spb_node_version }}.linux-amd64/node_exporter'}
+    - {name: blackbox_exporter, src: 'blackbox_exporter-{{ spb_blackbox_version }}.linux-amd64/blackbox_exporter'}
+
+# Flux decrypts these on edge-01. No age private key is copied to SPB or the controller.
+- name: Read SPB-specific secrets from the existing secret store
+  ansible.builtin.command:
+    argv:
+      - ssh
+      - -i
+      - '{{ spb_deploy_key_file }}'
+      - -o
+      - BatchMode=yes
+      - -o
+      - StrictHostKeyChecking=yes
+      - '{{ spb_secrets_ssh_target }}'
+      - sudo
+      - -n
+      - kubectl
+      - -n
+      - '{{ spb_secrets_namespace }}'
+      - get
+      - secret
+      - '{{ item }}'
+      - -o
+      - json
+  loop: [spb-gateway-config-source, spb-monitoring-server-tls]
+  delegate_to: localhost
+  become: false
+  changed_when: false
+  register: spb_secret_results
+  no_log: true
+
+- name: Install private gateway configuration
+  ansible.builtin.copy:
+    content: '{{ ((spb_secret_results.results[0].stdout | from_json).data)["config.json"] | b64decode }}'
+    dest: /etc/hm-spb/config.json
+    owner: root
+    group: hm-xray
+    mode: '0640'
+    validate: /usr/local/bin/xray run -test -c %s
+  no_log: true
+  notify: Restart SPB services
+
+- name: Install monitoring server identity
+  ansible.builtin.copy:
+    content: '{{ ((spb_secret_results.results[1].stdout | from_json).data)[item] | b64decode }}'
+    dest: '/etc/hm-spb/monitoring/{{ item }}'
+    owner: root
+    group: hm-monitor
+    mode: '0640'
+  loop: [ca.crt, tls.crt, tls.key]
+  no_log: true
+  notify: Restart SPB services
+
+- name: Install exporter TLS configuration
+  ansible.builtin.copy:
+    dest: /etc/hm-spb/monitoring/web.yml
+    owner: root
+    group: hm-monitor
+    mode: '0640'
+    content: |
+      tls_server_config:
+        cert_file: /etc/hm-spb/monitoring/tls.crt
+        key_file: /etc/hm-spb/monitoring/tls.key
+        client_auth_type: RequireAndVerifyClientCert
+        client_ca_file: /etc/hm-spb/monitoring/ca.crt
+        min_version: TLS12
+  notify: Restart SPB services
+
+- name: Install probe modules
+  ansible.builtin.template:
+    src: blackbox.yml.j2
+    dest: /etc/hm-spb/blackbox.yml
+    mode: '0644'
+  notify: Restart SPB services
+
+- name: Install aggregate online collector
+  ansible.builtin.copy:
+    src: '{{ playbook_dir }}/../../conf/monitoring/online_clients.py'
+    dest: /usr/local/lib/hm-spb/online_clients.py
+    mode: '0644'
+  notify: Restart SPB services
+
+- name: Install resource-bounded systemd services
+  ansible.builtin.template:
+    src: '{{ item }}.service.j2'
+    dest: '/etc/systemd/system/{{ item }}.service'
+    mode: '0644'
+  loop: [hm-xray, hm-node-exporter, hm-blackbox-exporter, hm-online-clients]
+  notify: Restart SPB services
+
+- name: Allow SSH and the authenticated gateway
+  ansible.builtin.command:
+    argv: [ufw, allow, '{{ item }}/tcp']
+  loop: [22, 443]
+  register: spb_ufw_public
+  changed_when: '"Rule added" in spb_ufw_public.stdout or "Rules updated" in spb_ufw_public.stdout'
+
+- name: Allow only the existing collector host to reach mTLS exporters
+  ansible.builtin.command:
+    argv: [ufw, allow, from, '{{ spb_metrics_source }}', to, any, port, '{{ item }}', proto, tcp]
+  loop: ['9100', '9115']
+  register: spb_ufw_metrics
+  changed_when: '"Rule added" in spb_ufw_metrics.stdout or "Rules updated" in spb_ufw_metrics.stdout'
+
+- name: Set firewall default and enable it without resetting provider rules
+  ansible.builtin.command:
+    argv: '{{ item }}'
+  loop:
+    - [ufw, default, deny, incoming]
+    - [ufw, default, allow, outgoing]
+    - [ufw, --force, enable]
+  changed_when: false
+
+# Only reached over the deployment key; sshd validates this before reloading.
+- name: Disable bootstrap password authentication
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/00-hm-spb.conf
+    mode: '0644'
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+      X11Forwarding no
+      MaxAuthTries 3
+  register: spb_sshd_config
+
+- name: Validate SSH configuration
+  ansible.builtin.command: /usr/sbin/sshd -t
+  changed_when: false
+
+- name: Reload hardened SSH
+  ansible.builtin.systemd:
+    name: ssh
+    state: reloaded
+  when: spb_sshd_config.changed
+
+- name: Start security services
+  ansible.builtin.systemd:
+    name: '{{ item }}'
+    state: started
+    enabled: true
+  loop: [fail2ban, unattended-upgrades]
+
+- name: Apply pending service changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable all gateway and probe services
+  ansible.builtin.systemd:
+    name: '{{ item }}'
+    state: started
+    enabled: true
+    daemon_reload: true
+  loop: [hm-xray, hm-node-exporter, hm-blackbox-exporter, hm-online-clients]
+
+- name: Verify gateway listener
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: 443
+    timeout: 30

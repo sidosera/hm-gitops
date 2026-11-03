@@ -1,0 +1,8 @@
+spb_xray_version: '26.10.31'
+spb_xray_sha256: e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214
+spb_node_version: '1.12.1'
+spb_node_sha256: b51d8a76aa2a9156a55d501aca6276fae09e262259a5e4e831d2c2222f084e63
+spb_blackbox_version: '0.29.1'
+spb_blackbox_sha256: b82b81839e6317e84fdd367f46d7ddd3b773fa09cbe2e3d5633a59171d741e76
+spb_deploy_key_file: '{{ lookup("env", "HOME") }}/.ssh/hm-gitops'
+spb_secrets_namespace: hm
