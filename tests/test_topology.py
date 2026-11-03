@@ -53,10 +53,13 @@ class TopologyTests(unittest.TestCase):
         inventory = json.loads((ROOT / 'conf/monitoring/inventory.json').read_text())
         self.assertEqual({v['name'] for v in inventory['templating']['list']}, {'cluster', 'zone', 'host'})
 
-    def test_new_cluster_and_legacy_migration_path_render_the_same_resources(self):
-        canonical = subprocess.check_output(['kubectl', 'kustomize', str(CLUSTER)])
-        legacy = subprocess.check_output(['kubectl', 'kustomize', str(ROOT / 'cluster/clusters/edge-01')])
-        self.assertEqual(list(yaml.safe_load_all(canonical)), list(yaml.safe_load_all(legacy)))
+    def test_cluster_sync_name_and_path_match_inventory(self):
+        sync = yaml.safe_load((CLUSTER / 'flux-system/sync.yaml').read_text())
+        self.assertEqual(sync['metadata']['name'], 'hm-cluster')
+        self.assertEqual(sync['spec']['path'], './cluster/clusters/hm-cluster')
+        self.assertFalse((ROOT / 'cluster/clusters/edge-01').exists())
+        subprocess.check_output(['kubectl', 'kustomize', str(CLUSTER)])
+
 
 
 if __name__ == '__main__':
