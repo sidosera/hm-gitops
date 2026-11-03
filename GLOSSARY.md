@@ -1,26 +1,34 @@
 # Infrastructure services
 
-The infrastructure is described by services and their regional deployments.
+The fleet is described by clusters, placement and services. A location or machine is never a service identity.
 
 ## Language
 
-**Gateway service**:
-The VPN service that accepts authenticated client traffic and routes it to an exit. It can have deployments in multiple regions with different ingress, routing and egress roles.
-_Avoid_: SPB service, UK service, primary service, secondary service
+**Cluster**:
+The shared deployment and control-plane boundary. `hm-cluster` currently contains two PoPs.
+_Avoid_: edge-01 (the former cluster name)
 
-**Region**:
-A named deployment location, such as `uk` or `spb`. A region contains service deployments and is independent of their service identity.
-_Avoid_: Service (when referring to a location)
+**PoP**:
+A point of presence, named `<country>-<city>`, such as `uk-ldn` or `ru-spb`. Country and city are descriptive metadata; a PoP contains one or more zones.
 
-**Availability zone**:
-A provider-defined failure domain within a region. A zone is recorded separately when known; a city or region alone does not establish an availability zone.
-_Avoid_: Region (when referring to an independent failure domain)
-
-**Service deployment**:
-A running instance of a service in a region. Regional deployments may perform complementary roles without becoming separate services.
+**Zone**:
+A named placement zone within a PoP, such as `uk-ldn-1` or `ru-spb-1`. Logical zone names alone do not establish provider availability-zone or failure-domain independence.
 
 **Host**:
-A machine that supplies capacity for service deployments. Its location and cluster role do not define a service.
+A capacity slot within a zone, named `<zone>/<ordinal>`, such as `uk-ldn-1/1`. Its service deployments can change independently of the slot identity.
+
+**Machine**:
+The physical or virtual machine occupying a host slot, identified in inventory by its management IP address. A replacement machine can occupy the same host slot with a different IP.
+
+**Service**:
+An application capability deployed within the cluster, independent of host and placement. Gateway, Website and VPN Probe are services.
+_Avoid_: UK service, SPB service (when referring to placement)
+
+**Gateway service**:
+The VPN service that accepts authenticated client traffic and routes it to an exit. Its deployments can have complementary ingress, routing and egress roles.
+
+**Service deployment**:
+An instance of a service placed in a zone. Multiple deployments do not create different logical services.
 
 **Control plane**:
-The shared system that manages desired deployment state across regions. A host's control-plane or worker role is separate from its location and from the services it runs.
+The shared system that manages desired deployment state across the cluster. Control-plane and worker roles are separate from placement and service identity.

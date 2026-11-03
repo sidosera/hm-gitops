@@ -17,7 +17,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 PROBE_EMAIL = 'probe-e2e@local'
-ENTRIES = {'uk': ('87.106.74.217', 'reality-legacy'), 'spb': ('212.116.115.29', 'gateway')}
+ENTRIES = {'uk-ldn-1': ('87.106.74.217', 'reality-legacy'), 'ru-spb-1': ('212.116.115.29', 'gateway')}
 
 
 def add_account(config, candidate):
@@ -69,15 +69,15 @@ def main():
     if not os.environ.get('SOPS_AGE_KEY_FILE'):
         parser.error('Set SOPS_AGE_KEY_FILE to the existing private age identity')
     staged, entries = {}, {}
-    for region, (address, tag) in ENTRIES.items():
-        source = ROOT / 'services/gateway/overlays' / region / 'credentials-secret.sops.yaml'
+    for zone, (address, tag) in ENTRIES.items():
+        source = ROOT / 'services/gateway/overlays' / zone / 'credentials-secret.sops.yaml'
         document = yaml.safe_load(subprocess.check_output(['sops', '--decrypt', str(source)]))
         config, ident = add_account(json.loads(document['stringData']['credentials.json']), str(uuid.uuid4()))
         chosen = next(i for i in config['inbounds'] if i['tag'] == tag)
-        entries[region] = client_config(chosen, ident, address)
+        entries[zone] = client_config(chosen, ident, address)
         document['stringData']['credentials.json'] = json.dumps(config, indent=2)
         staged[source] = encrypt(document, source)
-    for source, target in [('spb', 'uk'), ('uk', 'spb')]:
+    for source, target in [('ru-spb-1', 'uk-ldn-1'), ('uk-ldn-1', 'ru-spb-1')]:
         overlay = ROOT / 'services/vpn-probe/overlays' / source
         path = overlay / 'client-secret.sops.yaml'
         doc = {'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {'name': 'vpn-probe-client', 'namespace': 'hm'},
@@ -89,8 +89,8 @@ def main():
             kustomization['resources'].append('client-secret.sops.yaml')
         staged[kpath] = yaml.safe_dump(kustomization, sort_keys=False).encode()
     revision = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-    for region in ENTRIES:
-        path = ROOT / 'services/gateway/overlays' / region / 'deployment-patch.yaml'
+    for zone in ENTRIES:
+        path = ROOT / 'services/gateway/overlays' / zone / 'deployment-patch.yaml'
         doc = yaml.safe_load(path.read_text())
         doc['spec']['template'].setdefault('metadata', {}).setdefault('annotations', {})['hm.gitops/credentials-revision'] = revision
         staged[path] = yaml.safe_dump(doc, sort_keys=False).encode()

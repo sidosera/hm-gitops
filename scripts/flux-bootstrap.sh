@@ -4,12 +4,12 @@
 #
 # Usage:
 #   KUBECONFIG=/path/to/kubeconfig ./scripts/flux-bootstrap.sh [cluster]
-#   HM_FLUX_AGE_KEY_FILE=/secure/path/flux-age.agekey KUBECONFIG=/path/to/kubeconfig ./scripts/flux-bootstrap.sh edge-01
+#   HM_FLUX_AGE_KEY_FILE=/secure/path/flux-age.agekey KUBECONFIG=/path/to/kubeconfig ./scripts/flux-bootstrap.sh hm-cluster
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CLUSTER="${1:-edge-01}"
+CLUSTER="${1:-hm-cluster}"
 CLUSTER_DIR="$ROOT/cluster/clusters/$CLUSTER"
 FLUX_SYSTEM_DIR="$CLUSTER_DIR/flux-system"
 AGE_KEY_FILE="${HM_FLUX_AGE_KEY_FILE:-$ROOT/.secrets/flux-age.agekey}"
@@ -43,7 +43,7 @@ flux install --components="$FLUX_COMPONENTS"
 # Keep shared control services on the server; edge workers keep their small budget.
 for controller in source-controller kustomize-controller; do
   kubectl -n flux-system patch deployment "$controller" --type=merge \
-    -p '{"spec":{"template":{"spec":{"nodeSelector":{"kubernetes.io/hostname":"machine"}}}}}'
+    -p '{"spec":{"template":{"spec":{"nodeSelector":{"hm.gitops/control-plane":"true"}}}}}'
 done
 for controller in helm-controller notification-controller; do
   if [[ ",$FLUX_COMPONENTS," != *",$controller,"* ]]; then

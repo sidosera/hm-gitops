@@ -2,6 +2,8 @@ global:
   scrape_interval: 30s
   evaluation_interval: 30s
   scrape_timeout: 8s
+  external_labels:
+    cluster: hm-cluster
 scrape_configs:
 - job_name: prometheus
   static_configs:
@@ -9,20 +11,39 @@ scrape_configs:
     - localhost:9090
     labels:
       service: observability
-      region: uk
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      country: uk
   metric_relabel_configs:
   - source_labels:
     - __name__
     regex: prometheus_tsdb_head_series|prometheus_tsdb_storage_blocks_bytes|process_resident_memory_bytes
     action: keep
-- job_name: node
+- job_name: node-exporter
   static_configs:
   - targets:
     - 87.106.74.217:9100
     labels:
       node: machine
       service: infrastructure
-      region: uk
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      host: uk-ldn-1/1
+      machine: 87.106.74.217
+      country: uk
+  - targets:
+    - 212.116.115.29:9100
+    labels:
+      node: spb-01
+      service: infrastructure
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      host: ru-spb-1/1
+      machine: 212.116.115.29
+      country: ru
   sample_limit: 1500
   scheme: https
   tls_config: &id001
@@ -47,14 +68,24 @@ scrape_configs:
     - 87.106.74.217:10250
     labels:
       service: infrastructure
-      region: uk
       node: machine
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      host: uk-ldn-1/1
+      machine: 87.106.74.217
+      country: uk
   - targets:
     - 212.116.115.29:10250
     labels:
       service: infrastructure
-      region: spb
       node: spb-01
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      host: ru-spb-1/1
+      machine: 212.116.115.29
+      country: ru
   metric_relabel_configs:
   - source_labels:
     - __name__
@@ -67,7 +98,10 @@ scrape_configs:
     - kube-state-metrics.hm.svc.cluster.local:8080
     labels:
       service: kubernetes
-      region: uk
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      country: uk
   sample_limit: 1500
 - job_name: xray
   metrics_path: /scrape
@@ -76,26 +110,12 @@ scrape_configs:
     - xray-exporter.hm.svc.cluster.local:9550
     labels:
       service: gateway
-      region: uk
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      country: uk
   sample_limit: 500
-- job_name: spb-node
-  scheme: https
-  tls_config: *id001
-  static_configs:
-  - targets:
-    - 212.116.115.29:9100
-    labels:
-      node: spb-01
-      region: spb
-      service: infrastructure
-  sample_limit: 1500
-  metric_relabel_configs:
-  - source_labels:
-    - __name__
-    regex: xray_.*
-    target_label: service
-    replacement: gateway
-- job_name: spb-blackbox
+- job_name: gateway-blackbox
   scheme: https
   tls_config: *id001
   static_configs:
@@ -104,9 +124,14 @@ scrape_configs:
     labels:
       node: spb-01
       service: observability
-      region: spb
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      host: ru-spb-1/1
+      machine: 212.116.115.29
+      country: ru
   sample_limit: 500
-- job_name: spb-probes
+- job_name: gateway-transport-probes
   scheme: https
   metrics_path: /probe
   scrape_interval: 30s
@@ -120,9 +145,18 @@ scrape_configs:
       module: uk_primary
       node: spb-01
       service: gateway
-      region: spb
-      source_region: spb
-      target_region: uk
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      host: ru-spb-1/1
+      machine: 212.116.115.29
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: uk-ldn
+      target_zone: uk-ldn-1
+      country: ru
+      source_country: ru
+      target_country: uk
   - targets:
     - https://api.ipify.org
     labels:
@@ -130,9 +164,18 @@ scrape_configs:
       module: uk_backup
       node: spb-01
       service: gateway
-      region: spb
-      source_region: spb
-      target_region: uk
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      host: ru-spb-1/1
+      machine: 212.116.115.29
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: uk-ldn
+      target_zone: uk-ldn-1
+      country: ru
+      source_country: ru
+      target_country: uk
   - targets:
     - https://api.ipify.org
     labels:
@@ -140,9 +183,18 @@ scrape_configs:
       module: ru_direct
       node: spb-01
       service: gateway
-      region: spb
-      source_region: spb
-      target_region: spb
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      host: ru-spb-1/1
+      machine: 212.116.115.29
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: ru-spb
+      target_zone: ru-spb-1
+      country: ru
+      source_country: ru
+      target_country: ru
   - targets:
     - https://api.ipify.org
     labels:
@@ -150,9 +202,18 @@ scrape_configs:
       module: split_default
       node: spb-01
       service: gateway
-      region: spb
-      source_region: spb
-      target_region: spb
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      host: ru-spb-1/1
+      machine: 212.116.115.29
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: ru-spb
+      target_zone: ru-spb-1
+      country: ru
+      source_country: ru
+      target_country: ru
   - targets:
     - https://ya.ru
     labels:
@@ -160,9 +221,18 @@ scrape_configs:
       module: ru_http
       node: spb-01
       service: gateway
-      region: spb
-      source_region: spb
-      target_region: spb
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      host: ru-spb-1/1
+      machine: 212.116.115.29
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: ru-spb
+      target_zone: ru-spb-1
+      country: ru
+      source_country: ru
+      target_country: ru
   relabel_configs:
   - source_labels:
     - __address__
@@ -186,157 +256,241 @@ scrape_configs:
     labels:
       service: vpn-probe
       target_service: gateway
-      region: spb
-      source_region: spb
-      target_region: uk
       probe_scope: public-client
       check: client-web
       site: myanimelist
       module: website_myanimelist
-      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+      exporter: ru-spb-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: uk-ldn
+      target_zone: uk-ldn-1
+      country: ru
+      source_country: ru
+      target_country: uk
   - targets:
     - https://youtube.com/
     labels:
       service: vpn-probe
       target_service: gateway
-      region: spb
-      source_region: spb
-      target_region: uk
       probe_scope: public-client
       check: client-web
       site: youtube
       module: website_youtube
-      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+      exporter: ru-spb-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: uk-ldn
+      target_zone: uk-ldn-1
+      country: ru
+      source_country: ru
+      target_country: uk
   - targets:
     - https://facebook.com/
     labels:
       service: vpn-probe
       target_service: gateway
-      region: spb
-      source_region: spb
-      target_region: uk
       probe_scope: public-client
       check: client-web
       site: facebook
       module: website_facebook
-      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+      exporter: ru-spb-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: uk-ldn
+      target_zone: uk-ldn-1
+      country: ru
+      source_country: ru
+      target_country: uk
   - targets:
     - https://instagram.com/
     labels:
       service: vpn-probe
       target_service: gateway
-      region: spb
-      source_region: spb
-      target_region: uk
       probe_scope: public-client
       check: client-web
       site: instagram
       module: website_instagram
-      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+      exporter: ru-spb-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: uk-ldn
+      target_zone: uk-ldn-1
+      country: ru
+      source_country: ru
+      target_country: uk
   - targets:
     - https://x.com/
     labels:
       service: vpn-probe
       target_service: gateway
-      region: spb
-      source_region: spb
-      target_region: uk
       probe_scope: public-client
       check: client-web
       site: x
       module: website_x
-      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+      exporter: ru-spb-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: uk-ldn
+      target_zone: uk-ldn-1
+      country: ru
+      source_country: ru
+      target_country: uk
   - targets:
     - https://api.ipify.org
     labels:
       service: vpn-probe
       target_service: gateway
-      region: spb
-      source_region: spb
-      target_region: uk
       probe_scope: public-client
       check: client-exit
       site: exit
       module: exit
-      exporter: spb-vpn-probe.hm.svc.cluster.local:9115
+      exporter: ru-spb-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      source_pop: ru-spb
+      source_zone: ru-spb-1
+      target_pop: uk-ldn
+      target_zone: uk-ldn-1
+      country: ru
+      source_country: ru
+      target_country: uk
   - targets:
     - https://myanimelist.net/
     labels:
       service: vpn-probe
       target_service: gateway
-      region: uk
-      source_region: uk
-      target_region: spb
       probe_scope: public-client
       check: client-web
       site: myanimelist
       module: website_myanimelist
-      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+      exporter: uk-ldn-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      source_pop: uk-ldn
+      source_zone: uk-ldn-1
+      target_pop: ru-spb
+      target_zone: ru-spb-1
+      country: uk
+      source_country: uk
+      target_country: ru
   - targets:
     - https://youtube.com/
     labels:
       service: vpn-probe
       target_service: gateway
-      region: uk
-      source_region: uk
-      target_region: spb
       probe_scope: public-client
       check: client-web
       site: youtube
       module: website_youtube
-      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+      exporter: uk-ldn-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      source_pop: uk-ldn
+      source_zone: uk-ldn-1
+      target_pop: ru-spb
+      target_zone: ru-spb-1
+      country: uk
+      source_country: uk
+      target_country: ru
   - targets:
     - https://facebook.com/
     labels:
       service: vpn-probe
       target_service: gateway
-      region: uk
-      source_region: uk
-      target_region: spb
       probe_scope: public-client
       check: client-web
       site: facebook
       module: website_facebook
-      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+      exporter: uk-ldn-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      source_pop: uk-ldn
+      source_zone: uk-ldn-1
+      target_pop: ru-spb
+      target_zone: ru-spb-1
+      country: uk
+      source_country: uk
+      target_country: ru
   - targets:
     - https://instagram.com/
     labels:
       service: vpn-probe
       target_service: gateway
-      region: uk
-      source_region: uk
-      target_region: spb
       probe_scope: public-client
       check: client-web
       site: instagram
       module: website_instagram
-      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+      exporter: uk-ldn-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      source_pop: uk-ldn
+      source_zone: uk-ldn-1
+      target_pop: ru-spb
+      target_zone: ru-spb-1
+      country: uk
+      source_country: uk
+      target_country: ru
   - targets:
     - https://x.com/
     labels:
       service: vpn-probe
       target_service: gateway
-      region: uk
-      source_region: uk
-      target_region: spb
       probe_scope: public-client
       check: client-web
       site: x
       module: website_x
-      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+      exporter: uk-ldn-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      source_pop: uk-ldn
+      source_zone: uk-ldn-1
+      target_pop: ru-spb
+      target_zone: ru-spb-1
+      country: uk
+      source_country: uk
+      target_country: ru
   - targets:
     - https://api.ipify.org
     labels:
       service: vpn-probe
       target_service: gateway
-      region: uk
-      source_region: uk
-      target_region: spb
       probe_scope: public-client
       check: client-exit
       site: exit
       module: exit
-      exporter: uk-vpn-probe.hm.svc.cluster.local:9115
+      exporter: uk-ldn-1-vpn-probe.hm.svc.cluster.local:9115
+      pop: uk-ldn
+      zone: uk-ldn-1
+      cluster: hm-cluster
+      source_pop: uk-ldn
+      source_zone: uk-ldn-1
+      target_pop: ru-spb
+      target_zone: ru-spb-1
+      country: uk
+      source_country: uk
+      target_country: ru
   relabel_configs:
   - source_labels:
     - __address__

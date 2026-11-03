@@ -12,16 +12,16 @@ groups:
          or
          label_replace(kube_pod_labels{namespace="hm",label_hm_gitops_service="",label_app_kubernetes_io_name!=""}, "service", "$1", "label_app_kubernetes_io_name", "(.+)")
        ))
-       * on(node) group_left(region) max by(node,region) (node_uname_info{region!="",node!=""})
+       * on(node) group_left(cluster,zone) max by(node,cluster,zone) (node_uname_info{cluster!="",zone!="",node!=""})
   - record: hm:service_instance:ready
-    expr: max by(namespace,pod) (kube_pod_status_ready{namespace="hm",condition="true"}) * on(namespace,pod) group_left(service,region,node)
-      hm:service_instance:info
+    expr: max by(namespace,pod) (kube_pod_status_ready{namespace="hm",condition="true"}) * on(namespace,pod) group_left(service,cluster,zone,node)
+      hm:service_instance:info{cluster!=""}
   - record: hm:service_instance:cpu_cores
     expr: sum by(namespace,pod) (rate(container_cpu_usage_seconds_total{job="kubelet",namespace="hm",container!=""}[2m]))
-      * on(namespace,pod) group_left(service,region,node) hm:service_instance:info
+      * on(namespace,pod) group_left(service,cluster,zone,node) hm:service_instance:info{cluster!=""}
   - record: hm:service_instance:memory_bytes
     expr: max by(namespace,pod) (pod_memory_working_set_bytes{job="kubelet",namespace="hm"}) * on(namespace,pod)
-      group_left(service,region,node) hm:service_instance:info
+      group_left(service,cluster,zone,node) hm:service_instance:info{cluster!=""}
   - record: hm:service_instance:restarts_1h
     expr: sum by(namespace,pod) (increase(kube_pod_container_status_restarts_total{namespace="hm"}[1h])) * on(namespace,pod)
-      group_left(service,region,node) hm:service_instance:info
+      group_left(service,cluster,zone,node) hm:service_instance:info{cluster!=""}

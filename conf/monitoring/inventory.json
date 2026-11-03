@@ -1,14 +1,14 @@
 {
   "uid": "hm-inventory",
   "title": "Inventory / Capacity",
-  "description": "Physical host capacity. Independent of services; filter by region and host.",
+  "description": "Physical host capacity. Independent of services; filter by zone and host.",
   "tags": [
     "hackamonth",
     "inventory"
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -57,18 +57,44 @@
   "templating": {
     "list": [
       {
-        "name": "region",
-        "label": "Region",
+        "name": "cluster",
+        "label": "Cluster",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(node_uname_info{region!=\"\",node!=\"\"}, region)",
+          "query": "label_values(node_uname_info{cluster!=\"\"}, cluster)",
+          "refId": "cluster"
+        },
+        "definition": "label_values(node_uname_info{cluster!=\"\"}, cluster)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "text": "hm-cluster",
+          "value": "hm-cluster",
+          "selected": true
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "zone",
+        "label": "Zone",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(node_uname_info{cluster=~\"${cluster:regex}\",zone!=\"\",node!=\"\"}, zone)",
           "refId": "region"
         },
-        "definition": "label_values(node_uname_info{region!=\"\",node!=\"\"}, region)",
+        "definition": "label_values(node_uname_info{cluster=~\"${cluster:regex}\",zone!=\"\",node!=\"\"}, zone)",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -84,7 +110,7 @@
         "skipUrlSync": false
       },
       {
-        "name": "node",
+        "name": "host",
         "label": "Host",
         "type": "query",
         "datasource": {
@@ -92,10 +118,10 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(node_uname_info{region=~\"${region:regex}\",node!=\"\"}, node)",
+          "query": "label_values(node_uname_info{cluster=~\"${cluster:regex}\",zone=~\"${zone:regex}\",host!=\"\"}, host)",
           "refId": "node"
         },
-        "definition": "label_values(node_uname_info{region=~\"${region:regex}\",node!=\"\"}, node)",
+        "definition": "label_values(node_uname_info{cluster=~\"${cluster:regex}\",zone=~\"${zone:regex}\",host!=\"\"}, host)",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -128,7 +154,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Physical host capacity across regions. Select a **region** and **host**. Application health and usage are in **Services**."
+        "content": "Physical host capacity across zones. Select a **zone** and **host**. Application health and usage are in **Services**."
       }
     },
     {
@@ -149,8 +175,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * (1 - avg by (region,node) (rate(node_cpu_seconds_total{node=~\"${node:regex}\",region=~\"${region:regex}\",mode=\"idle\"}[$__rate_interval])))",
-          "legendFormat": "{{region}} / {{node}}",
+          "expr": "100 * (1 - avg by (cluster,zone,host,machine) (rate(node_cpu_seconds_total{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mode=\"idle\"}[$__rate_interval])))",
+          "legendFormat": "{{host}} \u00b7 {{machine}}",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -238,8 +264,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_memory_MemAvailable_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\"} / node_memory_MemTotal_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\"}",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Memory headroom",
+          "expr": "100 * node_memory_MemAvailable_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\"} / node_memory_MemTotal_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\"}",
+          "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 Memory headroom",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -327,8 +353,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_filesystem_avail_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Root disk available",
+          "expr": "100 * node_filesystem_avail_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+          "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 Root disk available",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -416,8 +442,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * (1 - avg by (region,node) (rate(node_cpu_seconds_total{node=~\"${node:regex}\",region=~\"${region:regex}\",mode=\"idle\"}[$__rate_interval])))",
-          "legendFormat": "{{region}} / {{node}}",
+          "expr": "100 * (1 - avg by (cluster,zone,host,machine) (rate(node_cpu_seconds_total{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mode=\"idle\"}[$__rate_interval])))",
+          "legendFormat": "{{host}} \u00b7 {{machine}}",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -518,8 +544,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "node_memory_MemAvailable_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\"}",
-          "legendFormat": "{{region}} / {{node}} \u00b7 Available RAM",
+          "expr": "node_memory_MemAvailable_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\"}",
+          "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 Available RAM",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -618,8 +644,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (region,node,device) (rate(node_network_receive_bytes_total{node=~\"${node:regex}\",region=~\"${region:regex}\",device!~\"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|wg.*\"}[$__rate_interval])) * 8",
-          "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} receive",
+          "expr": "sum by (cluster,zone,host,machine,device) (rate(node_network_receive_bytes_total{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",device!~\"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|wg.*\"}[$__rate_interval])) * 8",
+          "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 {{device}} receive",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -630,8 +656,8 @@
         },
         {
           "refId": "B",
-          "expr": "sum by (region,node,device) (rate(node_network_transmit_bytes_total{node=~\"${node:regex}\",region=~\"${region:regex}\",device!~\"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|wg.*\"}[$__rate_interval])) * 8",
-          "legendFormat": "{{region}} / {{node}} \u00b7 {{device}} send",
+          "expr": "sum by (cluster,zone,host,machine,device) (rate(node_network_transmit_bytes_total{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",device!~\"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|wg.*\"}[$__rate_interval])) * 8",
+          "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 {{device}} send",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -742,8 +768,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "100 * node_filesystem_avail_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-              "legendFormat": "{{region}} / {{node}} \u00b7 Available space",
+              "expr": "100 * node_filesystem_avail_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+              "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 Available space",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -754,8 +780,8 @@
             },
             {
               "refId": "B",
-              "expr": "100 * node_filesystem_files_free{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{node=~\"${node:regex}\",region=~\"${region:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
-              "legendFormat": "{{region}} / {{node}} \u00b7 Free inodes",
+              "expr": "100 * node_filesystem_files_free{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+              "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 Free inodes",
               "editorMode": "code",
               "instant": false,
               "range": true,

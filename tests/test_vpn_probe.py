@@ -32,21 +32,21 @@ class VPNProbeTests(unittest.TestCase):
         job = next(j for j in config['scrape_configs'] if j['job_name'] == 'vpn-client-probes')
         web = [t for t in job['static_configs'] if t['labels']['check'] == 'client-web']
         self.assertEqual(len(web), 10)
-        for source, dest in [('spb', 'uk'), ('uk', 'spb')]:
-            checks = [t for t in web if t['labels']['source_region'] == source and t['labels']['target_region'] == dest]
+        for source, dest in [('ru-spb-1', 'uk-ldn-1'), ('uk-ldn-1', 'ru-spb-1')]:
+            checks = [t for t in web if t['labels']['source_zone'] == source and t['labels']['target_zone'] == dest]
             self.assertEqual(len(checks), 5)
             self.assertTrue(all(t['labels']['service'] == 'vpn-probe' for t in checks))
         self.assertEqual(job['scrape_interval'], '60s')
 
     def test_regional_deployments_share_runtime_and_have_no_public_metrics_ports(self):
         images = []
-        for region in ['uk', 'spb']:
+        for region in ['uk-ldn-1', 'ru-spb-1']:
             output = subprocess.check_output(['kubectl', 'kustomize', str(ROOT / 'services/vpn-probe/overlays' / region)])
             docs = list(yaml.safe_load_all(output))
             deployment = next(d for d in docs if d['kind'] == 'Deployment')
             pod = deployment['spec']['template']['spec']
             self.assertFalse(pod['automountServiceAccountToken'])
-            self.assertEqual(pod['nodeSelector']['topology.kubernetes.io/region'], region)
+            self.assertEqual(pod['nodeSelector']['topology.kubernetes.io/zone'], region)
             self.assertEqual(len(pod['containers']), 2)
             # SOCKS stays on loopback, so kubelet TCP probes to the pod IP cannot work.
             self.assertNotIn('tcpSocket', pod['containers'][0].get('readinessProbe', {}))
@@ -88,7 +88,7 @@ class VPNProbeTests(unittest.TestCase):
         d = json.loads((ROOT / 'conf/monitoring/vpn.json').read_text())
         main = next(p for p in d['panels'] if p['id'] == 30)
         expr = main['targets'][0]['expr']
-        for selector in ['${source_region:regex}', '${target_region:regex}', '${site:regex}', 'probe_scope="public-client"']:
+        for selector in ['${source_zone:regex}', '${target_zone:regex}', '${site:regex}', 'probe_scope="public-client"']:
             self.assertIn(selector, expr)
         self.assertTrue(any(v['name'] == 'site' for v in d['templating']['list']))
         self.assertFalse(any(p['id'] == 20 for p in d['panels']))

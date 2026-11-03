@@ -12,4 +12,4 @@ labels:
   - pairs:
       app.kubernetes.io/part-of: hackamonth
       app.kubernetes.io/managed-by: gitops
-      hm.gitops/cluster: edge-01
+      hm.gitops/cluster: hm-cluster

@@ -3,40 +3,37 @@ groups:
   interval: 30s
   rules:
   - alert: GatewayTransportUnavailable
-    expr: (probe_success{job="spb-probes",check=~"primary|backup|split-default"} ==
-      0) and on(instance) (probe_success{job="spb-probes",check="internet"} == 1)
+    expr: (probe_success{job="gateway-transport-probes",check=~"primary|backup|split-default"} ==
+      0) and on(instance) (probe_success{job="gateway-transport-probes",check="internet"} == 1)
     for: 3m
     labels:
       severity: warning
-      region: spb
       service: gateway
     annotations:
-      summary: Gateway in {{ $labels.region }} {{ $labels.check }} path cannot reach
+      summary: Gateway in {{ $labels.source_zone }} {{ $labels.check }} path cannot reach
         the expected upstream exit
       description: Direct internet control succeeds but this authenticated path fails.
         Check the transport and compare backup. This is a datacenter vantage point,
         not a residential ISP.
   - alert: GatewayTelemetryUnavailable
-    expr: up{job=~"spb-node|spb-blackbox|spb-probes"} == 0
+    expr: up{job=~"node-exporter|gateway-blackbox|gateway-transport-probes"} == 0
     for: 3m
     labels:
       severity: warning
-      region: spb
       service: gateway
     annotations:
-      summary: Gateway in {{ $labels.region }} telemetry unavailable
+      summary: Gateway in {{ $labels.source_zone }} telemetry unavailable
       description: Monitoring cannot reach an mTLS endpoint; VPN blocking is not established.
-        Check SPB host, certificates, source-IP firewall rules and network path.
+        Check the source host, certificates, source-IP firewall rules and network path.
   - alert: GatewayInternetUnavailable
-    expr: probe_success{job="spb-probes",check="internet"} == 0
+    expr: probe_success{job="gateway-transport-probes",check="internet"} == 0
     for: 3m
     labels:
       severity: warning
-      region: spb
       service: gateway
     annotations:
-      summary: Gateway in {{ $labels.region }} direct-internet control failed
-      description: Do not diagnose this as a VPN transport block; check the SPB network
+      summary: Gateway in {{ $labels.source_zone }} direct-internet control failed
+      description: Do not diagnose this as a VPN transport block; check the source network
         and the control target.
 - name: vpn-end-to-end
   interval: 30s

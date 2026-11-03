@@ -6,7 +6,7 @@ metadata:
 spec:
   valuesContent: |
     nodeSelector:
-      kubernetes.io/hostname: machine
+      hm.gitops/control-plane: 'true'
     additionalArguments:
       - --entrypoints.websecure.address=[::]:8443
       - --certificatesresolvers.le.acme.email=admin@hackamonth.io

@@ -52,4 +52,4 @@ spec:
           initialDelaySeconds: 5
       volumes: []
       nodeSelector:
-        kubernetes.io/hostname: machine
+        hm.gitops/control-plane: 'true'

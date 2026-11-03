@@ -58,4 +58,4 @@ spec:
             memory: 256Mi
       automountServiceAccountToken: false
       nodeSelector:
-        kubernetes.io/hostname: machine
+        hm.gitops/control-plane: 'true'

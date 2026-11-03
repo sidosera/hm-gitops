@@ -8,7 +8,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 3,
+  "version": 4,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -57,18 +57,44 @@
   "templating": {
     "list": [
       {
-        "name": "entry_region",
-        "label": "Entry region",
+        "name": "cluster",
+        "label": "Cluster",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(hm:service_instance:info{probe_scope=\"public-client\"}, region)",
-          "refId": "entry_region"
+          "query": "label_values(node_uname_info{cluster!=\"\"}, cluster)",
+          "refId": "cluster"
         },
-        "definition": "label_values(hm:service_instance:info{probe_scope=\"public-client\"}, region)",
+        "definition": "label_values(node_uname_info{cluster!=\"\"}, cluster)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "text": "hm-cluster",
+          "value": "hm-cluster",
+          "selected": true
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "entry_zone",
+        "label": "Entry zone",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(hm:service_instance:info{cluster=~\"${cluster:regex}\",service=\"gateway\"}, zone)",
+          "refId": "entry_zone"
+        },
+        "definition": "label_values(hm:service_instance:info{cluster=~\"${cluster:regex}\",service=\"gateway\"}, zone)",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -84,7 +110,7 @@
         "skipUrlSync": false
       },
       {
-        "name": "source_region",
+        "name": "source_zone",
         "label": "Probe source",
         "type": "query",
         "datasource": {
@@ -92,10 +118,10 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(probe_success{probe_scope=\"public-client\"}, source_region)",
-          "refId": "source_region"
+          "query": "label_values(probe_success{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\"}, source_zone)",
+          "refId": "source_zone"
         },
-        "definition": "label_values(probe_success{probe_scope=\"public-client\"}, source_region)",
+        "definition": "label_values(probe_success{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\"}, source_zone)",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -111,7 +137,7 @@
         "skipUrlSync": false
       },
       {
-        "name": "target_region",
+        "name": "target_zone",
         "label": "Probe destination",
         "type": "query",
         "datasource": {
@@ -119,10 +145,10 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(probe_success{probe_scope=\"public-client\",source_region=~\"${source_region:regex}\"}, target_region)",
-          "refId": "target_region"
+          "query": "label_values(probe_success{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",source_zone=~\"${source_zone:regex}\"}, target_zone)",
+          "refId": "target_zone"
         },
-        "definition": "label_values(probe_success{probe_scope=\"public-client\",source_region=~\"${source_region:regex}\"}, target_region)",
+        "definition": "label_values(probe_success{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",source_zone=~\"${source_zone:regex}\"}, target_zone)",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -146,10 +172,10 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(probe_success{probe_scope=\"public-client\",check=\"client-web\"}, site)",
+          "query": "label_values(probe_success{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",check=\"client-web\"}, site)",
           "refId": "site"
         },
-        "definition": "label_values(probe_success{probe_scope=\"public-client\",check=\"client-web\"}, site)",
+        "definition": "label_values(probe_success{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",check=\"client-web\"}, site)",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -182,7 +208,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Website access uses a separate VPN client connecting through the **public Gateway listener**. **Probe source / destination / Website** scope those checks. Entry readiness and client counts use **Entry region**."
+        "content": "Website access uses a separate VPN client connecting through the **public Gateway listener**. **Probe source / destination / Website** scope those checks. Entry readiness and client counts use **Entry zone**."
       }
     },
     {
@@ -195,7 +221,7 @@
         "w": 12,
         "h": 4
       },
-      "description": "Ready / scheduled Gateway pods in the selected entry region. Workload readiness does not establish end-to-end client connectivity.",
+      "description": "Ready / scheduled Gateway pods in the selected entry zone. Workload readiness does not establish end-to-end client connectivity.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -203,7 +229,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(hm:service_instance:ready{service=\"gateway\",region=~\"${entry_region:regex}\"})",
+          "expr": "sum(hm:service_instance:ready{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${entry_zone:regex}\"})",
           "legendFormat": "Ready",
           "editorMode": "code",
           "instant": true,
@@ -215,7 +241,7 @@
         },
         {
           "refId": "B",
-          "expr": "count(hm:service_instance:info{service=\"gateway\",region=~\"${entry_region:regex}\"})",
+          "expr": "count(hm:service_instance:info{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${entry_zone:regex}\"})",
           "legendFormat": "Scheduled",
           "editorMode": "code",
           "instant": true,
@@ -266,7 +292,7 @@
         "w": 12,
         "h": 4
       },
-      "description": "Gateway only: fresh authenticated source-IP estimates, shown separately by region. Shared IPs make this a lower bound; do not sum across regions as unique people.",
+      "description": "Gateway only: fresh authenticated source-IP estimates, shown separately by zone. Shared IPs make this a lower bound; do not sum across zones as unique people.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -274,8 +300,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "xray_active_client_ips{service=\"gateway\",region=~\"${entry_region:regex}\"} and on(instance) (xray_online_scrape_success{service=\"gateway\",region=~\"${entry_region:regex}\"} == 1) and on(instance) (up{region=~\"${entry_region:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{region=~\"${entry_region:regex}\",file=\"/textfile/xray_online.prom\"}) < 60)",
-          "legendFormat": "{{region}} / {{node}}",
+          "expr": "xray_active_client_ips{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${entry_zone:regex}\"} and on(instance) (xray_online_scrape_success{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${entry_zone:regex}\"} == 1) and on(instance) (up{cluster=~\"${cluster:regex}\",zone=~\"${entry_zone:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{cluster=~\"${cluster:regex}\",zone=~\"${entry_zone:regex}\",file=\"/textfile/xray_online.prom\"}) < 60)",
+          "legendFormat": "{{zone}}",
           "editorMode": "code",
           "instant": true,
           "range": false,
@@ -333,8 +359,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "probe_success{probe_scope=\"public-client\",check=\"client-web\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\",site=~\"${site:regex}\"} and on(instance,source_region,target_region,check,site) (up{probe_scope=\"public-client\",check=\"client-web\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\",site=~\"${site:regex}\"} == 1)",
-          "legendFormat": "{{source_region}} \u2192 {{target_region}} / {{site}}",
+          "expr": "probe_success{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",check=\"client-web\",source_zone=~\"${source_zone:regex}\",target_zone=~\"${target_zone:regex}\",site=~\"${site:regex}\"} and on(instance,source_zone,target_zone,check,site) (up{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",check=\"client-web\",source_zone=~\"${source_zone:regex}\",target_zone=~\"${target_zone:regex}\",site=~\"${site:regex}\"} == 1)",
+          "legendFormat": "{{source_zone}} \u2192 {{target_zone}} / {{site}}",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -416,8 +442,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "probe_success{service=\"gateway\",source_region!=\"\",target_region!=\"\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\"} and on(instance,check) (up{service=\"gateway\",source_region!=\"\",target_region!=\"\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\"} == 1)",
-              "legendFormat": "{{source_region}} \u2192 {{target_region}} / {{check}}",
+              "expr": "probe_success{cluster=~\"${cluster:regex}\",service=\"gateway\",source_zone!=\"\",target_zone!=\"\",source_zone=~\"${source_zone:regex}\",target_zone=~\"${target_zone:regex}\"} and on(instance,check) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",source_zone!=\"\",target_zone!=\"\",source_zone=~\"${source_zone:regex}\",target_zone=~\"${target_zone:regex}\"} == 1)",
+              "legendFormat": "{{source_zone}} \u2192 {{target_zone}} / {{check}}",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -471,7 +497,7 @@
         },
         {
           "id": 21,
-          "title": "Transport traffic by measurement region",
+          "title": "Transport traffic by measurement zone",
           "type": "timeseries",
           "gridPos": {
             "x": 0,
@@ -479,7 +505,7 @@
             "w": 24,
             "h": 6
           },
-          "description": "Transport counters where an Xray exporter is deployed. Forwarded and direct client traffic can overlap between regions; do not sum as unique client traffic. Missing exporters are unmeasured.",
+          "description": "Transport counters where an Xray exporter is deployed. Forwarded and direct client traffic can overlap between zones; do not sum as unique client traffic. Missing exporters are unmeasured.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -487,8 +513,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by(region,target) (rate(xray_traffic_downlink_bytes_total{service=\"gateway\",dimension=\"inbound\"}[$__rate_interval])) * 8",
-              "legendFormat": "{{region}} / {{target}} \u00b7 Download",
+              "expr": "sum by(cluster,zone,target) (rate(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",dimension=\"inbound\"}[$__rate_interval])) * 8",
+              "legendFormat": "{{zone}} / {{target}} \u00b7 Download",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -499,8 +525,8 @@
             },
             {
               "refId": "B",
-              "expr": "sum by(region,target) (rate(xray_traffic_uplink_bytes_total{service=\"gateway\",dimension=\"inbound\"}[$__rate_interval])) * 8",
-              "legendFormat": "{{region}} / {{target}} \u00b7 Upload",
+              "expr": "sum by(cluster,zone,target) (rate(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",dimension=\"inbound\"}[$__rate_interval])) * 8",
+              "legendFormat": "{{zone}} / {{target}} \u00b7 Upload",
               "editorMode": "code",
               "instant": false,
               "range": true,
@@ -554,7 +580,7 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "probe_http_status_code{probe_scope=\"public-client\",check=\"client-web\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\",site=~\"${site:regex}\"}",
+              "expr": "probe_http_status_code{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",check=\"client-web\",source_zone=~\"${source_zone:regex}\",target_zone=~\"${target_zone:regex}\",site=~\"${site:regex}\"}",
               "legendFormat": "",
               "editorMode": "code",
               "instant": true,
@@ -597,19 +623,30 @@
                   "check": true,
                   "region": true,
                   "service": true,
-                  "target_service": true
+                  "target_service": true,
+                  "cluster": true,
+                  "pop": true,
+                  "node": true,
+                  "host": true,
+                  "machine": true,
+                  "country": true,
+                  "source_country": true,
+                  "source_pop": true,
+                  "target_country": true,
+                  "target_pop": true
                 },
                 "indexByName": {
-                  "source_region": 0,
-                  "target_region": 1,
+                  "source_zone": 0,
+                  "target_zone": 1,
                   "site": 2,
                   "Value": 3
                 },
                 "renameByName": {
-                  "source_region": "Probe source",
-                  "target_region": "Gateway entry",
+                  "source_zone": "Probe source",
+                  "target_zone": "Gateway entry",
                   "site": "Website",
-                  "Value": "HTTP status"
+                  "Value": "HTTP status",
+                  "zone": "Zone"
                 }
               }
             }
@@ -633,8 +670,8 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "probe_success{probe_scope=\"public-client\",check=\"client-exit\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\"} and on(instance,source_region,target_region,check,site) (up{probe_scope=\"public-client\",check=\"client-exit\",source_region=~\"${source_region:regex}\",target_region=~\"${target_region:regex}\"} == 1)",
-              "legendFormat": "{{source_region}} \u2192 {{target_region}} / exit IP",
+              "expr": "probe_success{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",check=\"client-exit\",source_zone=~\"${source_zone:regex}\",target_zone=~\"${target_zone:regex}\"} and on(instance,source_zone,target_zone,check,site) (up{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",check=\"client-exit\",source_zone=~\"${source_zone:regex}\",target_zone=~\"${target_zone:regex}\"} == 1)",
+              "legendFormat": "{{source_zone}} \u2192 {{target_zone}} / exit IP",
               "editorMode": "code",
               "instant": false,
               "range": true,

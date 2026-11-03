@@ -5,7 +5,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 class RoutingSafetyTests(unittest.TestCase):
     def setUp(self):
-        self.config = json.loads((ROOT / 'services/gateway/overlays/spb/config.json').read_text())
+        self.config = json.loads((ROOT / 'services/gateway/overlays/ru-spb-1/config.json').read_text())
 
     def route(self, host, inbound='gateway'):
         import ipaddress

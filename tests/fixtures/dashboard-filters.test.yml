@@ -4,11 +4,11 @@ evaluation_interval: 30s
 tests:
 - interval: 30s
   input_series:
-  - series: node_uname_info{job="node",node="machine",region="uk"}
+  - series: node_uname_info{cluster="hm-cluster",zone="uk-ldn-1",job="node",node="machine",country="uk"}
     values: 1+0x6
-  - series: node_uname_info{job="node",node="spb-01",region="spb"}
+  - series: node_uname_info{cluster="hm-cluster",zone="ru-spb-1",job="node",node="spb-01",country="ru"}
     values: 1+0x6
-  - series: kube_pod_info{namespace="hm",pod="proxy-service-fixture",node="machine",region="uk",service="kubernetes"}
+  - series: kube_pod_info{namespace="hm",pod="proxy-service-fixture",node="machine",country="uk",service="kubernetes"}
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="proxy-service-fixture",phase="Running"}
     values: 1+0x6
@@ -20,7 +20,7 @@ tests:
     values: 0+30x6
   - series: kube_pod_container_status_restarts_total{namespace="hm",pod="proxy-service-fixture",container="app"}
     values: 0+0x6
-  - series: kube_pod_info{namespace="hm",pod="spb-gateway-fixture",node="spb-01",region="uk",service="kubernetes"}
+  - series: kube_pod_info{namespace="hm",pod="spb-gateway-fixture",node="spb-01",country="uk",service="kubernetes"}
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="spb-gateway-fixture",phase="Running"}
     values: 1+0x6
@@ -32,7 +32,7 @@ tests:
     values: 0+30x6
   - series: kube_pod_container_status_restarts_total{namespace="hm",pod="spb-gateway-fixture",container="app"}
     values: 0+0x6
-  - series: kube_pod_info{namespace="hm",pod="www-service-fixture",node="machine",region="uk",service="kubernetes"}
+  - series: kube_pod_info{namespace="hm",pod="www-service-fixture",node="machine",country="uk",service="kubernetes"}
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="www-service-fixture",phase="Running"}
     values: 1+0x6
@@ -44,7 +44,7 @@ tests:
     values: 0+30x6
   - series: kube_pod_container_status_restarts_total{namespace="hm",pod="www-service-fixture",container="app"}
     values: 0+0x6
-  - series: kube_pod_info{namespace="hm",pod="prometheus-fixture",node="machine",region="uk",service="kubernetes"}
+  - series: kube_pod_info{namespace="hm",pod="prometheus-fixture",node="machine",country="uk",service="kubernetes"}
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="prometheus-fixture",phase="Running"}
     values: 1+0x6
@@ -56,7 +56,7 @@ tests:
     values: 0+30x6
   - series: kube_pod_container_status_restarts_total{namespace="hm",pod="prometheus-fixture",container="app"}
     values: 0+0x6
-  - series: kube_pod_info{namespace="hm",pod="node-exporter-fixture",node="spb-01",region="uk",service="kubernetes"}
+  - series: kube_pod_info{namespace="hm",pod="node-exporter-fixture",node="spb-01",country="uk",service="kubernetes"}
     values: 1+0x6
   - series: kube_pod_status_phase{namespace="hm",pod="node-exporter-fixture",phase="Running"}
     values: 1+0x6
@@ -78,9 +78,9 @@ tests:
     values: 1+0x6
   - series: kube_pod_labels{namespace="hm",pod="node-exporter-fixture",label_hm_gitops_service="observability",label_app_kubernetes_io_name="node-exporter",service="kubernetes"}
     values: 1+0x6
-  - series: node_uname_info{job="bare-metal-exporter",node="rack-17",region="de"}
+  - series: node_uname_info{cluster="hm-cluster",zone="de-fra-1",job="bare-metal-exporter",node="rack-17",country="de"}
     values: 1+0x6
-  - series: kube_pod_info{namespace="hm",pod="arbitrary-new-workload-xyz",node="rack-17",region="uk",service="kubernetes"}
+  - series: kube_pod_info{namespace="hm",pod="arbitrary-new-workload-xyz",node="rack-17",country="uk",service="kubernetes"}
     values: 1+0x6
   - series: kube_pod_labels{namespace="hm",pod="arbitrary-new-workload-xyz",label_app_kubernetes_io_name="search",service="kubernetes"}
     values: 1+0x6
@@ -93,12 +93,12 @@ tests:
   - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="www-service-fixture",container="completed-init"}
     values: 999999999+0x6
   promql_expr_test:
-  - expr: count(hm:service_instance:info{service="gateway",region="spb"})
+  - expr: count(hm:service_instance:info{service="gateway",zone="ru-spb-1"})
     eval_time: 3m
     exp_samples:
     - labels: '{}'
       value: 1
-  - expr: sum(hm:service_instance:memory_bytes{service="gateway",region="spb"})
+  - expr: sum(hm:service_instance:memory_bytes{service="gateway",zone="ru-spb-1"})
     eval_time: 3m
     exp_samples:
     - labels: '{}'
@@ -108,7 +108,7 @@ tests:
     exp_samples:
     - labels: '{}'
       value: 150
-  - expr: sum(hm:service_instance:memory_bytes{service="website",region="uk"})
+  - expr: sum(hm:service_instance:memory_bytes{service="website",zone="uk-ldn-1"})
     eval_time: 3m
     exp_samples:
     - labels: '{}'
@@ -118,21 +118,21 @@ tests:
     exp_samples:
     - labels: '{}'
       value: 70
-  - expr: sum(hm:service_instance:ready{service="gateway",region="spb"})
+  - expr: sum(hm:service_instance:ready{service="gateway",zone="ru-spb-1"})
     eval_time: 3m
     exp_samples:
     - labels: '{}'
       value: 0
-  - expr: round(sum(hm:service_instance:cpu_cores{service="gateway",region="spb"}),
+  - expr: round(sum(hm:service_instance:cpu_cores{service="gateway",zone="ru-spb-1"}),
       0.001)
     eval_time: 3m
     exp_samples:
     - labels: '{}'
       value: 1
-  - expr: hm:service_instance:info{service="website",region="spb"}
+  - expr: hm:service_instance:info{service="website",zone="ru-spb-1"}
     eval_time: 3m
     exp_samples: []
-  - expr: sum(hm:service_instance:memory_bytes{service="search",region="de"})
+  - expr: sum(hm:service_instance:memory_bytes{service="search",zone="de-fra-1"})
     eval_time: 3m
     exp_samples:
     - labels: '{}'
@@ -140,7 +140,7 @@ tests:
   - expr: hm:service_instance:info{service=~"legacy-uk|legacy-spb|www-service"}
     eval_time: 3m
     exp_samples: []
-  - expr: count(hm:service_instance:info{service="search",node="rack-17",region="de"})
+  - expr: count(hm:service_instance:info{service="search",node="rack-17",zone="de-fra-1"})
     eval_time: 3m
     exp_samples:
     - labels: '{}'

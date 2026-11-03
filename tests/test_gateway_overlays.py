@@ -20,12 +20,12 @@ class PublicGatewayConfigTests(unittest.TestCase):
             elif isinstance(value, list):
                 for child in value:
                     check(child)
-        for region in ['uk', 'spb']:
+        for region in ['uk-ldn-1', 'ru-spb-1']:
             with self.subTest(region=region):
                 check(json.loads((ROOT / 'services/gateway/overlays' / region / 'config.json').read_text()))
 
     def test_credentials_remain_sops_encrypted(self):
-        for region in ['uk', 'spb']:
+        for region in ['uk-ldn-1', 'ru-spb-1']:
             secret = yaml.safe_load((ROOT / 'services/gateway/overlays' / region / 'credentials-secret.sops.yaml').read_text())
             self.assertIn('sops', secret)
             self.assertEqual(set(secret['stringData']), {'credentials.json'})
@@ -36,19 +36,19 @@ class PublicGatewayConfigTests(unittest.TestCase):
 class GatewayOverlayTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        output = subprocess.check_output(['kubectl', 'kustomize', str(ROOT / 'cluster/clusters/edge-01')], text=True)
+        output = subprocess.check_output(['kubectl', 'kustomize', str(ROOT / 'cluster/clusters/hm-cluster')], text=True)
         cls.resources = {(d['kind'], d['metadata']['name']): d for d in yaml.safe_load_all(output)}
 
     def test_regional_resources_preserve_selectors_and_shared_runtime(self):
         images = []
-        for region, name in [('uk', 'proxy-service'), ('spb', 'spb-gateway')]:
+        for region, name in [('uk-ldn-1', 'proxy-service'), ('ru-spb-1', 'spb-gateway')]:
             with self.subTest(region=region):
                 deployment = self.resources['Deployment', name]
                 pod = deployment['spec']['template']
                 selector = {'app.kubernetes.io/name': name}
                 self.assertEqual(deployment['spec']['selector']['matchLabels'], selector)
                 self.assertEqual(self.resources['Service', name]['spec']['selector'], selector)
-                self.assertEqual(pod['spec']['nodeSelector'], {'topology.kubernetes.io/region': region})
+                self.assertEqual(pod['spec']['nodeSelector'], {'topology.kubernetes.io/zone': region})
                 self.assertEqual(pod['metadata']['labels']['hm.gitops/xray'], 'true')
                 xray = pod['spec']['containers'][0]
                 self.assertEqual(xray['args'], ['run', '-confdir', '/etc/xray'])

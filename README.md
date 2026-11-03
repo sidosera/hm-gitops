@@ -18,7 +18,7 @@ Minimal GitOps repo for a small k3s cluster.
 Bring up or refresh the hosts and k3s:
 
 ```bash
-./vm/k3s-bootstrap.sh -e vm_hosts_file=cluster/clusters/edge-01/hosts.yml -e hm_action=deploy
+./vm/k3s-bootstrap.sh -e vm_hosts_file=cluster/clusters/hm-cluster/hosts.yml -e hm_action=deploy
 ```
 
 This only:
@@ -47,19 +47,19 @@ To add a new VM to a cluster, append its IPv4 to `cluster/clusters/<cluster>/hos
 Bootstrap Flux once:
 
 ```bash
-KUBECONFIG=/path/to/kubeconfig HM_FLUX_AGE_KEY_FILE=/secure/path/flux-age.agekey ./scripts/flux-bootstrap.sh edge-01
+KUBECONFIG=/path/to/kubeconfig HM_FLUX_AGE_KEY_FILE=/secure/path/flux-age.agekey ./scripts/flux-bootstrap.sh hm-cluster
 ```
 
 After that, Flux reconciles:
 
-- `cluster/clusters/edge-01/`
+- `cluster/clusters/hm-cluster/`
 
 ## Secrets
 
 Runtime secrets are committed as SOPS-encrypted manifests:
 
 - [.sops.yaml](/Users/sidosera/dist/hackamonth-gitops/.sops.yaml#L1)
-- [services/gateway/overlays/uk/credentials-secret.sops.yaml](services/gateway/overlays/uk/credentials-secret.sops.yaml#L1)
+- [services/gateway/overlays/uk-ldn-1/credentials-secret.sops.yaml](services/gateway/overlays/uk-ldn-1/credentials-secret.sops.yaml#L1)
 
 Flux decrypts them using the `sops-age` Secret in `flux-system`.
 
@@ -71,15 +71,15 @@ The credentials exposed by the previous block-string format were replaced on 2 N
 
 Referenced node IPs:
 
-- [hosts.yml](/Users/sidosera/dist/hackamonth-gitops/cluster/clusters/edge-01/hosts.yml#L1)
+- [hosts.yml](/Users/sidosera/dist/hackamonth-gitops/cluster/clusters/hm-cluster/hosts.yml#L1)
 
 Cluster-wide Kubernetes:
 
-- [cluster/clusters/edge-01/kustomization.yaml](/Users/sidosera/dist/hackamonth-gitops/cluster/clusters/edge-01/kustomization.yaml#L1)
+- [cluster/clusters/hm-cluster/kustomization.yaml](/Users/sidosera/dist/hackamonth-gitops/cluster/clusters/hm-cluster/kustomization.yaml#L1)
 
 Cluster rollout:
 
-- [cluster/clusters/edge-01/kustomization.yaml](/Users/sidosera/dist/hackamonth-gitops/cluster/clusters/edge-01/kustomization.yaml#L1)
+- [cluster/clusters/hm-cluster/kustomization.yaml](/Users/sidosera/dist/hackamonth-gitops/cluster/clusters/hm-cluster/kustomization.yaml#L1)
 
 Current public endpoints:
 
@@ -138,11 +138,11 @@ Prometheus scrapes every 30 seconds and stores seven days of history, bounded to
 
 Three purpose-based dashboards share the same Grafana and Prometheus:
 
-- [Services / Overview](https://www.hackamonth.io/status/d/hm-services/services-overview): generic readiness, rolling-hour restarts, working-set memory and CPU. Service and Region apply to every panel. Instance details are collapsed; there are no VPN or host-capacity panels.
-- [VPN / Operations](https://www.hackamonth.io/status/d/hm-vpn/vpn-operations): entry readiness and authenticated client-IP estimates, public-client website connectivity and transport measurements. Entry region scopes client-facing signals. Probe source and destination independently scope connectivity checks, including upstream dependencies. Transport traffic is labelled by measurement region and listener; it is not attributed to the selected entry region or summed across hops as unique client traffic.
-- [Inventory / Capacity](https://www.hackamonth.io/status/d/hm-inventory/inventory-capacity): physical host CPU, available RAM, root-disk capacity and per-interface network traffic, filtered by Region and Host. The queries work for both virtual and bare-metal hosts.
+- [Services / Overview](https://www.hackamonth.io/status/d/hm-services/services-overview): generic readiness, rolling-hour restarts, working-set memory and CPU. Service and Zone apply to every panel. Instance details are collapsed; there are no VPN or host-capacity panels.
+- [VPN / Operations](https://www.hackamonth.io/status/d/hm-vpn/vpn-operations): entry readiness and authenticated client-IP estimates, public-client website connectivity and transport measurements. Entry zone scopes client-facing signals. Probe source zone and entry zone independently scope connectivity checks, including upstream dependencies. Transport traffic is labelled by measurement zone and listener; it is not attributed to the selected entry zone or summed across hops as unique client traffic.
+- [Inventory / Capacity](https://www.hackamonth.io/status/d/hm-inventory/inventory-capacity): physical host CPU, available RAM, root-disk capacity and per-interface network traffic, filtered by Zone and Host. The queries work for both virtual and bare-metal hosts.
 
-All region, service and host options come from metrics. No dashboard contains UK/SPB lists, host names, IPs or regional exporter job names. Missing observations remain missing.
+All zone, service and host options come from metrics. No dashboard contains UK/SPB lists, host names, IPs or regional exporter job names. Missing observations remain missing.
 
 Node-exporter supplies host metrics through read-only host mounts. Kube-state-metrics reads pods in the `hm` namespace, and Prometheus reads this node's kubelet resource metrics. Xray-exporter reads native traffic counters with log parsing disabled. A small poller uses the checksum-verified official Xray CLI to publish aggregate online-IP counts through node-exporter's textfile collector. It has no web UI or history database. Only Xray's read-only StatsService is enabled.
 
@@ -156,7 +156,7 @@ Validation:
 
 ```sh
 python3 -m unittest discover -s tests -v
-kubectl kustomize cluster/clusters/edge-01 >/dev/null
+kubectl kustomize cluster/clusters/hm-cluster >/dev/null
 ```
 
 ## Operating the dashboard
@@ -178,46 +178,52 @@ The layout follows [Google SRE monitoring guidance](https://sre.google/sre-book/
 
 Both hosts use the same Ansible `vm/playbooks/bootstrap.yml` bootstrap and Flux Git/Kustomize deployment. The original `machine` node runs the control plane and central Prometheus/Grafana. `spb-01` (212.116.115.29, 543 MiB) is a tainted K3s worker, without a second control plane or monitoring database. Shared node-exporter/online-client collectors are one DaemonSet on both nodes. Application deployments do not use standalone systemd services.
 
-`cluster/clusters/edge-01/hosts.yml` declares server and worker inventories and pins their K3s version. Flannel uses `wireguard-native` with external node addresses; only peer IPv4 addresses may reach UDP 51820/51821. ServiceLB runs on `machine`, leaving SPB TCP 443 for the gateway. SPB's taint keeps unrelated workloads off its small memory budget. The API server and Git reconciliation are central: a WAN outage interrupts reconciliation, while existing gateway containers continue running. Do not delete/restart healthy pods during a partition.
+`cluster/clusters/hm-cluster/hosts.yml` declares server and worker inventories and pins their K3s version. Flannel uses `wireguard-native` with external node addresses; only peer IPv4 addresses may reach UDP 51820/51821. ServiceLB runs on `machine`, leaving SPB TCP 443 for the gateway. SPB's taint keeps unrelated workloads off its small memory budget. The API server and Git reconciliation are central: a WAN outage interrupts reconciliation, while existing gateway containers continue running. Do not delete/restart healthy pods during a partition.
 
-The SPB gateway runs Xray plus a blackbox-exporter sidecar. `services/gateway/overlays/spb/config.json` is an explicit domain suffix allowlist for Russian egress, not a blanket `.ru` exception. Unknown destinations use the original upstream through either REALITY or HTTPS/XHTTP; failure never switches foreign traffic to Russian direct egress. SOCKS probe ports are loopback-only inside the pod; native StatsService is protected by a NetworkPolicy. Node/blackbox metrics use mTLS. TLS private material and authenticated Xray connection settings are SOPS encrypted; public routing settings are ConfigMaps. Certificates must be renewed before November 2027.
+The SPB gateway runs Xray plus a blackbox-exporter sidecar. `services/gateway/overlays/ru-spb-1/config.json` is an explicit domain suffix allowlist for Russian egress, not a blanket `.ru` exception. Unknown destinations use the original upstream through either REALITY or HTTPS/XHTTP; failure never switches foreign traffic to Russian direct egress. SOCKS probe ports are loopback-only inside the pod; native StatsService is protected by a NetworkPolicy. Node/blackbox metrics use mTLS. TLS private material and authenticated Xray connection settings are SOPS encrypted; public routing settings are ConfigMaps. Certificates must be renewed before November 2027.
 
-Both regions share the three dashboards described above. The VPN dashboard discovers the existing five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
+Both zones share the three dashboards described above. The VPN dashboard discovers the existing five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
 
 For client import, use the private `hm-spb-smart-routing.txt` VLESS profile provided outside Git. Existing upstream profiles remain valid. The bootstrap password is unnecessary after key-only SSH is configured.
 
 On small hosts: only source-controller and kustomize-controller are needed by Flux; unused Helm/notification controllers are suspended. Xray/node-exporter/blackbox/online collectors have bounded memory. The node-exporter init container streams its checksum-verified stats-client archive to disk, avoiding an archive-sized RAM allocation. Optional desktop/update GUI daemons are disabled; unattended security upgrades remain enabled. No swap is enabled on the SPB Kubernetes worker.
 
 
-## Service model
+## Service and placement model
 
-Use [the glossary](GLOSSARY.md) for infrastructure terminology. **Gateway** is one service with deployments in the `uk` and `spb` regions. Its regional roles differ: SPB provides client ingress, regional egress and upstream routing; UK provides upstream egress and keeps existing client ingress. `proxy-service` and `spb-gateway` are deployment resource names, not different service identities. Website is separate from Gateway. Monitoring workloads such as Grafana and Prometheus are individually selectable services.
+Use [the glossary](GLOSSARY.md) for terminology. `hm-cluster` contains two PoPs, with one zone and one host each:
 
-Region, provider availability zone and host are separate placement dimensions. `machine` and `spb-01` are hosts; control-plane/worker are cluster roles. Inventory records region and optionally zone. No availability-zone or failover independence is inferred from a region name. `uk` is the existing operational region name, not a new assertion about provider geography.
+| PoP | Zone | Host slot | Machine (inventory name / management IP) |
+| --- | --- | --- | --- |
+| uk-ldn | uk-ldn-1 | uk-ldn-1/1 | 87.106.74.217 |
+| ru-spb | ru-spb-1 | ru-spb-1/1 | 212.116.115.29 |
 
-Prometheus carries `service` and `region` labels. Host/kubelet metrics belong to infrastructure; gateway client metrics retain their Gateway identity even when collected by node-exporter. Services presents the selected service overview first and keeps specialist signals in Details. Inventory covers physical hosts independently; neither dashboard requires a separate monitoring stack. Regional deployment resource names and existing client credentials remain stable.
+Zone is the scheduling and observability dimension. Country and PoP are descriptive metadata; there is no separate region filter or region scheduling layer. These are logical placement names, not claims of provider-certified AZ isolation or independently verified datacenter geography.
 
+Machine inventory names are IP addresses. Host slots are independent, so replacing a machine does not rename a slot. The existing Kubernetes registration IDs `machine` and `spb-01` remain internal compatibility identifiers for node/pod joins, certificates and volumes; they are not the user-facing machine names. Slash-containing host names are Prometheus labels and Kubernetes annotations; node labels use a label-safe encoded host ID.
+
+Gateway is one service with deployments in both zones. The SPB deployment supplies Russian direct egress and upstream routing; the UK deployment supplies foreign egress. Website and VPN Probe are separate services. Services and VPN filter by cluster and zone; Inventory additionally filters by host slot and displays machine IPs. Service dashboards do not depend on host slot identity.
 
 ## Gateway configuration with Kustomize
 
-`services/gateway/base` owns the shared Deployment, Service and ingress NetworkPolicy. `services/gateway/overlays/uk` and `services/gateway/overlays/spb` reference that base and supply regional placement, resource budgets, exposed ports, authenticated connection settings and routing. The cluster root references both overlays directly; Flux remains the only workload deployment path.
+`services/gateway/base` owns the shared Deployment, Service and ingress NetworkPolicy. `services/gateway/overlays/uk-ldn-1` and `services/gateway/overlays/ru-spb-1` reference that base and supply zone placement, resource budgets, exposed ports, authenticated connection settings and routing. The cluster root references both overlays directly; Flux remains the only workload deployment path.
 
-Each regional `config.json` is a public ConfigMap input. It contains routing, private-address blocks, statistics, observation settings and non-authenticated local diagnostic listeners. `credentials-secret.sops.yaml` contains authenticated VLESS inbounds and, for SPB, its credential-bearing upstream outbounds. Those sections stay encrypted together so private keys/client IDs never enter ConfigMaps. Node/metrics TLS Secrets live under shared monitoring configuration; the SPB probe server certificate lives beside its overlay.
+Each zone-specific `config.json` is a public ConfigMap input. It contains routing, private-address blocks, statistics, observation settings and non-authenticated local diagnostic listeners. `credentials-secret.sops.yaml` contains authenticated VLESS inbounds and, for SPB, its credential-bearing upstream outbounds. Those sections stay encrypted together so private keys/client IDs never enter ConfigMaps. Node/metrics TLS Secrets live under shared monitoring configuration; the SPB probe server certificate lives beside its overlay.
 
-The same Xray image starts with `run -confdir /etc/xray` in both regions. A read-only projected volume exposes encrypted Secret data as `00-credentials.json` and the public ConfigMap as `10-config-tail.json`. Xray natively merges the files. The `tail` filename is intentional: direct/blocked outbounds are appended after credential-bearing upstream outbounds, preserving the fail-closed default in SPB. No init renderer or runtime templating process is involved.
+The same Xray image starts with `run -confdir /etc/xray` in both zones. A read-only projected volume exposes encrypted Secret data as `00-credentials.json` and the public ConfigMap as `10-config-tail.json`. Xray natively merges the files. The `tail` filename is intentional: direct/blocked outbounds are appended after credential-bearing upstream outbounds, preserving the fail-closed default in SPB. No init renderer or runtime templating process is involved.
 
-Change routing in the regional public JSON and validate with `kubectl kustomize services/gateway/overlays/REGION` and the routing tests. Kustomize hashes ConfigMaps, so a routing update triggers a rollout. For credential rotation, edit the SOPS Secret and override/bump `hm.gitops/credentials-revision` in the regional Deployment patch so Xray reloads its credentials. Keep stable Deployment/Service names, client identities, listener ports and Traefik routes during structural refactors. The SPB overlay uses Recreate because its fixed public host port cannot be shared by two pods; UK uses a rolling update.
+Change routing in the zone-specific public JSON and validate with `kubectl kustomize services/gateway/overlays/ZONE` and the routing tests. Kustomize hashes ConfigMaps, so a routing update triggers a rollout. For credential rotation, edit the SOPS Secret and override/bump `hm.gitops/credentials-revision` in the zone-specific Deployment patch so Xray reloads its credentials. Keep stable Deployment/Service names, client identities, listener ports and Traefik routes during structural refactors. The SPB overlay uses Recreate because its fixed public host port cannot be shared by two pods; UK uses a rolling update.
 
 Validate routing and overlay boundaries with `python -m unittest discover -s tests -v` (Python, PyYAML and kubectl required). The checks cover private-network blocks, fail-closed routing, credential isolation, stable selectors, unchanged source selectors in ingress policies, and shared runtime/image configuration.
 
 
 ## Monitoring identity and fleet growth
 
-Workload identity comes from pod labels, never resource-name regexes. Set `hm.gitops/service` on the pod template when several regional workload names implement one logical service (Gateway and Website use this). Otherwise `app.kubernetes.io/name` is the service identity. Kube-state-metrics exposes only these two allowlisted label keys, alongside the existing small metric set. Recording rules attach the actual node's `region`, discarding the collector's placement. Memory uses the pod working-set metric so completed init-container samples cannot inflate current usage. The generic dashboard discovers services from these rules, including new application names automatically. Current workload collection is intentionally scoped to namespace `hm`; adding another application namespace requires extending the collector/rule scope and RBAC deliberately.
+Workload identity comes from pod labels, never resource-name regexes. Set `hm.gitops/service` on the pod template when several regional workload names implement one logical service (Gateway and Website use this). Otherwise `app.kubernetes.io/name` is the service identity. Kube-state-metrics exposes only these two allowlisted label keys, alongside the existing small metric set. Recording rules attach the actual node's `cluster` and `zone`, discarding the collector's placement. Memory uses the pod working-set metric so completed init-container samples cannot inflate current usage. The generic dashboard discovers services from these rules, including new application names automatically. Current workload collection is intentionally scoped to namespace `hm`; adding another application namespace requires extending the collector/rule scope and RBAC deliberately.
 
-For any new VM or bare-metal host, register it through the existing inventory/bootstrap and deploy the shared node collector. Register its protected scrape endpoint with stable `node` and `region` target labels and provision TLS/firewall access. Once scraped, it appears in Inventory automatically; there is no dashboard change. New Kubernetes services follow the label contract above and require no service allowlist or dashboard edit. Existing static scrape targets, network peers and certificates still need explicit host onboarding; metric-discovered filters do not provision machines.
+For any new VM or bare-metal host, register it through the existing inventory/bootstrap and deploy the shared node collector. Register its protected scrape endpoint with stable raw `node` plus canonical `cluster`, `zone`, `host` and `machine` target labels and provision TLS/firewall access. Once scraped, it appears in Inventory automatically; there is no dashboard change. New Kubernetes services follow the label contract above and require no service allowlist or dashboard edit. Existing static scrape targets, network peers and certificates still need explicit host onboarding; metric-discovered filters do not provision machines.
 
-VPN collectors use `service="gateway"`, `region` for the measurement location, and stable listener names in `target`. Probes use `source_region`, `target_region` and `check` independently of exporter location. Add those labels when registering a new path and it appears automatically. Current traffic counters are collected only in UK; other regions are unmeasured until exporters are configured. Client estimates are per entry host and may count one IP in multiple places; they are not unique-user fleet totals.
+VPN collectors use `service="gateway"`, `zone` for the measurement location, and stable listener names in `target`. Probes use `source_zone`, `target_zone` and `check` independently of exporter location. Add those labels when registering a new path and it appears automatically. Current traffic counters are collected only in UK; other regions are unmeasured until exporters are configured. Client estimates are per entry host and may count one IP in multiple places; they are not unique-user fleet totals.
 
 The dashboard split itself adds no database or controller. The separate VPN Probe service described below adds bounded client/prober processes. Service identity uses one generic recording rule instead of three hardcoded service rules.
 
@@ -235,3 +241,6 @@ A website check requires certificate-verified HTTPS, a final HTTP 200 and a reco
 Probe workloads use `hm.gitops/service: vpn-probe`, so they appear independently in the generic Services view. Probe accounts use `probe-e2e@local` and are excluded from end-user client estimates. Credentials are distinct from existing user profiles and relay accounts; each observer receives only the credential for the public entry it tests. They are SOPS encrypted. The account grants normal authenticated VPN egress to that dedicated probe client; it does not grant host or Kubernetes administration.
 
 Dedicated probe accounts and regional encrypted Secrets are provisioned through the same GitOps path as Gateway. The credential maintenance command is `SOPS_AGE_KEY_FILE=/secure/path/age.key python3 scripts/provision_vpn_probe.py --write`. It preserves existing users, adds/reuses one dedicated account on each Gateway, derives the matching public-listener client configuration, encrypts each regional client Secret and updates workload revisions. It makes no cluster writes. Before publishing, render the cluster, run tests, inspect only encrypted changes and verify both public paths. Keep both regional client Secrets present before deploying the overlays. Notifications still require an Alertmanager receiver.
+
+
+Cluster configuration lives in `cluster/clusters/hm-cluster`; Gateway and VPN Probe overlays are named by zone. Bootstrap defaults to `hm-cluster`. Node placement uses `topology.kubernetes.io/zone`, and central services use the `hm.gitops/control-plane` role label. VM or bare-metal machine identity does not change this deployment path. Inventory keeps stable Kubernetes registration IDs explicitly so naming changes do not require draining/rejoining a healthy cluster or regenerating VPN profiles.

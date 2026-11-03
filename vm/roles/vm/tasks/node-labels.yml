@@ -1,17 +1,5 @@
 ---
-- name: Record region on the cluster node
-  ansible.builtin.command:
-    argv:
-      - kubectl
-      - label
-      - node
-      - "{{ hm_node_name }}"
-      - "topology.kubernetes.io/region={{ hm_node_region }}"
-      - --overwrite
-  delegate_to: "{{ hm_bootstrap_host }}"
-  changed_when: false
-  when: hm_node_region | default('') | length > 0
-- name: Record provider availability zone when supplied
+- name: Record logical placement zone when supplied
   ansible.builtin.command:
     argv:
       - kubectl
@@ -23,3 +11,25 @@
   delegate_to: "{{ hm_bootstrap_host }}"
   changed_when: false
   when: hm_node_zone | default('') | length > 0
+
+- name: Record cluster, PoP and machine identity
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - label
+      - node
+      - "{{ hm_node_name }}"
+      - "hm.gitops/cluster={{ hm_cluster_name }}"
+      - "hm.gitops/pop={{ hm_node_pop }}"
+      - "hm.gitops/country={{ hm_node_country }}"
+      - "hm.gitops/machine={{ hm_machine_name }}"
+      - "hm.gitops/host-id={{ hm_node_host | replace('/', '.') }}"
+      - "hm.gitops/control-plane={{ 'false' if hm_is_agent | bool else 'true' }}"
+      - --overwrite
+  delegate_to: "{{ hm_bootstrap_host }}"
+  changed_when: false
+- name: Record human-readable host slot
+  ansible.builtin.command:
+    argv: [kubectl, annotate, node, "{{ hm_node_name }}", "hm.gitops/host={{ hm_node_host }}", --overwrite]
+  delegate_to: "{{ hm_bootstrap_host }}"
+  changed_when: false

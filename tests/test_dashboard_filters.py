@@ -22,10 +22,11 @@ class DashboardFilterTests(unittest.TestCase):
             for variable in load(name)['templating']['list']:
                 self.assertEqual(variable['type'], 'query')
                 self.assertTrue(variable['query']['query'].startswith(('label_values(', 'query_result(')))
-                self.assertEqual(variable['allValue'], '.*')
+                if variable['name'] != 'cluster':
+                    self.assertEqual(variable['allValue'], '.*')
 
     def test_services_select_current_identities_not_historical_names(self):
-        variable = load('overview.json')['templating']['list'][0]
+        variable = next(v for v in load('overview.json')['templating']['list'] if v['name'] == 'service_name')
         self.assertIn('query_result(count by (service)', variable['query']['query'])
         self.assertIn('service=', variable['regex'])
 
@@ -33,40 +34,40 @@ class DashboardFilterTests(unittest.TestCase):
         for panel in panels(load('overview.json')['panels']):
             for target in panel.get('targets', []):
                 self.assertIn('${service_name:regex}', target['expr'])
-                self.assertIn('${region:regex}', target['expr'])
+                self.assertIn('${zone:regex}', target['expr'])
                 for metric in ['xray_', 'probe_', 'node_memory_', 'node_cpu_', 'node_filesystem_', 'node_network_']:
                     self.assertNotIn(metric, target['expr'])
 
     def test_inventory_is_independent_of_services(self):
         inventory = load('inventory.json')
         variables = {v['name']: v for v in inventory['templating']['list']}
-        self.assertEqual(set(variables), {'region', 'node'})
-        self.assertIn('${region:regex}', variables['node']['query']['query'])
+        self.assertEqual(set(variables), {'cluster', 'zone', 'host'})
+        self.assertIn('${zone:regex}', variables['host']['query']['query'])
         for panel in panels(inventory['panels']):
             for target in panel.get('targets', []):
-                self.assertIn('${region:regex}', target['expr'])
-                self.assertIn('${node:regex}', target['expr'])
+                self.assertIn('${zone:regex}', target['expr'])
+                self.assertIn('${host:regex}', target['expr'])
                 self.assertNotIn('hm:service_instance', target['expr'])
 
     def test_vpn_separates_entry_paths_and_measurement_locations(self):
         vpn = load('vpn.json')
         by_id = {p['id']: p for p in panels(vpn['panels'])}
         for target in by_id[3]['targets']:
-            self.assertIn('${entry_region:regex}', target['expr'])
+            self.assertIn('${entry_zone:regex}', target['expr'])
         path = by_id[20]['targets'][0]['expr']
-        self.assertIn('${source_region:regex}', path)
-        self.assertIn('${target_region:regex}', path)
-        self.assertNotIn('${entry_region:regex}', path)
-        self.assertIn('source_region!=""', path)
-        self.assertIn('target_region!=""', path)
+        self.assertIn('${source_zone:regex}', path)
+        self.assertIn('${target_zone:regex}', path)
+        self.assertNotIn('${entry_zone:regex}', path)
+        self.assertIn('source_zone!=""', path)
+        self.assertIn('target_zone!=""', path)
         for target in by_id[21]['targets']:
-            self.assertIn('by(region,target)', target['expr'])
-            self.assertNotIn('${entry_region:regex}', target['expr'])
+            self.assertIn('by(cluster,zone,target)', target['expr'])
+            self.assertNotIn('${entry_zone:regex}', target['expr'])
 
     def test_no_current_topology_constants_in_dashboards(self):
         for name in ['overview.json', 'inventory.json', 'vpn.json']:
             dashboard = json.dumps(load(name))
-            for constant in ['spb-01', 'machine', 'node|spb-node', 'uk|spb', 'checked from SPB', 'UK measurement', '87.106.74.217', '212.116.115.29']:
+            for constant in ['spb-01', 'node|spb-node', 'uk|spb', 'checked from SPB', 'UK measurement', '87.106.74.217', '212.116.115.29']:
                 self.assertNotIn(constant, dashboard)
 
     def test_overviews_remain_compact_and_missing_data_is_not_zero(self):

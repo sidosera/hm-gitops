@@ -3,12 +3,12 @@ kind: Deployment
 metadata:
   name: gateway
   labels:
-    hm.gitops/region: spb
+    hm.gitops/zone: ru-spb-1
 spec:
   template:
     spec:
       nodeSelector:
-        topology.kubernetes.io/region: spb
+        topology.kubernetes.io/zone: ru-spb-1
       containers:
       - ports:
         - $patch: replace

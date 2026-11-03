@@ -127,4 +127,4 @@ spec:
         configMap:
           name: grafana-dashboards
       nodeSelector:
-        kubernetes.io/hostname: machine
+        hm.gitops/control-plane: 'true'

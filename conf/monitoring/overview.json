@@ -1,14 +1,14 @@
 {
   "uid": "hm-services",
   "title": "Services / Overview",
-  "description": "Generic workload health and resource usage, discovered by service identity and region.",
+  "description": "Generic workload health and resource usage, discovered by service identity and zone.",
   "tags": [
     "hackamonth",
     "services"
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 9,
+  "version": 10,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -57,6 +57,32 @@
   "templating": {
     "list": [
       {
+        "name": "cluster",
+        "label": "Cluster",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(node_uname_info{cluster!=\"\"}, cluster)",
+          "refId": "cluster"
+        },
+        "definition": "label_values(node_uname_info{cluster!=\"\"}, cluster)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "text": "hm-cluster",
+          "value": "hm-cluster",
+          "selected": true
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
         "name": "service_name",
         "label": "Service",
         "type": "query",
@@ -65,10 +91,10 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "query_result(count by (service) (hm:service_instance:info))",
+          "query": "query_result(count by (service) (hm:service_instance:info{cluster=~\"${cluster:regex}\"}))",
           "refId": "service_name"
         },
-        "definition": "query_result(count by (service) (hm:service_instance:info))",
+        "definition": "query_result(count by (service) (hm:service_instance:info{cluster=~\"${cluster:regex}\"}))",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -85,18 +111,18 @@
         "regex": "/service=\"([^\"]+)\"/"
       },
       {
-        "name": "region",
-        "label": "Region",
+        "name": "zone",
+        "label": "Zone",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(hm:service_instance:info, region)",
+          "query": "label_values(hm:service_instance:info{cluster=~\"${cluster:regex}\"}, zone)",
           "refId": "region"
         },
-        "definition": "label_values(hm:service_instance:info, region)",
+        "definition": "label_values(hm:service_instance:info{cluster=~\"${cluster:regex}\"}, zone)",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -129,7 +155,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Workload readiness and resource usage for any **service** and **region**. Use **VPN** for client connectivity and **Inventory** for host capacity."
+        "content": "Workload readiness and resource usage for any **service** and **zone**. Use **VPN** for client connectivity and **Inventory** for host capacity."
       }
     },
     {
@@ -142,7 +168,7 @@
         "w": 8,
         "h": 4
       },
-      "description": "Ready / scheduled non-terminal pods for the selected service and region. This is workload readiness, not end-to-end availability.",
+      "description": "Ready / scheduled non-terminal pods for the selected service and zone. This is workload readiness, not end-to-end availability.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -150,7 +176,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(hm:service_instance:ready{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "expr": "sum(hm:service_instance:ready{cluster=~\"${cluster:regex}\",service=~\"${service_name:regex}\",zone=~\"${zone:regex}\"})",
           "legendFormat": "Ready",
           "editorMode": "code",
           "instant": true,
@@ -162,7 +188,7 @@
         },
         {
           "refId": "B",
-          "expr": "count(hm:service_instance:info{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "expr": "count(hm:service_instance:info{cluster=~\"${cluster:regex}\",service=~\"${service_name:regex}\",zone=~\"${zone:regex}\"})",
           "legendFormat": "Scheduled",
           "editorMode": "code",
           "instant": true,
@@ -221,7 +247,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(hm:service_instance:restarts_1h{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "expr": "sum(hm:service_instance:restarts_1h{cluster=~\"${cluster:regex}\",service=~\"${service_name:regex}\",zone=~\"${zone:regex}\"})",
           "legendFormat": "Restarts",
           "editorMode": "code",
           "instant": true,
@@ -280,7 +306,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(hm:service_instance:memory_bytes{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
+          "expr": "sum(hm:service_instance:memory_bytes{cluster=~\"${cluster:regex}\",service=~\"${service_name:regex}\",zone=~\"${zone:regex}\"})",
           "legendFormat": "Working set",
           "editorMode": "code",
           "instant": true,
@@ -339,8 +365,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(service,region) (hm:service_instance:cpu_cores{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
-          "legendFormat": "{{service}} / {{region}}",
+          "expr": "sum by(service,zone) (hm:service_instance:cpu_cores{cluster=~\"${cluster:regex}\",service=~\"${service_name:regex}\",zone=~\"${zone:regex}\"})",
+          "legendFormat": "{{service}} / {{zone}}",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -394,8 +420,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(service,region) (hm:service_instance:memory_bytes{service=~\"${service_name:regex}\",region=~\"${region:regex}\"})",
-          "legendFormat": "{{service}} / {{region}}",
+          "expr": "sum by(service,zone) (hm:service_instance:memory_bytes{cluster=~\"${cluster:regex}\",service=~\"${service_name:regex}\",zone=~\"${zone:regex}\"})",
+          "legendFormat": "{{service}} / {{zone}}",
           "editorMode": "code",
           "instant": false,
           "range": true,
@@ -445,7 +471,7 @@
       "panels": [
         {
           "id": 8,
-          "title": "Regional instances",
+          "title": "Service instances by zone",
           "type": "table",
           "gridPos": {
             "x": 0,
@@ -453,7 +479,7 @@
             "w": 24,
             "h": 5
           },
-          "description": "Only the selected service and region; Ready is Kubernetes pod readiness.",
+          "description": "Only the selected service and zone; Ready is Kubernetes pod readiness.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -461,7 +487,7 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "hm:service_instance:ready{service=~\"${service_name:regex}\",region=~\"${region:regex}\"}",
+              "expr": "hm:service_instance:ready{cluster=~\"${cluster:regex}\",service=~\"${service_name:regex}\",zone=~\"${zone:regex}\"}",
               "legendFormat": "",
               "editorMode": "code",
               "instant": true,
@@ -532,19 +558,31 @@
                   "__name__": true,
                   "namespace": true,
                   "service": false,
-                  "node": true
+                  "node": true,
+                  "cluster": true,
+                  "pop": true,
+                  "region": true,
+                  "host": true,
+                  "machine": true,
+                  "country": true,
+                  "source_country": true,
+                  "source_pop": true,
+                  "target_country": true,
+                  "target_pop": true
                 },
                 "indexByName": {
                   "service": 0,
-                  "region": 1,
+                  "zone": 1,
                   "pod": 2,
                   "Value": 3
                 },
                 "renameByName": {
-                  "region": "Region",
                   "pod": "Instance",
                   "Value": "Ready",
-                  "service": "Service"
+                  "service": "Service",
+                  "zone": "Zone",
+                  "source_zone": "Probe source",
+                  "target_zone": "Gateway entry"
                 }
               }
             }

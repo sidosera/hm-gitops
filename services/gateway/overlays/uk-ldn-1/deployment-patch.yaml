@@ -3,12 +3,12 @@ kind: Deployment
 metadata:
   name: gateway
   labels:
-    hm.gitops/region: uk
+    hm.gitops/zone: uk-ldn-1
 spec:
   template:
     spec:
       nodeSelector:
-        topology.kubernetes.io/region: uk
+        topology.kubernetes.io/zone: uk-ldn-1
       containers:
       - ports:
         - name: reality

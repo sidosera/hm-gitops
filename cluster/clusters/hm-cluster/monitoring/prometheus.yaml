@@ -114,4 +114,4 @@ spec:
           mountPath: /etc/prometheus/spb-tls
           readOnly: true
       nodeSelector:
-        kubernetes.io/hostname: machine
+        hm.gitops/control-plane: 'true'
