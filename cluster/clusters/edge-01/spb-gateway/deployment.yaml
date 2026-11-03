@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: xray
-        image: ghcr.io/xtls/xray-core:26.10.31
+        image: ghcr.io/xtls/xray-core:26.10.31@sha256:ceabeac03a89d991d2a247361825c1d1d2e9c91cd5dc010f298c7dc0c2f325c9
         args:
         - run
         - -c
@@ -71,7 +71,7 @@ spec:
             port: reality
           periodSeconds: 20
       - name: blackbox
-        image: quay.io/prometheus/blackbox-exporter:v0.29.1
+        image: quay.io/prometheus/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13
         args:
         - --config.file=/etc/blackbox/blackbox.yml
         - --web.listen-address=:9115
@@ -97,6 +97,7 @@ spec:
         readinessProbe:
           tcpSocket:
             port: probes
+          periodSeconds: 30
       volumes:
       - name: xray-config
         secret:

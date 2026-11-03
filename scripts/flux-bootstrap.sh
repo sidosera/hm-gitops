@@ -40,6 +40,11 @@ kubectl create namespace flux-system --dry-run=client -o yaml | kubectl apply -f
 # Opt in explicitly if HelmRelease or notification resources are introduced later.
 FLUX_COMPONENTS="${HM_FLUX_COMPONENTS:-source-controller,kustomize-controller}"
 flux install --components="$FLUX_COMPONENTS"
+# Keep shared control services on the server; edge workers keep their small budget.
+for controller in source-controller kustomize-controller; do
+  kubectl -n flux-system patch deployment "$controller" --type=merge \
+    -p '{"spec":{"template":{"spec":{"nodeSelector":{"kubernetes.io/hostname":"machine"}}}}}'
+done
 for controller in helm-controller notification-controller; do
   if [[ ",$FLUX_COMPONENTS," != *",$controller,"* ]]; then
     if [[ "$controller" == helm-controller ]]; then

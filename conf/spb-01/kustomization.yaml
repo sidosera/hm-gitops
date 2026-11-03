@@ -4,7 +4,6 @@ resources:
   - config.sops.yaml
   - server-tls-secret.sops.yaml
   - client-tls-secret.sops.yaml
-  - ca-secret.sops.yaml
   - fleet-tls-secret.sops.yaml
 configMapGenerator:
   - name: spb-blackbox-config

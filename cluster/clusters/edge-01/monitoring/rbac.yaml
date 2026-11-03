@@ -21,6 +21,7 @@ rules:
       - nodes/metrics
     resourceNames:
       - machine
+      - spb-01
     verbs:
       - get
 ---
