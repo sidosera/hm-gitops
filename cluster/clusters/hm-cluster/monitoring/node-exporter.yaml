@@ -30,9 +30,10 @@ spec:
           with urllib.request.urlopen('https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip',timeout=60)\
           \ as response,open('/tools/client.zip','wb') as target:\n while chunk:=response.read(65536):\n\
           \  h.update(chunk);target.write(chunk)\nif h.hexdigest()!='e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214':\n\
-          \ raise RuntimeError('Xray client checksum mismatch')\nwith zipfile.ZipFile('/tools/client.zip')\
-          \ as archive:\n with archive.open('xray') as source,open('/tools/xray','wb')\
-          \ as target:\n  shutil.copyfileobj(source,target)\nos.unlink('/tools/client.zip');os.chmod('/tools/xray',0o555)\n"
+          \ raise RuntimeError('Xray client checksum mismatch')\nstaged=pathlib.Path('/tools/xray.next')\n\
+          staged.unlink(missing_ok=True)\nwith zipfile.ZipFile('/tools/client.zip')\
+          \ as archive:\n with archive.open('xray') as source,open(staged,'xb') as\
+          \ target:\n  shutil.copyfileobj(source,target)\nos.chmod(staged,0o555);os.replace(staged,'/tools/xray');os.unlink('/tools/client.zip')\n"
         securityContext:
           runAsNonRoot: true
           runAsUser: 65534
