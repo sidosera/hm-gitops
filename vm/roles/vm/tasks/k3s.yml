@@ -22,6 +22,7 @@
     _k3s_server_config: "{{ _base | combine(_ipv6_extra) }}"
   vars:
     _base:
+      node-name: "{{ hm_node_name }}"
       write-kubeconfig-mode: "0600"
       flannel-backend: wireguard-native
       flannel-external-ip: true

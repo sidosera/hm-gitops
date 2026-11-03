@@ -22,6 +22,11 @@ class TopologyTests(unittest.TestCase):
             self.assertIn('kubernetes_name', machine)
             self.assertNotIn('region', machine)
 
+    def test_bootstrap_explicitly_uses_inventory_node_identity(self):
+        tasks = yaml.safe_load((ROOT / 'vm/roles/vm/tasks/k3s.yml').read_text())
+        task = next(t for t in tasks if t.get('name') == 'Build k3s server config')
+        self.assertEqual(task['vars']['_base']['node-name'], '{{ hm_node_name }}')
+
     def test_all_scrapes_carry_cluster_and_zone_and_real_host_identity(self):
         config = yaml.safe_load((ROOT / 'conf/monitoring/prometheus.yml').read_text())
         for job in config['scrape_configs']:
