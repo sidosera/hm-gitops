@@ -48,6 +48,8 @@ class VPNProbeTests(unittest.TestCase):
             self.assertFalse(pod['automountServiceAccountToken'])
             self.assertEqual(pod['nodeSelector']['topology.kubernetes.io/region'], region)
             self.assertEqual(len(pod['containers']), 2)
+            # SOCKS stays on loopback, so kubelet TCP probes to the pod IP cannot work.
+            self.assertNotIn('tcpSocket', pod['containers'][0].get('readinessProbe', {}))
             for container in pod['containers']:
                 self.assertEqual(container['resources']['limits']['memory'], '40Mi')
                 self.assertTrue(container['securityContext']['readOnlyRootFilesystem'])

@@ -50,10 +50,6 @@ spec:
         - name: client-config
           mountPath: /etc/xray
           readOnly: true
-        readinessProbe:
-          tcpSocket:
-            port: 10800
-          periodSeconds: 10
       - name: blackbox
         image: quay.io/prometheus/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13
         args:
