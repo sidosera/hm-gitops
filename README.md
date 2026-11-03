@@ -136,7 +136,7 @@ Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing 
 
 Prometheus scrapes every 30 seconds and stores seven days of history, bounded to 750 MB of blocks on a 2 GiB volume. Grafana has a separate 1 GiB volume for its settings. Both volumes use the VPS disk, so they do not survive loss of the VPS. History starts when Prometheus is deployed; the previous SQLite history volume is retained as an archive and is not imported.
 
-The overview has six signal panels: ready/scheduled instances, Gateway client estimates, service memory, host RAM headroom, CPU history and memory history. Service and Region filter all of them. Expand **Details** for Gateway paths, UK traffic counters, restarts, disk headroom and the regional instance list. Gateway-only signals show N/A for other services; regions with no deployment show no instances.
+The Services overview has five signal panels: ready/scheduled instances, Gateway client estimates, service memory, CPU history and memory history. Service and Region filter all of them. Expand **Details** for Gateway paths, UK traffic counters, restarts and the regional instance list. Physical host capacity is in the separate [Inventory / Capacity](https://www.hackamonth.io/status/d/hm-inventory/inventory-capacity) dashboard, filtered by Region and Host. Both dashboards share the same Grafana and Prometheus. Gateway-only signals show N/A for other services; regions with no deployment show no instances.
 
 Node-exporter supplies host metrics through read-only host mounts. Kube-state-metrics reads pods in the `hm` namespace, and Prometheus reads this node's kubelet resource metrics. Xray-exporter reads native traffic counters with log parsing disabled. A small poller uses the checksum-verified official Xray CLI to publish aggregate online-IP counts through node-exporter's textfile collector. It has no web UI or history database. Only Xray's read-only StatsService is enabled.
 
@@ -155,7 +155,7 @@ kubectl kustomize cluster/clusters/edge-01 >/dev/null
 
 ## Operating the dashboard
 
-Select Service and Region to scope the entire dashboard. Gateway is selected initially; All regions includes its UK and SPB instances. The six overview panels show readiness, clients and resource usage. Expand Details for connectivity checks and workload/host diagnostics. These selections also apply to Details. Workload readiness is separate from end-to-end connectivity.
+Select Service and Region to scope the entire dashboard. Gateway is selected initially; All regions includes its UK and SPB instances. The five overview panels show readiness, clients and service resource usage. Expand Details for connectivity checks and workload diagnostics. Open Inventory for host CPU, available RAM, disk capacity and physical network traffic; its Region and Host filters are independent of service placement. These selections also apply to Details. Workload readiness is separate from end-to-end connectivity.
 
 - **VPN fails, server checks green:** test the existing client profile from the affected ISP. Compare the authenticated Russia probes with the direct-internet control. They measure datacenter reachability and request duration, but cannot establish availability from every residential/mobile ISP or a client-facing SLO.
 - **API failed or pod not ready:** inspect `kubectl -n hm logs deployment/proxy-service` and pod events. Check collector health before interpreting missing data.
@@ -163,7 +163,7 @@ Select Service and Region to scope the entire dashboard. Gateway is selected ini
 - **Memory pressure:** compare MemAvailable with Linux pressure stall information (PSI), swapping and each container's working set / configured memory limit. Occupied swap alone does not prove current pressure.
 - **Disk pressure:** inspect both free space and free inodes on `/`. Dashboard thresholds are investigation guides: memory/disk headroom under 20% warns, under 10% is urgent; container memory-limit use above 80% warns, above 95% is urgent. No paging or notifications are configured by the dashboard.
 
-Traffic rates use Grafana's adaptive rate interval with a 30-second scrape interval; selected-window transfer totals use reset-aware increases. Missing samples remain gaps. PSI begins at this rollout; older periods have no PSI history. Recent restarts use a rolling 15-minute window and do not count pod replacements. Container limit panels omit containers without a memory limit.
+Traffic rates use Grafana's adaptive rate interval with a 30-second scrape interval; selected-window transfer totals use reset-aware increases. Missing samples remain gaps. PSI begins at this rollout; older periods have no PSI history. Recent restarts use a rolling one-hour window and do not count pod replacements. Container limit panels omit containers without a memory limit.
 
 The layout follows [Google SRE monitoring guidance](https://sre.google/sre-book/monitoring-distributed-systems/) while making unmeasured user-path signals explicit.
 
@@ -176,7 +176,7 @@ Both hosts use the same Ansible `vm/playbooks/bootstrap.yml` bootstrap and Flux 
 
 The SPB gateway runs Xray plus a blackbox-exporter sidecar. `services/gateway/overlays/spb/config.json` is an explicit domain suffix allowlist for Russian egress, not a blanket `.ru` exception. Unknown destinations use the original upstream through either REALITY or HTTPS/XHTTP; failure never switches foreign traffic to Russian direct egress. SOCKS probe ports are loopback-only inside the pod; native StatsService is protected by a NetworkPolicy. Node/blackbox metrics use mTLS. TLS private material and authenticated Xray connection settings are SOPS encrypted; public routing settings are ConfigMaps. Certificates must be renewed before November 2027.
 
-Both hosts share one dashboard at `/status/d/hm-services`. Service and Region filter every panel. The default view shows ready instances, clients, service memory, host RAM headroom, CPU and memory history; specialist signals are in a collapsed Details row. It includes host RAM/CPU/network, client estimate and five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
+Both regions share the Services dashboard at `/status/d/hm-services`; physical hosts are covered separately by Inventory at `/status/d/hm-inventory`. Service and Region filter every Services panel. The default view shows ready instances, clients, service memory, CPU and memory history; specialist signals are in a collapsed Details row. Gateway has five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
 
 For client import, use the private `hm-spb-smart-routing.txt` VLESS profile provided outside Git. Existing upstream profiles remain valid. The bootstrap password is unnecessary after key-only SSH is configured.
 
@@ -189,7 +189,7 @@ Use [the glossary](GLOSSARY.md) for infrastructure terminology. **Gateway** is o
 
 Region, provider availability zone and host are separate placement dimensions. `machine` and `spb-01` are hosts; control-plane/worker are cluster roles. Inventory records region and optionally zone. No availability-zone or failover independence is inferred from a region name. `uk` is the existing operational region name, not a new assertion about provider geography.
 
-Prometheus carries `service` and `region` labels. Host/kubelet metrics belong to infrastructure; gateway client metrics retain their Gateway identity even when collected by node-exporter. The single dashboard presents the selected service overview first and keeps specialist signals in Details. Regional deployment resource names and existing client credentials remain stable.
+Prometheus carries `service` and `region` labels. Host/kubelet metrics belong to infrastructure; gateway client metrics retain their Gateway identity even when collected by node-exporter. Services presents the selected service overview first and keeps specialist signals in Details. Inventory covers physical hosts independently; neither dashboard requires a separate monitoring stack. Regional deployment resource names and existing client credentials remain stable.
 
 
 ## Gateway configuration with Kustomize

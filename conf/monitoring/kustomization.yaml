@@ -19,6 +19,7 @@ configMapGenerator:
   - name: grafana-dashboards
     files:
       - overview.json
+      - inventory.json
   - name: online-client-code
     files:
       - online_clients.py

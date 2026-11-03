@@ -35,10 +35,28 @@ class DashboardFilterTests(unittest.TestCase):
 
     def test_specialist_signals_are_collapsed(self):
         visible = [p for p in self.dashboard['panels'] if p['type'] not in ['row', 'text']]
-        self.assertLessEqual(len(visible), 6)
+        self.assertLessEqual(len(visible), 5)
         details = [p for p in self.dashboard['panels'] if p['type'] == 'row']
         self.assertTrue(details)
         self.assertTrue(all(p['collapsed'] for p in details))
+
+    def test_services_exclude_physical_host_capacity(self):
+        for panel in panels(self.dashboard['panels']):
+            for target in panel.get('targets', []):
+                for metric in ['node_memory_', 'node_cpu_', 'node_filesystem_', 'node_network_']:
+                    self.assertNotIn(metric, target['expr'])
+
+    def test_inventory_is_independent_of_services(self):
+        inventory = json.loads((ROOT / 'conf/monitoring/inventory.json').read_text())
+        variables = {v['name']: v for v in inventory['templating']['list']}
+        self.assertEqual(set(variables), {'region', 'node'})
+        self.assertIn('${region:regex}', variables['node']['query']['query'])
+        for panel in panels(inventory['panels']):
+            for target in panel.get('targets', []):
+                self.assertIn('${region:regex}', target['expr'])
+                self.assertIn('${node:regex}', target['expr'])
+                self.assertNotIn('hm:service_instance', target['expr'])
+                self.assertNotIn('service_name', target['expr'])
 
     def test_unsupported_signals_are_not_fabricated_as_zero(self):
         for panel in panels(self.dashboard['panels']):
