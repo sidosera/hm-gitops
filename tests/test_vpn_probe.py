@@ -95,6 +95,20 @@ class VPNProbeTests(unittest.TestCase):
         self.assertNotIn('target_zone', {v['name'] for v in d['templating']['list']})
         self.assertFalse(any(p['id'] == 20 for p in d['panels']))
 
+    def test_observer_outage_keeps_zone_and_target_rows_visible(self):
+        d = json.loads((ROOT / 'conf/monitoring/vpn.json').read_text())
+        variables = {v['name']: v for v in d['templating']['list']}
+        zone_query = variables['source_zone']['query']['query']
+        self.assertIn('up{', zone_query)
+        self.assertNotIn('probe_target_info', zone_query)
+        self.assertIn('max_over_time(', variables['site']['query']['query'])
+        matrix = next(p for p in d['panels'] if p['id'] == 30)
+        self.assertIn('max_over_time(probe_target_info{', matrix['targets'][0]['expr'])
+        self.assertIn('[24h]', matrix['targets'][0]['expr'])
+        status = next(p for p in d['panels'] if p['id'] == 4)
+        self.assertIn('up{', status['targets'][0]['expr'])
+        self.assertNotIn('probe_success', status['targets'][0]['expr'])
+
 
 if __name__ == '__main__':
     unittest.main()
