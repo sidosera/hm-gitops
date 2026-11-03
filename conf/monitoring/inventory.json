@@ -8,7 +8,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 3,
+  "version": 4,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -175,7 +175,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * (1 - avg by (cluster,zone,host,machine) (rate(node_cpu_seconds_total{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mode=\"idle\"}[$__rate_interval])))",
+          "expr": "100 * (1 - avg by (cluster,zone,host,machine) (rate(node_cpu_seconds_total{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mode=\"idle\"}[$__rate_interval])))",
           "legendFormat": "{{host}} \u00b7 {{machine}}",
           "editorMode": "code",
           "instant": true,
@@ -264,7 +264,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_memory_MemAvailable_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\"} / node_memory_MemTotal_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\"}",
+          "expr": "100 * node_memory_MemAvailable_bytes{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\"} / node_memory_MemTotal_bytes{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\"}",
           "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 Memory headroom",
           "editorMode": "code",
           "instant": true,
@@ -353,7 +353,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * node_filesystem_avail_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+          "expr": "100 * node_filesystem_avail_bytes{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
           "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 Root disk available",
           "editorMode": "code",
           "instant": true,
@@ -442,7 +442,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * (1 - avg by (cluster,zone,host,machine) (rate(node_cpu_seconds_total{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mode=\"idle\"}[$__rate_interval])))",
+          "expr": "100 * (1 - avg by (cluster,zone,host,machine) (rate(node_cpu_seconds_total{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mode=\"idle\"}[$__rate_interval])))",
           "legendFormat": "{{host}} \u00b7 {{machine}}",
           "editorMode": "code",
           "instant": false,
@@ -544,7 +544,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "node_memory_MemAvailable_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\"}",
+          "expr": "node_memory_MemAvailable_bytes{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\"}",
           "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 Available RAM",
           "editorMode": "code",
           "instant": false,
@@ -644,7 +644,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (cluster,zone,host,machine,device) (rate(node_network_receive_bytes_total{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",device!~\"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|wg.*\"}[$__rate_interval])) * 8",
+          "expr": "sum by (cluster,zone,host,machine,device) (rate(node_network_receive_bytes_total{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",device!~\"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|wg.*\"}[$__rate_interval])) * 8",
           "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 {{device}} receive",
           "editorMode": "code",
           "instant": false,
@@ -656,7 +656,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum by (cluster,zone,host,machine,device) (rate(node_network_transmit_bytes_total{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",device!~\"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|wg.*\"}[$__rate_interval])) * 8",
+          "expr": "sum by (cluster,zone,host,machine,device) (rate(node_network_transmit_bytes_total{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",device!~\"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|wg.*\"}[$__rate_interval])) * 8",
           "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 {{device}} send",
           "editorMode": "code",
           "instant": false,
@@ -768,7 +768,7 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "100 * node_filesystem_avail_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+              "expr": "100 * node_filesystem_avail_bytes{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
               "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 Available space",
               "editorMode": "code",
               "instant": false,
@@ -780,7 +780,7 @@
             },
             {
               "refId": "B",
-              "expr": "100 * node_filesystem_files_free{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{cluster=~\"${cluster:regex}\",host=~\"${host:regex}\",zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
+              "expr": "100 * node_filesystem_files_free{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_files{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}",
               "legendFormat": "{{host}} \u00b7 {{machine}} \u00b7 Free inodes",
               "editorMode": "code",
               "instant": false,

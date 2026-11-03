@@ -4,9 +4,9 @@ evaluation_interval: 30s
 tests:
 - interval: 30s
   input_series:
-  - series: node_uname_info{cluster="hm-cluster",zone="uk-ldn-1",job="node",node="machine",country="uk"}
+  - series: node_uname_info{host="uk-ldn-1/1",cluster="hm-cluster",zone="uk-ldn-1",job="node",node="machine",country="uk"}
     values: 1+0x6
-  - series: node_uname_info{cluster="hm-cluster",zone="ru-spb-1",job="node",node="spb-01",country="ru"}
+  - series: node_uname_info{host="ru-spb-1/1",cluster="hm-cluster",zone="ru-spb-1",job="node",node="spb-01",country="ru"}
     values: 1+0x6
   - series: kube_pod_info{namespace="hm",pod="proxy-service-fixture",node="machine",country="uk",service="kubernetes"}
     values: 1+0x6
@@ -78,7 +78,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_labels{namespace="hm",pod="node-exporter-fixture",label_hm_gitops_service="observability",label_app_kubernetes_io_name="node-exporter",service="kubernetes"}
     values: 1+0x6
-  - series: node_uname_info{cluster="hm-cluster",zone="de-fra-1",job="bare-metal-exporter",node="rack-17",country="de"}
+  - series: node_uname_info{host="de-fra-1/1",cluster="hm-cluster",zone="de-fra-1",job="bare-metal-exporter",node="rack-17",country="de"}
     values: 1+0x6
   - series: kube_pod_info{namespace="hm",pod="arbitrary-new-workload-xyz",node="rack-17",country="uk",service="kubernetes"}
     values: 1+0x6
@@ -141,6 +141,11 @@ tests:
     eval_time: 3m
     exp_samples: []
   - expr: count(hm:service_instance:info{service="search",node="rack-17",zone="de-fra-1"})
+    eval_time: 3m
+    exp_samples:
+    - labels: '{}'
+      value: 1
+  - expr: count(node_uname_info{cluster="hm-cluster",host=~`ru-spb-1\/1`})
     eval_time: 3m
     exp_samples:
     - labels: '{}'

@@ -52,6 +52,9 @@ class TopologyTests(unittest.TestCase):
                     self.assertNotIn('\\"', target['expr'])
         inventory = json.loads((ROOT / 'conf/monitoring/inventory.json').read_text())
         self.assertEqual({v['name'] for v in inventory['templating']['list']}, {'cluster', 'zone', 'host'})
+        for panel in inventory['panels']:
+            for target in panel.get('targets', []):
+                self.assertIn('host=~`${host:regex}`', target['expr'])
 
     def test_cluster_sync_name_and_path_match_inventory(self):
         sync = yaml.safe_load((CLUSTER / 'flux-system/sync.yaml').read_text())
