@@ -9,7 +9,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 5,
+  "version": 6,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -497,118 +497,13 @@
       }
     },
     {
-      "id": 8,
-      "title": "Regional instances",
-      "type": "table",
-      "gridPos": {
-        "x": 0,
-        "y": 12,
-        "w": 24,
-        "h": 5
-      },
-      "description": "Only the selected service and region; Ready is Kubernetes pod readiness.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "hm:service_instance:ready{service=~\"${service_name:regex}\",region=~\"${region:regex}\"}",
-          "legendFormat": "",
-          "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "format": "table"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "noValue": "No instances",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "Not ready",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "Ready",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Ready"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "maxDataPoints": 600,
-      "interval": "30s",
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
-        }
-      },
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "namespace": true,
-              "service": true,
-              "node": true
-            },
-            "indexByName": {
-              "region": 0,
-              "pod": 1,
-              "Value": 2
-            },
-            "renameByName": {
-              "region": "Region",
-              "pod": "Instance",
-              "Value": "Ready"
-            }
-          }
-        }
-      ]
-    },
-    {
       "id": 10,
       "type": "row",
       "title": "Details \u00b7 connectivity, traffic & capacity",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 17,
+        "y": 12,
         "w": 24,
         "h": 1
       },
@@ -619,7 +514,7 @@
           "type": "state-timeline",
           "gridPos": {
             "x": 0,
-            "y": 18,
+            "y": 13,
             "w": 12,
             "h": 6
           },
@@ -690,7 +585,7 @@
           "type": "timeseries",
           "gridPos": {
             "x": 12,
-            "y": 18,
+            "y": 13,
             "w": 12,
             "h": 6
           },
@@ -757,7 +652,7 @@
           "type": "timeseries",
           "gridPos": {
             "x": 0,
-            "y": 24,
+            "y": 19,
             "w": 12,
             "h": 6
           },
@@ -812,7 +707,7 @@
           "type": "stat",
           "gridPos": {
             "x": 12,
-            "y": 24,
+            "y": 19,
             "w": 12,
             "h": 6
           },
@@ -864,6 +759,111 @@
             "wideLayout": true,
             "justifyMode": "auto"
           }
+        },
+        {
+          "id": 8,
+          "title": "Regional instances",
+          "type": "table",
+          "gridPos": {
+            "x": 0,
+            "y": 25,
+            "w": 24,
+            "h": 5
+          },
+          "description": "Only the selected service and region; Ready is Kubernetes pod readiness.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "hm:service_instance:ready{service=~\"${service_name:regex}\",region=~\"${region:regex}\"}",
+              "legendFormat": "",
+              "editorMode": "code",
+              "instant": true,
+              "range": false,
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "noValue": "No instances",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "Not ready",
+                      "color": "red"
+                    },
+                    "1": {
+                      "text": "Ready",
+                      "color": "green"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Ready"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "maxDataPoints": 600,
+          "interval": "30s",
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            }
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "namespace": true,
+                  "service": true,
+                  "node": true
+                },
+                "indexByName": {
+                  "region": 0,
+                  "pod": 1,
+                  "Value": 2
+                },
+                "renameByName": {
+                  "region": "Region",
+                  "pod": "Instance",
+                  "Value": "Ready"
+                }
+              }
+            }
+          ]
         }
       ]
     }

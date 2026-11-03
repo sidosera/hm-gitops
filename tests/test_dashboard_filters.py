@@ -35,7 +35,7 @@ class DashboardFilterTests(unittest.TestCase):
 
     def test_specialist_signals_are_collapsed(self):
         visible = [p for p in self.dashboard['panels'] if p['type'] not in ['row', 'text']]
-        self.assertLessEqual(len(visible), 7)
+        self.assertLessEqual(len(visible), 6)
         details = [p for p in self.dashboard['panels'] if p['type'] == 'row']
         self.assertTrue(details)
         self.assertTrue(all(p['collapsed'] for p in details))
