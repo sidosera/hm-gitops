@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Idempotent single-server K3s migration. Never prints credentials or key material."""
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -271,4 +272,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('age_recipient')
     args = parser.parse_args()
-    migrate(args.age_recipient)
+    fd = os.open(SERVER / '.hm-secrets-migration.lock', os.O_WRONLY | os.O_CREAT, 0o600)
+    with os.fdopen(fd, 'w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SystemExit('Another Secrets migration is running; no changes made')
+        migrate(args.age_recipient)
