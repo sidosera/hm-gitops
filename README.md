@@ -296,3 +296,15 @@ Dedicated probe accounts and their runtime configs are keys in the same canonica
 
 
 Cluster configuration lives in `cluster/clusters/hm-cluster`; Gateway and VPN Probe overlays are named by zone. Bootstrap defaults to `hm-cluster`. Node placement uses `topology.kubernetes.io/zone`, and central services use the `hm.gitops/control-plane` role label. VM or bare-metal machine identity does not change this deployment path. Inventory keeps stable Kubernetes registration IDs explicitly so naming changes do not require draining/rejoining a healthy cluster or regenerating VPN profiles.
+
+## Proxy service dashboard
+
+`Proxy / Service` (`hm-proxy`) uses the structure of the [Traefik dashboard 5851](https://grafana.com/grafana/dashboards/5851-traefik/) for Xray's available measurements: ready gateways, active source-IP estimates, inbound upload/download rates, range traffic totals, egress routes and a collapsed runtime section. Filters discover clusters, gateway zones and listeners from metrics. Physical hosts remain in Inventory; direct/VPN website reachability remains in VPN / Operations. The listener filter affects entry traffic and transferred bytes; client estimates, egress and runtime are zone-wide because Xray does not expose listener attribution for them. No HTTP request count, status-code error rate or latency percentile is invented for the opaque TCP/VLESS service.
+
+Both zone collectors use `services/xray-metrics/base` with small endpoint overlays, a digest-pinned exporter, no API token, no secret volumes and no access logs or per-user labels. Both run on the control plane: SPB receives no new process. Metrics scrape the existing private StatsService over the cluster network; public ports and credentials are unchanged. Exporter and gateway failures remain missing/failed telemetry, never zero throughput presented as healthy.
+
+Traffic is reported per measurement zone. The same relayed bytes may be measured on SPB and UK, so do not sum them as unique fleet volume. The connected-IP number is an estimate, not open TCP connections or unique people. Counter-based range totals handle restarts but are not billing data. Internal API/SOCKS diagnostic listeners are excluded from entry traffic. A newly deployed collector needs two scrapes before rates appear and has no historical samples from before deployment.
+
+The current exporter overlays each target a single gateway instance through its zone Service. Before scaling that Service to multiple replicas, give each gateway instance a stable collector target (or an exporter sidecar with pod discovery); do not repeatedly scrape a load-balanced endpoint for independent monotonic counters. Additional collectors use the same base and zone labels, and dashboard queries discover new zones/listeners without edits. Provisioning new metric targets and private network access is still explicit configuration.
+
+Validate with `python -m unittest discover -s tests -v` and `promtool test rules tests/fixtures/proxy-dashboard.test.yml`. The PromQL fixture checks independent zone rates, equal listener names across zones, diagnostic/per-user exclusion and missing-zone behavior.

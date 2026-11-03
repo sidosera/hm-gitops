@@ -21,6 +21,7 @@ configMapGenerator:
       - overview.json
       - inventory.json
       - vpn.json
+      - proxy.json
   - name: online-client-code
     files:
       - online_clients.py

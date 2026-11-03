@@ -1,0 +1,967 @@
+{
+  "uid": "hm-proxy",
+  "title": "Proxy / Service",
+  "description": "Xray gateway traffic, clients, routes and runtime health. Traffic stays separate by measurement zone; host inventory and end-to-end connectivity have their own dashboards.",
+  "tags": [
+    "hackamonth",
+    "proxy",
+    "xray"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m"
+    ],
+    "time_options": [
+      "15m",
+      "1h",
+      "3h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d"
+    ]
+  },
+  "editable": false,
+  "graphTooltip": 1,
+  "fiscalYearStartMonth": 0,
+  "links": [
+    {
+      "title": "VPN connectivity",
+      "url": "/status/d/hm-vpn/vpn-operations",
+      "type": "link",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "includeVars": false,
+      "keepTime": true
+    },
+    {
+      "title": "Services",
+      "url": "/status/d/hm-services/services-overview",
+      "type": "link",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "includeVars": false,
+      "keepTime": true
+    },
+    {
+      "title": "Inventory",
+      "url": "/status/d/hm-inventory/inventory-capacity",
+      "type": "link",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "cluster",
+        "label": "Cluster",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(node_uname_info{cluster!=\"\"}, cluster)",
+          "refId": "cluster"
+        },
+        "definition": "label_values(node_uname_info{cluster!=\"\"}, cluster)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "text": "hm-cluster",
+          "value": "hm-cluster",
+          "selected": true
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "zone",
+        "label": "Zone",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(hm:service_instance:info{cluster=~\"${cluster:regex}\",service=\"gateway\"}, zone)",
+          "refId": "zone"
+        },
+        "definition": "label_values(hm:service_instance:info{cluster=~\"${cluster:regex}\",service=\"gateway\"}, zone)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all",
+          "selected": true
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "listener",
+        "label": "Listener",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target!~\"api-in|stats-api|probe-.*\"}, target)",
+          "refId": "listener"
+        },
+        "definition": "label_values(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target!~\"api-in|stats-api|probe-.*\"}, target)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all",
+          "selected": true
+        },
+        "options": [],
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Proxy service",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 2
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Xray traffic and client activity. **Upload** goes toward destinations; **download** returns to clients. Zones show separate measurements of traffic that may cross both. [Website reachability \u2192](/status/d/hm-vpn/vpn-operations)"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Ready gateway instances",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 2,
+        "w": 6,
+        "h": 4
+      },
+      "description": "Workload readiness by zone. A ready pod alone does not prove VPN connectivity. Listener filter does not apply.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(cluster,zone) (hm:service_instance:ready{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"})",
+          "legendFormat": "{{zone}}",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Connected client IPs",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 2,
+        "w": 6,
+        "h": 4
+      },
+      "description": "Sum of per-instance active source-IP estimates within each zone; infrastructure relay/probe profiles excluded. Shared IPs and relays mask clients; the same IP can appear on several instances. These are not open TCP connections or unique people. Listener filter does not apply.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(cluster,zone) (xray_active_client_ips{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} and on(instance) (xray_online_scrape_success{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(instance) (up{cluster=~\"${cluster:regex}\",zone=~\"${zone:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{cluster=~\"${cluster:regex}\",zone=~\"${zone:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
+          "legendFormat": "{{zone}}",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Upload \u00b7 now",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 2,
+        "w": 6,
+        "h": 4
+      },
+      "description": "Entry-side throughput per zone and selected listener. Missing telemetry stays No data. Zones are never summed as unique fleet traffic.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum by(cluster,zone) (rate(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "legendFormat": "{{zone}}",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Download \u00b7 now",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 2,
+        "w": 6,
+        "h": 4
+      },
+      "description": "Entry-side throughput per zone and selected listener. Upload/download are Xray application bytes, not host-interface bytes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum by(cluster,zone) (rate(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "legendFormat": "{{zone}}",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 600,
+      "interval": "30s",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Traffic by entry listener",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 16,
+        "h": 8
+      },
+      "description": "Authenticated proxy listener traffic. Diagnostic SOCKS/API counters are excluded. Labels describe the gateway where bytes were measured, not where the metrics collector runs.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum by(cluster,zone,target) (rate(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "legendFormat": "{{zone}} / {{target}} \u00b7 upload",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "(sum by(cluster,zone,target) (rate(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "legendFormat": "{{zone}} / {{target}} \u00b7 download",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "spanNulls": false,
+            "axisCenteredZero": false
+          }
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 500,
+      "interval": "30s",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Connected client IPs over time",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 6,
+        "w": 8,
+        "h": 8
+      },
+      "description": "Zone-wide estimates, not connection counts. Listener filter does not apply.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(cluster,zone) (xray_active_client_ips{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} and on(instance) (xray_online_scrape_success{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(instance) (up{cluster=~\"${cluster:regex}\",zone=~\"${zone:regex}\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{cluster=~\"${cluster:regex}\",zone=~\"${zone:regex}\",file=\"/textfile/xray_online.prom\"}) < 60))",
+          "legendFormat": "{{zone}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "spanNulls": false,
+            "axisCenteredZero": false
+          }
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 500,
+      "interval": "30s",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Transferred in selected time range",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Counter increases per zone/listener, with counter resets handled. Range totals may include small Prometheus boundary extrapolation; not billing data. Forwarded traffic can occur in both zones and must not be summed as unique client volume. Less than two samples produces No data.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "label_replace(sum by(cluster,zone,target) (increase(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__range])),\"direction\",\"Upload\",\"zone\",\".*\") or label_replace(sum by(cluster,zone,target) (increase(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"inbound\",target=~\"${listener:regex}\",target!~\"api-in|stats-api|probe-.*\"}[$__range])),\"direction\",\"Download\",\"zone\",\".*\")",
+          "legendFormat": "",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
+            },
+            "indexByName": {
+              "cluster": 0,
+              "zone": 1,
+              "target": 2,
+              "direction": 3,
+              "Value": 4
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "zone": "Zone",
+              "target": "Listener",
+              "direction": "Direction",
+              "Value": "Transferred"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Zone",
+            "desc": false
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "title": "Egress traffic by route",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Actual egress path counters, for example local direct or upstream transports. These are bytes, not successful requests or errors. Listener filter does not apply: Xray does not provide listener-to-route attribution.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum by(cluster,zone,target) (rate(xray_traffic_uplink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"outbound\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "legendFormat": "{{zone}} / {{target}} \u00b7 upload",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "(sum by(cluster,zone,target) (rate(xray_traffic_downlink_bytes_total{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",dimension=\"outbound\"}[$__rate_interval])) * 8) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+          "legendFormat": "{{zone}} / {{target}} \u00b7 download",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "spanNulls": false,
+            "axisCenteredZero": false
+          }
+        },
+        "overrides": []
+      },
+      "maxDataPoints": 500,
+      "interval": "30s",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "title": "Runtime & telemetry",
+      "type": "row",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 21,
+          "title": "Gateway CPU",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 23,
+            "w": 12,
+            "h": 8
+          },
+          "description": "Gateway workload CPU, excluding the central metrics collector. Listener filter does not apply.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by(cluster,zone) (hm:service_instance:cpu_cores{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"})",
+              "legendFormat": "{{zone}}",
+              "editorMode": "code",
+              "instant": false,
+              "range": true,
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "cores",
+              "min": 0,
+              "noValue": "No data",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "spanNulls": false,
+                "axisCenteredZero": false
+              }
+            },
+            "overrides": []
+          },
+          "maxDataPoints": 500,
+          "interval": "30s",
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 22,
+          "title": "Gateway memory",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 23,
+            "w": 12,
+            "h": 8
+          },
+          "description": "Gateway pod working set, not physical host memory. Listener filter does not apply.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by(cluster,zone) (hm:service_instance:memory_bytes{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"})",
+              "legendFormat": "{{zone}}",
+              "editorMode": "code",
+              "instant": false,
+              "range": true,
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "min": 0,
+              "noValue": "No data",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "spanNulls": false,
+                "axisCenteredZero": false
+              }
+            },
+            "overrides": []
+          },
+          "maxDataPoints": 500,
+          "interval": "30s",
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 23,
+          "title": "Xray uptime",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 31,
+            "w": 12,
+            "h": 8
+          },
+          "description": "Native Xray uptime; resets when the gateway restarts. Listener filter does not apply.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "(min by(cluster,zone) (xray_uptime_seconds{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"})) and on(cluster,zone) ((xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} == 1) and on(job,instance) (up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"} == 1))",
+              "legendFormat": "{{zone}}",
+              "editorMode": "code",
+              "instant": false,
+              "range": true,
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "min": 0,
+              "noValue": "No data",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "spanNulls": false,
+                "axisCenteredZero": false
+              }
+            },
+            "overrides": []
+          },
+          "maxDataPoints": 500,
+          "interval": "30s",
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 24,
+          "title": "Stats collection health",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 31,
+            "w": 12,
+            "h": 8
+          },
+          "description": "1 means exporter and Xray Stats API are responding; 0 means collection failed. Missing samples remain gaps. This is not a VPN error rate. Listener filter does not apply.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "min by(cluster,zone) (xray_up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\"} * on(job,instance) up{cluster=~\"${cluster:regex}\",service=\"gateway\",zone=~\"${zone:regex}\",job=\"xray\"})",
+              "legendFormat": "{{zone}}",
+              "editorMode": "code",
+              "instant": false,
+              "range": true,
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "noValue": "No data",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "spanNulls": false,
+                "axisCenteredZero": false
+              }
+            },
+            "overrides": []
+          },
+          "maxDataPoints": 500,
+          "interval": "30s",
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

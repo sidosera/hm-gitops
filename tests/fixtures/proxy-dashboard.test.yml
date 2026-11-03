@@ -1,0 +1,62 @@
+fuzzy_compare: true
+evaluation_interval: 30s
+tests:
+- interval: 30s
+  input_series:
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a",dimension="inbound",target="same-listener"}
+    values: 0+3000x10
+  - series: xray_up{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a"}
+    values: 1+0x10
+  - series: up{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a"}
+    values: 1+0x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a",dimension="inbound",target="probe-direct"}
+    values: 0+900000x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a",dimension="inbound",target="api-in"}
+    values: 0+900000x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a",dimension="user",target="private-profile"}
+    values: 0+900000x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b",dimension="inbound",target="same-listener"}
+    values: 0+6000x10
+  - series: xray_up{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b"}
+    values: 1+0x10
+  - series: up{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b"}
+    values: 1+0x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b",dimension="inbound",target="probe-direct"}
+    values: 0+900000x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b",dimension="inbound",target="api-in"}
+    values: 0+900000x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b",dimension="user",target="private-profile"}
+    values: 0+900000x10
+  promql_expr_test:
+  - expr: (sum by(cluster,zone) (rate(xray_traffic_uplink_bytes_total{cluster=~"test",service="gateway",zone=~".*",dimension="inbound",target=~".*",target!~"api-in|stats-api|probe-.*"}[2m]))
+      * 8) and on(cluster,zone) ((xray_up{cluster=~"test",service="gateway",zone=~".*"}
+      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~".*",job="xray"}
+      == 1))
+    eval_time: 5m
+    exp_samples:
+    - labels: '{cluster="test",zone="zone-a"}'
+      value: 800
+    - labels: '{cluster="test",zone="zone-b"}'
+      value: 1600
+  - expr: (sum by(cluster,zone) (rate(xray_traffic_uplink_bytes_total{cluster=~"test",service="gateway",zone=~"zone-a",dimension="inbound",target=~".*",target!~"api-in|stats-api|probe-.*"}[2m]))
+      * 8) and on(cluster,zone) ((xray_up{cluster=~"test",service="gateway",zone=~"zone-a"}
+      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~"zone-a",job="xray"}
+      == 1))
+    eval_time: 5m
+    exp_samples:
+    - labels: '{cluster="test",zone="zone-a"}'
+      value: 800
+  - expr: (sum by(cluster,zone) (rate(xray_traffic_uplink_bytes_total{cluster=~"test",service="gateway",zone=~"zone-b",dimension="inbound",target=~".*",target!~"api-in|stats-api|probe-.*"}[2m]))
+      * 8) and on(cluster,zone) ((xray_up{cluster=~"test",service="gateway",zone=~"zone-b"}
+      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~"zone-b",job="xray"}
+      == 1))
+    eval_time: 5m
+    exp_samples:
+    - labels: '{cluster="test",zone="zone-b"}'
+      value: 1600
+  - expr: (sum by(cluster,zone) (rate(xray_traffic_uplink_bytes_total{cluster=~"test",service="gateway",zone=~"missing",dimension="inbound",target=~".*",target!~"api-in|stats-api|probe-.*"}[2m]))
+      * 8) and on(cluster,zone) ((xray_up{cluster=~"test",service="gateway",zone=~"missing"}
+      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~"missing",job="xray"}
+      == 1))
+    eval_time: 5m
+    exp_samples: []

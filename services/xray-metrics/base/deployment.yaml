@@ -2,7 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: xray-exporter
-  namespace: hm
+  labels:
+    app.kubernetes.io/name: xray-exporter
 spec:
   replicas: 1
   strategy:
@@ -22,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: xray-exporter
-        image: ghcr.io/compassvpn/xray-exporter:v0.6.9
+        image: ghcr.io/compassvpn/xray-exporter:v0.6.9@sha256:62a0b07799effdc68b5625fdb7e0f1fde56a4c105a4f51d98d27d36a22c50ede
         args:
         - --xray-endpoint=proxy-service.hm.svc.cluster.local:10085
         - --listen=:9550

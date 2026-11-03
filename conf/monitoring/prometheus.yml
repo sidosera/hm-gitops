@@ -107,13 +107,21 @@ scrape_configs:
   metrics_path: /scrape
   static_configs:
   - targets:
-    - xray-exporter.hm.svc.cluster.local:9550
+    - uk-ldn-1-xray-exporter.hm.svc.cluster.local:9550
     labels:
       service: gateway
       pop: uk-ldn
       zone: uk-ldn-1
       cluster: hm-cluster
       country: uk
+  - targets:
+    - ru-spb-1-xray-exporter.hm.svc.cluster.local:9550
+    labels:
+      service: gateway
+      pop: ru-spb
+      zone: ru-spb-1
+      cluster: hm-cluster
+      country: ru
   sample_limit: 500
 - job_name: gateway-blackbox
   scheme: https

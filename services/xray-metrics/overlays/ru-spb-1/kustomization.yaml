@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hm
+namePrefix: ru-spb-1-
+resources:
+  - ../../base
+labels:
+  - pairs:
+      hm.gitops/observed-zone: ru-spb-1
+    includeSelectors: true
+patches:
+  - target:
+      kind: Deployment
+      name: xray-exporter
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/args/0
+        value: --xray-endpoint=spb-gateway.hm.svc.cluster.local:10085

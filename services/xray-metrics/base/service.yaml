@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: xray-exporter
+spec:
+  selector:
+    app.kubernetes.io/name: xray-exporter
+  ports:
+  - name: http
+    port: 9550
+    targetPort: http
