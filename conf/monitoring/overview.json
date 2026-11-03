@@ -190,7 +190,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min(xray_up{job=\"xray\"} * on(instance) up{job=\"xray\"})",
+          "expr": "min(xray_up{job=\"xray\",service=\"gateway\"} * on(instance,service,region) up{job=\"xray\",service=\"gateway\"})",
           "legendFormat": "Xray control API",
           "editorMode": "code",
           "instant": true,
@@ -382,7 +382,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min(up)",
+          "expr": "min(up{service!=\"\"})",
           "legendFormat": "Telemetry coverage",
           "editorMode": "code",
           "instant": true,
@@ -1573,7 +1573,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (target) (rate(xray_traffic_downlink_bytes_total{dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__rate_interval])) * 8",
+          "expr": "sum by (target) (rate(xray_traffic_downlink_bytes_total{service=\"gateway\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__rate_interval])) * 8",
           "legendFormat": "{{target}}",
           "editorMode": "code",
           "instant": false,
@@ -1673,7 +1673,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (target) (rate(xray_traffic_uplink_bytes_total{dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__rate_interval])) * 8",
+          "expr": "sum by (target) (rate(xray_traffic_uplink_bytes_total{service=\"gateway\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__rate_interval])) * 8",
           "legendFormat": "{{target}}",
           "editorMode": "code",
           "instant": false,
@@ -1885,7 +1885,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(increase(xray_traffic_downlink_bytes_total{dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__range]))",
+          "expr": "sum(increase(xray_traffic_downlink_bytes_total{service=\"gateway\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__range]))",
           "legendFormat": "Downloaded by clients",
           "editorMode": "code",
           "instant": true,
@@ -1897,7 +1897,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum(increase(xray_traffic_uplink_bytes_total{dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__range]))",
+          "expr": "sum(increase(xray_traffic_uplink_bytes_total{service=\"gateway\",dimension=\"inbound\",target=~\"reality|reality-legacy|https-backup\"}[$__range]))",
           "legendFormat": "Uploaded by clients",
           "editorMode": "code",
           "instant": true,
@@ -2702,7 +2702,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * max by (namespace,pod,container) (container_memory_working_set_bytes{job=\"kubelet\",namespace=\"hm\",pod=~\"(${service:raw})-.*\",container!=\"\"}) / on(namespace,pod,container) (max by(namespace,pod,container) (kube_pod_container_resource_limits{namespace=\"hm\",pod=~\"(${service:raw})-.*\",resource=\"memory\",unit=\"byte\"}) > 0)",
+          "expr": "100 * max by (namespace,pod,container) (container_memory_working_set_bytes{job=\"kubelet\",service=\"infrastructure\",namespace=\"hm\",pod=~\"(${service:raw})-.*\",container!=\"\"}) / on(namespace,pod,container) (max by(namespace,pod,container) (kube_pod_container_resource_limits{namespace=\"hm\",pod=~\"(${service:raw})-.*\",resource=\"memory\",unit=\"byte\"}) > 0)",
           "legendFormat": "{{pod}} / {{container}}",
           "editorMode": "code",
           "instant": false,
@@ -2812,7 +2812,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(pod) (rate(container_cpu_usage_seconds_total{job=\"kubelet\",namespace=\"hm\",pod=~\"(${service:raw})-.*\",container!=\"\"}[$__rate_interval]))",
+          "expr": "sum by(pod) (rate(container_cpu_usage_seconds_total{job=\"kubelet\",service=\"infrastructure\",namespace=\"hm\",pod=~\"(${service:raw})-.*\",container!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{pod}}",
           "editorMode": "code",
           "instant": false,
@@ -3483,7 +3483,7 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by(instance) (container_memory_working_set_bytes{job=\"kubelet\",namespace=\"hm\",container=~\"grafana|prometheus|node-exporter|online-clients|kube-state-metrics|xray-exporter|blackbox\"})",
+              "expr": "sum by(instance) (container_memory_working_set_bytes{job=\"kubelet\",service=\"infrastructure\",namespace=\"hm\",container=~\"grafana|prometheus|node-exporter|online-clients|kube-state-metrics|xray-exporter|blackbox\"})",
               "legendFormat": "{{instance}} monitoring",
               "editorMode": "code",
               "instant": false,
