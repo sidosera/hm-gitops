@@ -8,7 +8,8 @@ resources:
 labels:
 - pairs:
     hm.gitops/region: spb
-  includeSelectors: true
+  includeSelectors: false
+  includeTemplates: true
 patches:
 - target:
     kind: Deployment
@@ -16,4 +17,16 @@ patches:
   patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: vpn-probe\nspec:\n\
     \  template:\n    spec:\n      nodeSelector:\n        topology.kubernetes.io/region:\
     \ spb\n      volumes:\n      - name: client-config\n        secret:\n        \
-    \  secretName: spb-vpn-probe-client\n          defaultMode: 292\n"
+    \  secretName: spb-vpn-probe-client\n          defaultMode: 292\n  selector:\n\
+    \    matchLabels:\n      hm.gitops/region: spb\n"
+- target:
+    kind: Service
+    name: vpn-probe
+  patch: "apiVersion: v1\nkind: Service\nmetadata:\n  name: vpn-probe\nspec:\n  selector:\n\
+    \    hm.gitops/region: spb\n"
+- target:
+    kind: NetworkPolicy
+    name: vpn-probe
+  patch: "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name:\
+    \ vpn-probe\nspec:\n  podSelector:\n    matchLabels:\n      hm.gitops/region:\
+    \ spb\n"

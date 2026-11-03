@@ -57,7 +57,8 @@ class VPNProbeTests(unittest.TestCase):
             service = next(d for d in docs if d['kind'] == 'Service')
             self.assertNotIn(service['spec'].get('type', 'ClusterIP'), ['LoadBalancer', 'NodePort'])
             policy = next(d for d in docs if d['kind'] == 'NetworkPolicy')
-            self.assertEqual(policy['spec']['ingress'][0]['from'][0]['podSelector']['matchLabels']['app.kubernetes.io/name'], 'prometheus')
+            self.assertEqual(policy['spec']['ingress'][0]['from'][0]['podSelector']['matchLabels'], {'app.kubernetes.io/name': 'prometheus'})
+            self.assertEqual(service['spec']['selector'], deployment['spec']['selector']['matchLabels'])
             images.append([c['image'] for c in pod['containers']])
         self.assertEqual(images[0], images[1])
 
