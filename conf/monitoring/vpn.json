@@ -8,7 +8,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 5,
+  "version": 6,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -145,10 +145,10 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(up{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\"}, site)",
+          "query": "label_values(probe_target_info{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\"}, site)",
           "refId": "site"
         },
-        "definition": "label_values(up{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\"}, site)",
+        "definition": "label_values(probe_target_info{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\"}, site)",
         "refresh": 1,
         "sort": 1,
         "multi": false,
@@ -181,7 +181,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Website access uses a separate VPN client connecting through the **public Gateway listener**. **Probe source / destination / Website** scope those checks. Entry readiness and client counts use **Entry zone**."
+        "content": "Website reachability from **Probe zone**, compared **Direct** and through the **public VPN entry**. Cells show the worst completed observation in the last minute: green reachable, red failed, gray no data. Entry readiness and client counts use **Entry zone**."
       }
     },
     {
@@ -332,7 +332,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min by(site,access) (min_over_time(probe_success{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\",site=~\"${site:regex}\"}[1m]) and on(cluster,instance,source_zone,access,site,check) (up{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\",site=~\"${site:regex}\"} == 1) and on(cluster,instance,source_zone,access,site,check) (timestamp(up{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\",site=~\"${site:regex}\"}) > time() - 60)) or on(site,access) (0 * max by(site,access) (up{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\",site=~\"${site:regex}\"}) - 1)",
+          "expr": "min by(site,access) (min_over_time(probe_success{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\",site=~\"${site:regex}\"}[1m]) and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\",site=~\"${site:regex}\"} > time() - 60) and on(job,instance) (up{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",source_zone=~\"${source_zone:regex}\"} == 1)) or on(site,access) (0 * max by(site,access) (probe_target_info{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",check=\"client-web\",source_zone=~\"${source_zone:regex}\",site=~\"${site:regex}\"}) - 1)",
           "legendFormat": "",
           "editorMode": "code",
           "instant": true,
@@ -722,7 +722,7 @@
           "targets": [
             {
               "refId": "A",
-              "expr": "probe_success{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",check=\"client-exit\",source_zone=~\"${source_zone:regex}\"} and on(instance,source_zone,target_zone,check,site) (up{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",check=\"client-exit\",source_zone=~\"${source_zone:regex}\"} == 1)",
+              "expr": "probe_success{cluster=~\"${cluster:regex}\",probe_scope=\"public-client\",check=\"client-exit\",source_zone=~\"${source_zone:regex}\"} and on(job,instance) (up{cluster=~\"${cluster:regex}\",job=\"vpn-client-probes\",source_zone=~\"${source_zone:regex}\"} == 1) and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{cluster=~\"${cluster:regex}\",check=\"client-exit\"} > time() - 60)",
               "legendFormat": "{{source_zone}} \u2192 {{target_zone}} / exit IP",
               "editorMode": "code",
               "instant": false,

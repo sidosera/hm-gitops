@@ -1,0 +1,41 @@
+{
+  "interval_seconds": 60,
+  "timeout_seconds": 20,
+  "socks_proxy": [
+    "127.0.0.1",
+    10800
+  ],
+  "vpn_entry_zone": "uk-ldn-1",
+  "websites": [
+    {
+      "site": "myanimelist",
+      "url": "https://myanimelist.net/",
+      "content_match": "(?i)MyAnimeList"
+    },
+    {
+      "site": "youtube",
+      "url": "https://youtube.com/",
+      "content_match": "(?i)YouTube"
+    },
+    {
+      "site": "facebook",
+      "url": "https://facebook.com/",
+      "content_match": "(?i)Facebook"
+    },
+    {
+      "site": "instagram",
+      "url": "https://instagram.com/",
+      "content_match": "(?i)Instagram"
+    },
+    {
+      "site": "x",
+      "url": "https://x.com/",
+      "content_match": "(?i)(twitter|x\\.com)"
+    }
+  ],
+  "exit": {
+    "site": "exit",
+    "url": "https://api.ipify.org",
+    "content_match": "^87\\.106\\.74\\.217$"
+  }
+}

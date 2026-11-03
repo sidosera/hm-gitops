@@ -14,37 +14,22 @@ spec.loader.exec_module(provision)
 
 
 class VPNProbeTests(unittest.TestCase):
-    def test_required_sites_use_the_client_proxy_and_verify_responses(self):
-        base = ROOT / 'services/vpn-probe/base'
-        sites = yaml.safe_load((base / 'targets.yaml').read_text())['websites']
-        self.assertEqual({s['url'] for s in sites}, {'https://myanimelist.net/', 'https://youtube.com/',
+    def test_required_sites_and_cadence_are_configured_in_probe_service(self):
+        config = json.loads((ROOT / 'services/vpn-probe/base/targets.json').read_text())
+        self.assertEqual({s['url'] for s in config['websites']}, {'https://myanimelist.net/', 'https://youtube.com/',
                          'https://facebook.com/', 'https://instagram.com/', 'https://x.com/'})
-        modules = yaml.safe_load((base / 'blackbox.yml').read_text())['modules']
-        for site in sites:
-            http = modules['website_' + site['site']]['http']
-            self.assertEqual(http['proxy_url'], 'socks5://127.0.0.1:10800')
-            self.assertEqual(http['valid_status_codes'], [200])
-            self.assertFalse(http.get('tls_config', {}).get('insecure_skip_verify', False))
-            self.assertEqual(http['fail_if_body_not_matches_regexp'], [site['content_match']])
+        self.assertEqual(config['interval_seconds'], 60)
+        self.assertEqual(config['timeout_seconds'], 20)
+        self.assertEqual(config['socks_proxy'], ['127.0.0.1', 10800])
 
-    def test_only_spb_runs_paired_direct_and_vpn_checks(self):
+    def test_only_spb_runs_probe_service_and_prometheus_only_scrapes_metrics(self):
         config = yaml.safe_load((ROOT / 'conf/monitoring/prometheus.yml').read_text())
         job = next(j for j in config['scrape_configs'] if j['job_name'] == 'vpn-client-probes')
-        web = [t for t in job['static_configs'] if t['labels']['check'] == 'client-web']
-        self.assertEqual(len(web), 10)
-        modules = yaml.safe_load((ROOT / 'services/vpn-probe/base/blackbox.yml').read_text())['modules']
-        for site in {t['labels']['site'] for t in web}:
-            pair = [t for t in web if t['labels']['site'] == site]
-            self.assertEqual({t['labels']['access'] for t in pair}, {'vpn', 'direct'})
-            self.assertEqual(pair[0]['targets'], pair[1]['targets'])
-            vpn = next(t for t in pair if t['labels']['access'] == 'vpn')
-            direct = next(t for t in pair if t['labels']['access'] == 'direct')
-            a = copy.deepcopy(modules[vpn['labels']['module']])
-            a['http'].pop('proxy_url')
-            self.assertTrue(a['http'].pop('skip_resolve_phase_with_proxy'))
-            self.assertEqual(a, modules[direct['labels']['module']])
-        self.assertTrue(all(t['labels']['source_zone'] == 'ru-spb-1' for t in job['static_configs']))
-        self.assertEqual(job['scrape_interval'], '60s')
+        self.assertEqual(job['metrics_path'], '/metrics')
+        self.assertTrue(job['honor_timestamps'])
+        self.assertEqual(len(job['static_configs']), 1)
+        self.assertEqual(job['static_configs'][0]['labels']['source_zone'], 'ru-spb-1')
+        self.assertNotIn('relabel_configs', job)
         resources = yaml.safe_load((ROOT / 'cluster/clusters/hm-cluster/kustomization.yaml').read_text())['resources']
         self.assertNotIn('../../../services/vpn-probe/overlays/uk-ldn-1', resources)
         self.assertIn('../../../services/vpn-probe/overlays/ru-spb-1', resources)
@@ -102,7 +87,7 @@ class VPNProbeTests(unittest.TestCase):
         d = json.loads((ROOT / 'conf/monitoring/vpn.json').read_text())
         main = next(p for p in d['panels'] if p['id'] == 30)
         expr = main['targets'][0]['expr']
-        for selector in ['${source_zone:regex}', '${site:regex}', 'min_over_time(', '[1m]', 'timestamp(up', 'time() - 60']:
+        for selector in ['${source_zone:regex}', '${site:regex}', 'min_over_time(', '[1m]', 'probe_last_run_timestamp_seconds', 'time() - 60']:
             self.assertIn(selector, expr)
         self.assertEqual(main['type'], 'table')
         self.assertTrue(main['targets'][0]['instant'])

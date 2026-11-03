@@ -7,4 +7,5 @@ resources:
 configMapGenerator:
 - name: vpn-probe-checks
   files:
-  - blackbox.yml
+  - probe.py
+  - targets.json

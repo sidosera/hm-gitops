@@ -50,14 +50,14 @@ spec:
         - name: client-config
           mountPath: /etc/xray
           readOnly: true
-      - name: blackbox
-        image: quay.io/prometheus/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13
+      - name: probe
+        image: python:3.14-alpine@sha256:eb2c62658b8d51bff0acc408504b76521d02030de56a8a3c1e830083e89b89d2
         args:
-        - --config.file=/etc/blackbox/blackbox.yml
-        - --web.listen-address=:9115
+        - --config
+        - /etc/probe/targets.json
         env:
-        - name: GOMEMLIMIT
-          value: 24MiB
+        - name: PYTHONUNBUFFERED
+          value: '1'
         ports:
         - name: http
           containerPort: 9115
@@ -70,13 +70,17 @@ spec:
             memory: 40Mi
         volumeMounts:
         - name: checks
-          mountPath: /etc/blackbox
+          mountPath: /etc/probe
           readOnly: true
         readinessProbe:
           httpGet:
             path: /-/healthy
             port: http
           periodSeconds: 10
+        command:
+        - python3
+        - -B
+        - /etc/probe/probe.py
       volumes:
       - name: client-config
         secret:
