@@ -58,7 +58,7 @@
   block:
     - name: Drop weak SSH defaults
       ansible.builtin.copy:
-        dest: /etc/ssh/sshd_config.d/99-hm.conf
+        dest: /etc/ssh/sshd_config.d/00-hm.conf
         mode: "0644"
         content: |
           PasswordAuthentication no
@@ -66,6 +66,16 @@
           PermitRootLogin prohibit-password
           X11Forwarding no
           MaxAuthTries 3
+    - name: Remove superseded HM SSH snippets
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/ssh/sshd_config.d/99-hm.conf
+        - /etc/ssh/sshd_config.d/00-hm-spb.conf
+    - name: Validate SSH configuration
+      ansible.builtin.command: /usr/sbin/sshd -t
+      changed_when: false
     - name: Reload SSH
       ansible.builtin.systemd:
         name: "{{ 'ssh' if ansible_distribution == 'Ubuntu' else 'sshd' }}"
