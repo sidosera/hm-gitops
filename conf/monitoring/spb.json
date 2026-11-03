@@ -1122,7 +1122,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "xray_active_client_ips{job=\"spb-node\"} and on(instance) (xray_online_scrape_success{job=\"spb-node\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=\"spb-node\",file=\"/var/lib/hm-spb/textfile/xray_online.prom\"}) < 60) and on(instance) (up{job=\"spb-node\"} == 1)",
+          "expr": "xray_active_client_ips{job=\"spb-node\"} and on(instance) (xray_online_scrape_success{job=\"spb-node\"} == 1) and on(instance) ((time() - node_textfile_mtime_seconds{job=\"spb-node\",file=\"/textfile/xray_online.prom\"}) < 60) and on(instance) (up{job=\"spb-node\"} == 1)",
           "legendFormat": "Clients on SPB \u00b7 IP estimate",
           "instant": true,
           "range": false,

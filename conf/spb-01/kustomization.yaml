@@ -8,5 +8,6 @@ resources:
   - fleet-tls-secret.sops.yaml
 configMapGenerator:
   - name: spb-blackbox-config
+    namespace: hm
     files:
       - blackbox.yml
