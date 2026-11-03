@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    hm.gitops/region: spb
+spec:
+  template:
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: spb
+      containers:
+      - ports:
+        - $patch: replace
+        - name: reality
+          containerPort: 14443
+          hostPort: 443
+        - name: stats-api
+          containerPort: 10085
+        name: xray
+        env:
+        - name: GOMEMLIMIT
+          value: 48MiB
+      - name: blackbox
+        image: quay.io/prometheus/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13
+        args:
+        - --config.file=/etc/blackbox/blackbox.yml
+        - --web.listen-address=:9115
+        - --web.config.file=/tls/web.yml
+        ports:
+        - name: probes
+          containerPort: 9115
+          hostPort: 9115
+        resources:
+          requests:
+            cpu: 5m
+            memory: 12Mi
+          limits:
+            memory: 40Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: blackbox-config
+          mountPath: /etc/blackbox
+          readOnly: true
+        - name: server-tls
+          mountPath: /tls
+          readOnly: true
+        readinessProbe:
+          tcpSocket:
+            port: probes
+          periodSeconds: 30
+      volumes:
+      - name: config
+        projected:
+          sources:
+          - secret:
+              name: spb-gateway-config-source
+              items:
+              - key: credentials.json
+                path: 00-credentials.json
+          - configMap:
+              name: gateway-spb-config
+              items:
+              - key: config.json
+                path: 10-config-tail.json
+      - name: blackbox-config
+        configMap:
+          name: spb-blackbox-config
+      - name: server-tls
+        secret:
+          secretName: spb-monitoring-server-tls
+          defaultMode: 292
+      tolerations:
+      - key: hm.gitops/edge
+        value: spb
+        effect: NoSchedule
+  strategy:
+    type: Recreate
+    rollingUpdate: null

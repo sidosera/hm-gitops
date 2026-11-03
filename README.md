@@ -59,7 +59,7 @@ After that, Flux reconciles:
 Runtime secrets are committed as SOPS-encrypted manifests:
 
 - [.sops.yaml](/Users/sidosera/dist/hackamonth-gitops/.sops.yaml#L1)
-- [conf/proxy-service/config.sops.yaml](/Users/sidosera/dist/hackamonth-gitops/conf/proxy-service/config.sops.yaml#L1)
+- [services/gateway/overlays/uk/credentials-secret.sops.yaml](services/gateway/overlays/uk/credentials-secret.sops.yaml#L1)
 
 Flux decrypts them using the `sops-age` Secret in `flux-system`.
 
@@ -180,7 +180,7 @@ Both hosts use the same Ansible `vm/playbooks/bootstrap.yml` bootstrap and Flux 
 
 `cluster/clusters/edge-01/hosts.yml` declares server and worker inventories and pins their K3s version. Flannel uses `wireguard-native` with external node addresses; only peer IPv4 addresses may reach UDP 51820/51821. ServiceLB runs on `machine`, leaving SPB TCP 443 for the gateway. SPB's taint keeps unrelated workloads off its small memory budget. The API server and Git reconciliation are central: a WAN outage interrupts reconciliation, while existing gateway containers continue running. Do not delete/restart healthy pods during a partition.
 
-The SPB gateway runs Xray plus a blackbox-exporter sidecar. `conf/spb-01/routing.json` is an explicit domain suffix allowlist for Russian egress, not a blanket `.ru` exception. Unknown destinations use the original upstream through either REALITY or HTTPS/XHTTP; failure never switches foreign traffic to Russian direct egress. SOCKS probe ports are loopback-only inside the pod; native StatsService is protected by a NetworkPolicy. Node/blackbox metrics use mTLS. TLS private material and Xray configuration are SOPS encrypted. Certificates must be renewed before November 2027.
+The SPB gateway runs Xray plus a blackbox-exporter sidecar. `services/gateway/overlays/spb/config.json` is an explicit domain suffix allowlist for Russian egress, not a blanket `.ru` exception. Unknown destinations use the original upstream through either REALITY or HTTPS/XHTTP; failure never switches foreign traffic to Russian direct egress. SOCKS probe ports are loopback-only inside the pod; native StatsService is protected by a NetworkPolicy. Node/blackbox metrics use mTLS. TLS private material and authenticated Xray connection settings are SOPS encrypted; public routing settings are ConfigMaps. Certificates must be renewed before November 2027.
 
 Both hosts share one dashboard at `/status/d/hm-services`. The host selector filters capacity and client counts; workload diagnostics cover both nodes. It includes host RAM/CPU/network, client estimate and five checks: upstream REALITY, upstream HTTPS backup, local internet control, split-routing default exit, and a Russian site through the split policy. Upstream checks verify the egress IP, not merely TCP connectivity. Alert rules distinguish upstream path failure from local internet/probe failure; an Alertmanager receiver is not configured. This is a Russian datacenter vantage point, not proof of access from every mobile/home ISP.
 
@@ -196,3 +196,16 @@ Use [the glossary](GLOSSARY.md) for infrastructure terminology. **Gateway** is o
 Region, provider availability zone and host are separate placement dimensions. `machine` and `spb-01` are hosts; control-plane/worker are cluster roles. Inventory records region and optionally zone. No availability-zone or failover independence is inferred from a region name. `uk` is the existing operational region name, not a new assertion about provider geography.
 
 Prometheus carries `service` and `region` labels. Host/kubelet metrics belong to infrastructure; gateway client metrics retain their Gateway identity even when collected by node-exporter. The single dashboard presents Gateway health and regional paths first, then infrastructure capacity and service diagnostics. Regional deployment resource names and existing client credentials remain stable.
+
+
+## Gateway configuration with Kustomize
+
+`services/gateway/base` owns the shared Deployment, Service and ingress NetworkPolicy. `services/gateway/overlays/uk` and `services/gateway/overlays/spb` reference that base and supply regional placement, resource budgets, exposed ports, authenticated connection settings and routing. The cluster root references both overlays directly; Flux remains the only workload deployment path.
+
+Each regional `config.json` is a public ConfigMap input. It contains routing, private-address blocks, statistics, observation settings and non-authenticated local diagnostic listeners. `credentials-secret.sops.yaml` contains authenticated VLESS inbounds and, for SPB, its credential-bearing upstream outbounds. Those sections stay encrypted together so private keys/client IDs never enter ConfigMaps. Node/metrics TLS Secrets live under shared monitoring configuration; the SPB probe server certificate lives beside its overlay.
+
+The same Xray image starts with `run -confdir /etc/xray` in both regions. A read-only projected volume exposes encrypted Secret data as `00-credentials.json` and the public ConfigMap as `10-config-tail.json`. Xray natively merges the files. The `tail` filename is intentional: direct/blocked outbounds are appended after credential-bearing upstream outbounds, preserving the fail-closed default in SPB. No init renderer or runtime templating process is involved.
+
+Change routing in the regional public JSON and validate with `kubectl kustomize services/gateway/overlays/REGION` and the routing tests. Kustomize hashes ConfigMaps, so a routing update triggers a rollout. For credential rotation, edit the SOPS Secret and bump `hm.gitops/credentials-revision` in the regional Deployment patch so Xray reloads its credentials. Keep stable Deployment/Service names, client identities, listener ports and Traefik routes during structural refactors. The SPB overlay uses Recreate because its fixed public host port cannot be shared by two pods; UK uses a rolling update.
+
+Validate routing and overlay boundaries with `python -m unittest discover -s tests -v` (Python, PyYAML and kubectl required). The checks cover private-network blocks, fail-closed routing, credential isolation, stable selectors, unchanged source selectors in ingress policies, and shared runtime/image configuration.

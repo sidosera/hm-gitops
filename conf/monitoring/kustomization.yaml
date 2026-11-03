@@ -2,6 +2,8 @@ apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 resources:
   - grafana-auth-secret.sops.yaml
+  - client-tls-secret.sops.yaml
+  - fleet-tls-secret.sops.yaml
 configMapGenerator:
   - name: prometheus-config
     files:

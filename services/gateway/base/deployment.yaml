@@ -1,49 +1,40 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: proxy-service
+  name: gateway
   labels:
-    app.kubernetes.io/name: proxy-service
-    app.kubernetes.io/component: edge
-    hm.gitops/region: uk
     hm.gitops/service: gateway
 spec:
   replicas: 1
   revisionHistoryLimit: 2
   selector:
     matchLabels:
-      app.kubernetes.io/name: proxy-service
+      app.kubernetes.io/name: gateway
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: proxy-service
-        app.kubernetes.io/component: edge
+        app.kubernetes.io/name: gateway
         hm.gitops/xray: 'true'
       annotations:
-        hm.gitops/config-revision: 2026-11-03-spb-relay
+        hm.gitops/credentials-revision: '2026-11-03'
     spec:
       automountServiceAccountToken: false
       securityContext:
         seccompProfile:
           type: RuntimeDefault
+        fsGroup: 65534
       containers:
-      - name: proxy-service
+      - name: xray
         imagePullPolicy: IfNotPresent
         args:
         - run
-        - -c
-        - /usr/local/etc/xray/config.json
+        - -confdir
+        - /etc/xray
         ports:
         - name: reality
           containerPort: 10443
-        - name: xhttp
-          containerPort: 18080
-        - name: realv2
-          containerPort: 11443
         - name: stats-api
           containerPort: 10085
-        - name: metrics
-          containerPort: 11111
         startupProbe:
           tcpSocket:
             port: reality
@@ -64,25 +55,35 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
           runAsNonRoot: true
-          runAsUser: 65532
+          runAsUser: 65534
+          runAsGroup: 65534
         resources:
           requests:
-            cpu: 50m
-            memory: 64Mi
+            cpu: 20m
+            memory: 24Mi
           limits:
-            memory: 256Mi
+            memory: 80Mi
         volumeMounts:
         - name: config
-          mountPath: /usr/local/etc/xray
+          mountPath: /etc/xray
           readOnly: true
+        image: ghcr.io/xtls/xray-core:26.10.31@sha256:ceabeac03a89d991d2a247361825c1d1d2e9c91cd5dc010f298c7dc0c2f325c9
       volumes:
       - name: config
-        secret:
-          secretName: proxy-service-config-source
+        projected:
           defaultMode: 292
+          sources:
+          - secret:
+              name: gateway-credentials
+              items:
+              - key: credentials.json
+                path: 00-credentials.json
+          - configMap:
+              name: gateway-config
+              items:
+              - key: config.json
+                path: 10-config-tail.json
       terminationGracePeriodSeconds: 30
-      nodeSelector:
-        kubernetes.io/hostname: machine
   strategy:
     type: RollingUpdate
     rollingUpdate:

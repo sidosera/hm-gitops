@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+spec:
+  ports:
+  - $patch: replace
+  - name: reality
+    port: 14443
+    targetPort: reality
+  - name: stats-api
+    port: 10085
+    targetPort: stats-api

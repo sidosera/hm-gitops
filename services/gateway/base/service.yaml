@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: gateway
+  ports:
+  - name: reality
+    port: 10443
+    targetPort: reality
+  - name: stats-api
+    port: 10085
+    targetPort: stats-api

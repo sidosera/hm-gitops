@@ -4,8 +4,6 @@ resources:
   - ../../base
   - traefik-acme.yaml
   - www-service
-  - proxy-service
+  - ../../../services/gateway/overlays/uk
   - monitoring
-  - spb-gateway
-components:
-  - ../../../conf/spb-01
+  - ../../../services/gateway/overlays/spb

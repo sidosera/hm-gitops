@@ -53,11 +53,11 @@ def main() -> None:
     parser.add_argument('--output-dir', type=Path, help='Write private profile files instead of stdout')
     args = parser.parse_args()
     repo = args.repo.resolve()
-    source = repo / 'conf/proxy-service/config.sops.yaml'
+    source = repo / 'services/gateway/overlays/uk/credentials-secret.sops.yaml'
     decrypted = subprocess.run(['sops', '--decrypt', str(source)], check=True,
                                capture_output=True, text=True).stdout
     secret = yaml.safe_load(decrypted)
-    config = json.loads(secret['stringData']['config.json'])
+    config = json.loads(secret['stringData']['credentials.json'])
     reality = next(i['streamSettings']['realitySettings'] for i in config['inbounds']
                    if i['streamSettings'].get('security') == 'reality')
     key_output = subprocess.run([args.xray, 'x25519', '-i', reality['privateKey']],
@@ -69,8 +69,9 @@ def main() -> None:
     if not hosts:
         inventory = yaml.safe_load((repo / 'cluster/clusters/edge-01/hosts.yml').read_text())
         hosts.extend(inventory['vm_hosts'])
-        if inventory.get('vm_node_ipv6'):
-            hosts.append(inventory['vm_node_ipv6'])
+        ipv6 = inventory.get('vm_node_settings', {}).get(inventory['vm_hosts'][0], {}).get('ipv6', inventory.get('vm_node_ipv6'))
+        if ipv6:
+            hosts.append(ipv6)
     profiles = export_profiles(config, hosts, match.group(1), args.https_host)
     if args.output_dir:
         output = args.output_dir.resolve()

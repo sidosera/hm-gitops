@@ -1,0 +1,213 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "tag": "probe-primary",
+      "listen": "127.0.0.1",
+      "port": 10811,
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": false
+      }
+    },
+    {
+      "tag": "probe-backup",
+      "listen": "127.0.0.1",
+      "port": 10812,
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": false
+      }
+    },
+    {
+      "tag": "probe-split",
+      "listen": "127.0.0.1",
+      "port": 10813,
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": false
+      }
+    },
+    {
+      "tag": "probe-direct",
+      "listen": "127.0.0.1",
+      "port": 10814,
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": false
+      }
+    },
+    {
+      "tag": "api-in",
+      "listen": "0.0.0.0",
+      "port": 10085,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "127.0.0.1"
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "ru-direct",
+      "protocol": "freedom",
+      "settings": {}
+    },
+    {
+      "tag": "blocked",
+      "protocol": "blackhole",
+      "settings": {}
+    }
+  ],
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": [
+          "api-in"
+        ],
+        "outboundTag": "api"
+      },
+      {
+        "type": "field",
+        "ip": [
+          "0.0.0.0/8",
+          "10.0.0.0/8",
+          "100.64.0.0/10",
+          "127.0.0.0/8",
+          "169.254.0.0/16",
+          "172.16.0.0/12",
+          "192.0.0.0/24",
+          "192.168.0.0/16",
+          "198.18.0.0/15",
+          "224.0.0.0/4",
+          "240.0.0.0/4",
+          "::/128",
+          "::1/128",
+          "fc00::/7",
+          "fe80::/10",
+          "ff00::/8"
+        ],
+        "outboundTag": "blocked"
+      },
+      {
+        "type": "field",
+        "domain": [
+          "domain:localhost"
+        ],
+        "outboundTag": "blocked"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "probe-primary"
+        ],
+        "outboundTag": "uk-primary"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "probe-backup"
+        ],
+        "outboundTag": "uk-backup"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "probe-direct"
+        ],
+        "outboundTag": "ru-direct"
+      },
+      {
+        "type": "field",
+        "domain": [
+          "domain:yandex.ru",
+          "domain:yandex.net",
+          "domain:ya.ru",
+          "domain:yandex.com",
+          "domain:vk.com",
+          "domain:vk.ru",
+          "domain:mail.ru",
+          "domain:ok.ru",
+          "domain:gosuslugi.ru",
+          "domain:sberbank.ru",
+          "domain:sber.ru",
+          "domain:tbank.ru",
+          "domain:tinkoff.ru",
+          "domain:ozon.ru",
+          "domain:ozon.com",
+          "domain:wildberries.ru",
+          "domain:avito.ru",
+          "domain:2gis.ru",
+          "domain:2gis.com",
+          "domain:dzen.ru",
+          "domain:rutube.ru",
+          "domain:kinopoisk.ru",
+          "domain:mos.ru",
+          "domain:rzd.ru",
+          "domain:pochta.ru",
+          "domain:mts.ru",
+          "domain:megafon.ru",
+          "domain:beeline.ru",
+          "domain:t2.ru",
+          "domain:tele2.ru"
+        ],
+        "outboundTag": "ru-direct"
+      },
+      {
+        "type": "field",
+        "network": "tcp,udp",
+        "balancerTag": "uk-egress"
+      }
+    ],
+    "balancers": [
+      {
+        "tag": "uk-egress",
+        "selector": [
+          "uk-primary",
+          "uk-backup"
+        ],
+        "fallbackTag": "uk-backup",
+        "strategy": {
+          "type": "leastPing"
+        }
+      }
+    ]
+  },
+  "observatory": {
+    "subjectSelector": [
+      "uk-primary",
+      "uk-backup"
+    ],
+    "probeUrl": "https://www.google.com/generate_204",
+    "probeInterval": "30s",
+    "enableConcurrency": true
+  },
+  "api": {
+    "tag": "api",
+    "services": [
+      "StatsService"
+    ]
+  },
+  "stats": {},
+  "policy": {
+    "levels": {
+      "0": {
+        "statsUserOnline": true
+      }
+    },
+    "system": {
+      "statsInboundUplink": true,
+      "statsInboundDownlink": true,
+      "statsOutboundUplink": true,
+      "statsOutboundDownlink": true
+    }
+  }
+}

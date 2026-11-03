@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    hm.gitops/region: uk
+spec:
+  template:
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/region: uk
+      containers:
+      - ports:
+        - name: reality
+          containerPort: 10443
+        - name: xhttp
+          containerPort: 18080
+        - name: realv2
+          containerPort: 11443
+        - name: stats-api
+          containerPort: 10085
+        - name: metrics
+          containerPort: 11111
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+        name: xray
+      volumes:
+      - name: config
+        projected:
+          sources:
+          - secret:
+              name: proxy-service-config-source
+              items:
+              - key: credentials.json
+                path: 00-credentials.json
+          - configMap:
+              name: gateway-uk-config
+              items:
+              - key: config.json
+                path: 10-config-tail.json
