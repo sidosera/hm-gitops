@@ -14,7 +14,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_ready{namespace="hm",pod="proxy-service-fixture",condition="true"}
     values: 1+0x6
-  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="proxy-service-fixture",container="app"}
+  - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="proxy-service-fixture"}
     values: 100+0x6
   - series: container_cpu_usage_seconds_total{job="kubelet",namespace="hm",pod="proxy-service-fixture",container="app"}
     values: 0+30x6
@@ -26,7 +26,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_ready{namespace="hm",pod="spb-gateway-fixture",condition="true"}
     values: 0+0x6
-  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="spb-gateway-fixture",container="app"}
+  - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="spb-gateway-fixture"}
     values: 50+0x6
   - series: container_cpu_usage_seconds_total{job="kubelet",namespace="hm",pod="spb-gateway-fixture",container="app"}
     values: 0+30x6
@@ -38,7 +38,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_ready{namespace="hm",pod="www-service-fixture",condition="true"}
     values: 1+0x6
-  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="www-service-fixture",container="app"}
+  - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="www-service-fixture"}
     values: 20+0x6
   - series: container_cpu_usage_seconds_total{job="kubelet",namespace="hm",pod="www-service-fixture",container="app"}
     values: 0+30x6
@@ -50,7 +50,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_ready{namespace="hm",pod="prometheus-fixture",condition="true"}
     values: 1+0x6
-  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="prometheus-fixture",container="app"}
+  - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="prometheus-fixture"}
     values: 60+0x6
   - series: container_cpu_usage_seconds_total{job="kubelet",namespace="hm",pod="prometheus-fixture",container="app"}
     values: 0+30x6
@@ -62,7 +62,7 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_ready{namespace="hm",pod="node-exporter-fixture",condition="true"}
     values: 1+0x6
-  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="node-exporter-fixture",container="app"}
+  - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="node-exporter-fixture"}
     values: 10+0x6
   - series: container_cpu_usage_seconds_total{job="kubelet",namespace="hm",pod="node-exporter-fixture",container="app"}
     values: 0+30x6
@@ -88,8 +88,10 @@ tests:
     values: 1+0x6
   - series: kube_pod_status_ready{namespace="hm",pod="arbitrary-new-workload-xyz",condition="true"}
     values: 1+0x6
-  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="arbitrary-new-workload-xyz",container="app"}
+  - series: pod_memory_working_set_bytes{job="kubelet",namespace="hm",pod="arbitrary-new-workload-xyz"}
     values: 25+0x6
+  - series: container_memory_working_set_bytes{job="kubelet",namespace="hm",pod="www-service-fixture",container="completed-init"}
+    values: 999999999+0x6
   promql_expr_test:
   - expr: count(hm:service_instance:info{service="gateway",region="spb"})
     eval_time: 3m
