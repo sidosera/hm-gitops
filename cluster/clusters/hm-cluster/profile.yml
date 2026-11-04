@@ -1,6 +1,7 @@
 # Shared cluster host policy. Values are applied before installing/starting K3s.
 # Application container resources remain in their Kubernetes manifests.
 vm_cluster_profile:
+  k3s_version: v1.36.2+k3s1
   host:
     apply_security: true
     auto_firewall: true

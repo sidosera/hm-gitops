@@ -42,6 +42,7 @@
 - name: Validate the shared kernel and role policy
   ansible.builtin.assert:
     that:
+      - vm_cluster_profile.k3s_version is match('^v[0-9]+\.[0-9]+\.[0-9]+\+k3s[0-9]+$')
       - not (vm_cluster_profile.host.automatic_package_updates | bool)
       - vm_cluster_profile.host.cgroup_mode == 'unified'
       - vm_cluster_profile.host.transparent_hugepages in ['never', 'madvise', 'always']
@@ -109,7 +110,7 @@
     hm_service_lb: "{{ vm_node_settings[item].service_lb | default(false) }}"
     hm_cluster_peer_ipv6: "{{ vm_node_settings.values() | map(attribute='ipv6') | list }}"
     hm_cluster_peers: "{{ vm_hosts + (vm_agent_hosts | default([])) }}"
-    hm_k3s_version: "{{ vm_k3s_version | default('') }}"
+    hm_k3s_version: "{{ vm_cluster_profile.k3s_version }}"
     hm_machine_profile: "{{ vm_cluster_profile.host }}"
     hm_action: "{{ hm_action }}"
   loop: "{{ vm_hosts + (vm_agent_hosts | default([])) }}"

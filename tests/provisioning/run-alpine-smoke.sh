@@ -5,6 +5,7 @@ umask 077
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TEMP="$(mktemp -d)"
 CONTAINER=""
+K3S_VERSION="$(python3 -c 'import sys,yaml; print(yaml.safe_load(open(sys.argv[1]))["vm_cluster_profile"]["k3s_version"])' "$ROOT/cluster/clusters/hm-cluster/profile.yml")"
 cleanup() {
   if [[ -n "$CONTAINER" ]]; then docker rm --force "$CONTAINER" >/dev/null; fi
   rm -rf "$TEMP"
@@ -41,7 +42,7 @@ grep -Eq '^alpine_test[[:space:]]+:.*changed=0.*failed=0' "$TEMP/second.log"
 # in a container that shares its host kernel/cgroup hierarchy.
 docker exec "$CONTAINER" wget -q -O /tmp/k3s-install.sh 'https://raw.githubusercontent.com/k3s-io/k3s/01b6f04aaa69e8b09303f0393d4b4f1811da23aa/install.sh'
 docker exec "$CONTAINER" sh -c 'echo "46177d4c99440b4c0311b67233823a8e8a2fc09693f6c89af1a7161e152fbfad  /tmp/k3s-install.sh" | sha256sum -c -'
-docker exec --env INSTALL_K3S_VERSION=v1.36.2+k3s1 --env INSTALL_K3S_EXEC=agent --env INSTALL_K3S_SKIP_START=true "$CONTAINER" sh /tmp/k3s-install.sh
+docker exec --env INSTALL_K3S_VERSION="$K3S_VERSION" --env INSTALL_K3S_EXEC=agent --env INSTALL_K3S_SKIP_START=true "$CONTAINER" sh /tmp/k3s-install.sh
 docker exec --env INSTALL_K3S_SKIP_DOWNLOAD=true --env INSTALL_K3S_EXEC=server --env INSTALL_K3S_SKIP_START=true "$CONTAINER" sh /tmp/k3s-install.sh
 docker exec "$CONTAINER" sh -c '/usr/local/bin/k3s --version; sh -n /etc/init.d/k3s; sh -n /etc/init.d/k3s-agent; test -x /etc/init.d/ufw; test ! -e /etc/periodic/daily/hm-packages'
 # OpenRC deliberately excludes its cgroups service inside Docker; assert that
