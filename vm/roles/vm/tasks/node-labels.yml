@@ -1,4 +1,14 @@
 ---
+- name: Wait for node registration before applying placement metadata
+  ansible.builtin.command:
+    argv: [kubectl, get, node, "{{ hm_node_name }}", -o, name]
+  delegate_to: "{{ hm_bootstrap_host }}"
+  register: hm_node_registration
+  until: hm_node_registration.rc == 0
+  retries: 60
+  delay: 5
+  changed_when: false
+
 - name: Record logical placement zone when supplied
   ansible.builtin.command:
     argv:
