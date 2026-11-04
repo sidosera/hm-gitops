@@ -44,10 +44,14 @@ class ProxyDashboardTests(unittest.TestCase):
                 self.assertIn(text,t['expr'])
             self.assertNotIn('${zone:regex}',t['expr'])
         for override in p['fieldConfig']['overrides']:
+            if override['matcher']['options'] not in ('Direct','VPN'):continue
             cell=next(v['value'] for v in override['properties'] if v['id']=='custom.cellOptions')
             self.assertEqual(cell['type'],'sparkline')
             self.assertTrue(cell['hideValue'])
             self.assertFalse(cell['spanNulls'])
+            self.assertEqual(cell['fillOpacity'],0)
+            thresholds=next(v['value'] for v in override['properties'] if v['id']=='thresholds')
+            self.assertEqual(thresholds['steps'][1]['value'],0.5)
 
     def test_collectors_share_hardened_base_and_run_only_on_control_plane(self):
         exporters=[d for d in self.resources if d['kind']=='Deployment' and d['metadata'].get('labels',{}).get('app.kubernetes.io/name')=='xray-exporter']

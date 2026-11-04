@@ -137,7 +137,7 @@
         "x": 0,
         "y": 0,
         "w": 4,
-        "h": 5
+        "h": 3
       },
       "description": "Configured hosts stay visible when unreachable. Green: fresh successful kubelet scrape; red: down. Click a tile to select the host; Host shows machine IP, node name and slot.",
       "datasource": {
@@ -220,7 +220,11 @@
         "graphMode": "none",
         "textMode": "name",
         "wideLayout": false,
-        "justifyMode": "center"
+        "justifyMode": "center",
+        "text": {
+          "titleSize": 18,
+          "valueSize": 18
+        }
       },
       "repeat": "zone",
       "repeatDirection": "h",
@@ -236,7 +240,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 5,
+        "y": 3,
         "w": 24,
         "h": 9
       },
@@ -301,7 +305,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 12,
         "w": 24,
         "h": 9
       },
@@ -364,7 +368,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 23,
+        "y": 21,
         "w": 24,
         "h": 9
       },

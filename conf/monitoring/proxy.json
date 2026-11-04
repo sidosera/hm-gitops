@@ -140,10 +140,10 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 11
+        "h": 9
       },
       "interval": "30s",
-      "description": "Each cell shows reachability history: green 1 / red 0, one-minute minimum. Missing, stale or unreachable probe observations are gaps. Direct and VPN share the same observer. Configured targets remain visible for 24h after last metadata; hover for timestamps. Datacenter vantage point, not every residential ISP.",
+      "description": "Each cell shows reachability history: green 1 / red 0, one-minute minimum. Missing, stale or unreachable probe observations are gaps. Direct and VPN share the same observer. Configured targets remain visible for 24h after last metadata; all cells share the selected time range. Datacenter vantage point, not every residential ISP.",
       "targets": [
         {
           "expr": "min by(source_zone,site) (min_over_time(probe_success{job=\"vpn-client-probes\",cluster=~\"${cluster:regex}\",source_zone=~\"${source_zone:regex}\",check=\"client-web\",access=\"direct\"}[1m]) and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job=\"vpn-client-probes\",cluster=~\"${cluster:regex}\",source_zone=~\"${source_zone:regex}\",check=\"client-web\",access=\"direct\"} > time() - 60) and on(job,instance) ((up{job=\"vpn-client-probes\",cluster=~\"${cluster:regex}\",source_zone=~\"${source_zone:regex}\"} == 1) and on(job,instance) (timestamp(up{job=\"vpn-client-probes\",cluster=~\"${cluster:regex}\",source_zone=~\"${source_zone:regex}\"}) > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job=\"vpn-client-probes\",cluster=~\"${cluster:regex}\",source_zone=~\"${source_zone:regex}\",check=\"client-web\",access=\"direct\"}[24h])) / 0)",
@@ -261,7 +261,7 @@
                   "showTooltip": true,
                   "lineInterpolation": "stepAfter",
                   "lineWidth": 2,
-                  "fillOpacity": 15,
+                  "fillOpacity": 0,
                   "gradientMode": "scheme",
                   "spanNulls": false,
                   "showPoints": "never"
@@ -313,11 +313,35 @@
                   "showTooltip": true,
                   "lineInterpolation": "stepAfter",
                   "lineWidth": 2,
-                  "fillOpacity": 15,
+                  "fillOpacity": 0,
                   "gradientMode": "scheme",
                   "spanNulls": false,
                   "showPoints": "never"
                 }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Probe zone"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Website"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
               }
             ]
           }
@@ -341,7 +365,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 11,
+        "y": 9,
         "w": 24,
         "h": 9
       },
@@ -416,7 +440,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 20,
+        "y": 18,
         "w": 24,
         "h": 9
       },
