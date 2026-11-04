@@ -409,12 +409,13 @@
             "fillOpacity": 8,
             "showPoints": "never",
             "spanNulls": false,
-            "axisCenteredZero": true,
+            "axisCenteredZero": false,
             "stacking": {
               "mode": "none",
               "group": "A"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -472,12 +473,13 @@
             "fillOpacity": 8,
             "showPoints": "never",
             "spanNulls": false,
-            "axisCenteredZero": true,
+            "axisCenteredZero": false,
             "stacking": {
               "mode": "none",
               "group": "A"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
