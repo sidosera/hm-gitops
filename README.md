@@ -234,7 +234,7 @@ Both zones share the three dashboards described above. The VPN dashboard discove
 
 For client import, use the private `hm-spb-smart-routing.txt` VLESS profile provided outside Git. Existing upstream profiles remain valid. The bootstrap password is unnecessary after key-only SSH is configured.
 
-On small hosts: only source-controller and kustomize-controller are needed by Flux; unused Helm/notification controllers are suspended. Xray/node-exporter/online collectors have bounded memory. The node-exporter init container streams its checksum-verified stats-client archive to disk, avoiding an archive-sized RAM allocation. Optional desktop/update GUI daemons are disabled; unattended security upgrades remain enabled. The same Ansible role on every host gives apt background jobs low CPU/I/O priority, a 25% CPU quota and a 128 MiB soft memory threshold (no hard memory cap that could kill dpkg). This reduces contention but does not guarantee a fixed memory ceiling. No swap is enabled on the SPB Kubernetes worker.
+On small hosts: only source-controller and kustomize-controller are needed by Flux; unused Helm/notification controllers are suspended. Xray/node-exporter/online collectors have bounded memory. The node-exporter init container streams its checksum-verified stats-client archive to disk, avoiding an archive-sized RAM allocation. Optional daemons, cron and unattended package updates are disabled by the shared host role. Package upgrades are explicit maintenance. There is no custom update timer, cron job or memory-throttled APT job. No swap is enabled on the SPB Kubernetes worker.
 
 
 ## Service and placement model
@@ -315,3 +315,8 @@ Validate with `python -m unittest discover -s tests -v` and `promtool test rules
 Dashboard availability is anchored to configured kubelet scrape targets (`hm:node:info`), not successful node-exporter samples. An unreachable host therefore stays in Inventory and zone filters with **Down** status. Generic Services, Proxy and VPN summaries show separate **Ready** and **Down** counts for scheduled instances. Readiness requires a fresh successful kubelet scrape, Kubernetes Node Ready and Pod Ready; cached Pod Ready alone cannot keep an instance green during a host outage. Failed or older-than-90-second kubelet samples are unavailable. Resource graphs retain gaps when measurements are missing rather than inventing zero CPU or memory usage. Retired scrape targets and deleted/completed pods are removed normally; this is an inventory of configured hosts and currently scheduled workloads, not historical membership.
 
 `promtool test rules tests/fixtures/host-outage.test.yml` covers failed scrapes for an hour, stale successful scrapes, Kubernetes NotReady nodes, cached Ready pods, unaffected zones and retired targets. These outage tests do not interrupt production VPN traffic.
+
+
+## Alpine host support
+
+The shared host role supports Alpine 3.24+/OpenRC as well as Ubuntu/Debian/systemd. Install the pinned collection with `ansible-galaxy collection install -r vm/requirements.yml`, then use the existing bootstrap and inventory. OS adapters cover apk packages, Python bootstrap, cgroup/kernel prerequisites, UFW boot persistence, SSH hardening, disabled optional background services and encrypted Secret recovery. Kubernetes manifests and application pipelines stay shared. See [Alpine provisioning, validation and migration boundaries](docs/alpine-hosts.md). Existing hosts are not reimaged by this change.

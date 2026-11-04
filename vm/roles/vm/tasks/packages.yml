@@ -1,6 +1,34 @@
 ---
-- name: Install base packages
+- name: Enable the signed stable community repository on Alpine
+  ansible.builtin.lineinfile:
+    path: /etc/apk/repositories
+    line: "https://dl-cdn.alpinelinux.org/alpine/v{{ ansible_distribution_version.split('.')[:2] | join('.') }}/community"
+  when: ansible_distribution == 'Alpine'
+- name: Install base packages on Debian-family hosts
   ansible.builtin.apt:
-    name: "{{ hm_base_packages + (hm_machine_profile.extra_packages | default([])) }}"
+    name: "{{ hm_platform_packages + hm_base_packages + (hm_machine_profile.extra_packages | default([])) }}"
     state: present
     update_cache: true
+  when: ansible_os_family == 'Debian'
+- name: Install base packages on Alpine
+  community.general.apk:
+    name: "{{ hm_platform_packages + hm_base_packages + (hm_machine_profile.extra_packages | default([])) }}"
+    state: present
+    update_cache: true
+  when: ansible_distribution == 'Alpine'
+- name: Create shared administrative directories on minimal images
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /usr/local/bin
+    - /usr/local/sbin
+    - /usr/local/src
+    - /etc/ssh/sshd_config.d
+    - /etc/sysctl.d
+- name: Configure fail-closed Kubernetes boot dependencies on OpenRC
+  ansible.builtin.include_tasks: openrc-dependencies.yml
+  when: ansible_distribution == 'Alpine'

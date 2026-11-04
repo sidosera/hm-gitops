@@ -13,10 +13,12 @@
 - name: Apply resource policy to every cluster host
   hosts: vm
   become: true
-  gather_facts: false
+  gather_facts: true
   vars_files:
     - ../roles/vm/defaults/main.yml
   tasks:
+    - name: Disable automatic package maintenance
+      ansible.builtin.include_tasks: ../roles/vm/tasks/updates.yml
     - name: Apply shared low-memory host settings
       ansible.builtin.include_tasks: ../roles/vm/tasks/low-memory.yml
     - name: Remove retired Blackbox peer firewall rule

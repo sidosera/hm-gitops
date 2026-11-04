@@ -23,6 +23,15 @@ def command(*args, timeout=180):
     return subprocess.run(args, check=True, capture_output=True, text=True, timeout=timeout).stdout
 
 
+def restart_k3s(init_system):
+    if init_system == 'systemd':
+        command('systemctl', 'restart', 'k3s')
+    elif init_system == 'openrc':
+        command('rc-service', 'k3s', 'restart')
+    else:
+        raise ValueError('Unsupported init system')
+
+
 def status():
     # /readyz can succeed before the K3s runtime/node annotation is initialized.
     until = time.monotonic() + 45
@@ -201,7 +210,7 @@ def finish_sqlite_history():
     return True
 
 
-def migrate(recipient):
+def migrate(recipient, init_system="systemd"):
     config = yaml.safe_load(CONFIG.read_text()) or {}
     try:
         initial = status()
@@ -241,7 +250,7 @@ def migrate(recipient):
         config['secrets-encryption'] = True
         atomic_config(config)
         print('Restarting control plane with secrets encryption configured', flush=True)
-        command('systemctl', 'restart', 'k3s')
+        restart_k3s(init_system)
         wait_ready()
     current = status()
     if 'Encryption Status: Enabled' not in current:
@@ -257,7 +266,7 @@ def migrate(recipient):
         else:
             raise RuntimeError('Secrets reencryption did not finish')
         print('Restarting control plane to finish encryption activation', flush=True)
-        command('systemctl', 'restart', 'k3s')
+        restart_k3s(init_system)
         wait_ready()
     final = status()
     if 'Encryption Status: Enabled' not in final:
@@ -271,6 +280,7 @@ def migrate(recipient):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('age_recipient')
+    parser.add_argument('--init-system', choices=['systemd', 'openrc'], default='systemd')
     args = parser.parse_args()
     fd = os.open(SERVER / '.hm-secrets-migration.lock', os.O_WRONLY | os.O_CREAT, 0o600)
     with os.fdopen(fd, 'w') as lock:
@@ -278,4 +288,4 @@ if __name__ == '__main__':
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise SystemExit('Another Secrets migration is running; no changes made')
-        migrate(args.age_recipient)
+        migrate(args.age_recipient, args.init_system)

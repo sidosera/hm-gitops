@@ -78,14 +78,16 @@
     - hm_is_bootstrap | bool
 
 - name: Enable and start bootstrap k3s service
-  ansible.builtin.systemd:
+  ansible.builtin.service:
+    use: "{{ hm_service_backend }}"
     name: k3s
     enabled: true
     state: started
   when: hm_is_bootstrap | bool
 
 - name: Restart k3s after config change
-  ansible.builtin.systemd:
+  ansible.builtin.service:
+    use: "{{ hm_service_backend }}"
     name: k3s
     state: restarted
   when:
@@ -134,7 +136,8 @@
     - not (hm_is_bootstrap | bool)
 
 - name: Enable and start k3s service on joining nodes
-  ansible.builtin.systemd:
+  ansible.builtin.service:
+    use: "{{ hm_service_backend }}"
     name: k3s
     enabled: true
     state: started

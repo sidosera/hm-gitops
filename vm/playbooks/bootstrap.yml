@@ -28,7 +28,10 @@
 - name: VM
   hosts: vm
   become: true
-  gather_facts: true
+  gather_facts: false
+  pre_tasks:
+    - name: Bootstrap Python and gather platform facts
+      ansible.builtin.include_tasks: ../tasks/python-bootstrap.yml
 
   roles:
     - role: vm

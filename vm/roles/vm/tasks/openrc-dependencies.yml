@@ -1,0 +1,14 @@
+---
+# The pinned installer only wants cgroups and orders after network-online.
+# Explicit requirements make boot fail closed if the host firewall cannot start.
+- name: Require cgroups and the configured firewall before Kubernetes
+  ansible.builtin.blockinfile:
+    path: '/etc/conf.d/{{ item }}'
+    create: true
+    owner: root
+    group: root
+    mode: '0600'
+    marker: '# {mark} HM KUBERNETES BOOT DEPENDENCIES'
+    block: 'rc_need="${rc_need:-} cgroups{{ " ufw" if (hm_machine_profile.apply_security | default(hm_apply_security) | bool) and (hm_machine_profile.auto_firewall | default(hm_auto_firewall) | bool) else "" }}"'
+    validate: /bin/sh -n %s
+  loop: [k3s, k3s-agent]

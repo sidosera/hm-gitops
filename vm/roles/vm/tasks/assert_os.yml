@@ -1,6 +1,11 @@
 ---
-- name: Require Ubuntu or Debian
+- name: Require a supported Linux platform
   ansible.builtin.assert:
     that:
-      - ansible_distribution in ['Ubuntu', 'Debian']
-    fail_msg: "This role supports only Ubuntu or Debian."
+      - ansible_distribution in ['Ubuntu', 'Debian', 'Alpine']
+      - (ansible_distribution == 'Alpine' and ansible_service_mgr == 'openrc') or (ansible_distribution in ['Ubuntu', 'Debian'] and ansible_service_mgr == 'systemd')
+      - ansible_distribution != 'Alpine' or ansible_distribution_version is version('3.24', '>=')
+    fail_msg: "Supported platforms are Ubuntu/Debian with systemd and Alpine with OpenRC."
+- name: Load the platform adapter for the shared host role
+  ansible.builtin.include_vars:
+    file: "{{ role_path }}/vars/{{ 'Alpine' if ansible_distribution == 'Alpine' else 'Debian' }}.yml"

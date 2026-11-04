@@ -3,22 +3,12 @@
 hm_k3s_channel: stable
 hm_k3s_kubeconfig: /etc/rancher/k3s/k3s.yaml
 hm_node_ipv6: ""
-hm_base_packages:
-  - apache2-utils
-  - ca-certificates
-  - curl
-  - ufw
-  - wget
-  - unzip
-  - util-linux
-  - gnupg
-  - python3
-  - git
+# Optional common additions; distribution-specific equivalents live in vars/.
+hm_base_packages: []
 
 hm_apply_security: true
 hm_auto_firewall: true
-hm_auto_fail2ban: true
-hm_auto_unattended_upgrades: true
+hm_auto_fail2ban: false
 hm_auto_ssh_harden: true
 
 # Teardown: set true to run k3s-uninstall.sh (destructive).
@@ -35,3 +25,56 @@ hm_api_pod_interfaces:
 
 # Public age recipient only; private identities never belong in inventory.
 hm_sops_age_recipient: age1xpd0gspqq4d2neww2gwerv8p7mt2v7lyuazk5mmz2677my9rp93qd76ves
+
+# Explicit minimal-host policy. Keep SSH, firewall, networking, DNS, time sync,
+# logging and Kubernetes; do not install or run an extra scheduler for updates.
+hm_optional_systemd_units:
+  - apt-daily.timer
+  - apt-daily-upgrade.timer
+  - apt-daily.service
+  - apt-daily-upgrade.service
+  - unattended-upgrades.service
+  - cron.service
+  - anacron.service
+  - anacron.timer
+  - fwupd.service
+  - fwupd-refresh.service
+  - fwupd-refresh.timer
+  - packagekit.service
+  - multipathd.service
+  - multipathd.socket
+  - motd-news.service
+  - motd-news.timer
+  - update-notifier-download.service
+  - update-notifier-download.timer
+  - update-notifier-motd.service
+  - update-notifier-motd.timer
+  - man-db.service
+  - man-db.timer
+  - plocate-updatedb.service
+  - plocate-updatedb.timer
+  - fstrim.timer
+  - e2scrub_all.timer
+  - ua-timer.timer
+  - snapd.service
+  - snapd.socket
+  - snapd.seeded.service
+  - snapd.snap-repair.timer
+  - apport.service
+  - whoopsie.service
+  - ModemManager.service
+  - avahi-daemon.service
+  - avahi-daemon.socket
+  - bluetooth.service
+  - cups.service
+  - cups.socket
+hm_optional_openrc_services:
+  - crond
+  - dcron
+  - cronie
+  - fcron
+  - acpid
+  - avahi-daemon
+  - bluetooth
+  - cupsd
+  - modemmanager

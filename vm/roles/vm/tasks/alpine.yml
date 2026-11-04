@@ -1,0 +1,59 @@
+---
+- name: Require OpenRC for Alpine hosts
+  ansible.builtin.assert:
+    that: ansible_service_mgr == 'openrc'
+    fail_msg: Alpine hosts must boot OpenRC before provisioning.
+- name: Persist unified cgroup mode
+  ansible.builtin.lineinfile:
+    path: /etc/rc.conf
+    regexp: '^rc_cgroup_mode='
+    line: 'rc_cgroup_mode="unified"'
+- name: Enable cgroups at boot
+  ansible.builtin.service:
+    name: cgroups
+    use: service
+    runlevel: boot
+    enabled: true
+    state: started
+- name: Read required cgroup v2 controllers
+  ansible.builtin.command: cat /sys/fs/cgroup/cgroup.controllers
+  register: hm_cgroup_controllers
+  changed_when: false
+- name: Require kernel support before installing Kubernetes
+  ansible.builtin.assert:
+    that:
+      - "'cpu' in hm_cgroup_controllers.stdout.split()"
+      - "'memory' in hm_cgroup_controllers.stdout.split()"
+      - "'pids' in hm_cgroup_controllers.stdout.split()"
+      - "'cpuset' in hm_cgroup_controllers.stdout.split()"
+    fail_msg: "The running Alpine kernel needs cgroup v2 CPU, memory, pids and cpuset controllers. Correct boot settings and reboot before joining; provisioning does not reboot hosts."
+- name: Create kernel module configuration directory
+  ansible.builtin.file:
+    path: /etc/modules-load.d
+    state: directory
+    mode: '0755'
+- name: Persist Kubernetes kernel modules
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/hm-kubernetes.conf
+    mode: '0644'
+    content: |
+      overlay
+      br_netfilter
+      wireguard
+- name: Load required kernel modules before joining
+  ansible.builtin.command:
+    argv: [modprobe, '{{ item }}']
+  loop: [overlay, br_netfilter, wireguard]
+  changed_when: false
+- name: Enable module loading at boot
+  ansible.builtin.service:
+    name: modules
+    use: service
+    enabled: true
+    runlevel: boot
+- name: Enable sysctl settings at boot
+  ansible.builtin.service:
+    name: sysctl
+    use: service
+    enabled: true
+    runlevel: boot

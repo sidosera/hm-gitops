@@ -1,0 +1,26 @@
+name: Host adapter validation
+on:
+  pull_request:
+    paths: ['vm/**', 'tests/provisioning/**', '.github/workflows/host-adapters.yml']
+  push:
+    branches: [main]
+    paths: ['vm/**', 'tests/provisioning/**', '.github/workflows/host-adapters.yml']
+permissions:
+  contents: read
+jobs:
+  alpine:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install Ansible
+        run: |
+          python3 -m venv "$RUNNER_TEMP/host-adapters-venv"
+          "$RUNNER_TEMP/host-adapters-venv/bin/pip" install ansible-core==2.20.11
+          echo "$RUNNER_TEMP/host-adapters-venv/bin" >> "$GITHUB_PATH"
+      - name: Install pinned provisioning collection
+        run: ansible-galaxy collection install -r vm/requirements.yml
+      - name: Validate Alpine host adapter
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          bash tests/provisioning/run-alpine-smoke.sh

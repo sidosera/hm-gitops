@@ -1,0 +1,69 @@
+---
+# Run against a disposable, SSH-accessible Alpine/OpenRC host, never production.
+# Intentionally excludes kernel/cgroup mounts, firewall changes and K3s startup;
+# those require a VM boot test rather than a container sharing the host kernel.
+- name: Alpine host adapter smoke test
+  hosts: all
+  gather_facts: false
+  pre_tasks:
+    - ansible.builtin.include_tasks: ../../vm/tasks/python-bootstrap.yml
+    - name: Account for the container test harness PID 1
+      ansible.builtin.set_fact:
+        ansible_service_mgr: openrc
+      when:
+        - ansible_distribution == 'Alpine'
+        - ansible_virtualization_type == 'docker'
+  tasks:
+    - ansible.builtin.include_role:
+        name: vm
+        tasks_from: assert_os
+        public: true
+    - ansible.builtin.include_role:
+        name: vm
+        tasks_from: packages
+        public: true
+    - ansible.builtin.include_role:
+        name: vm
+        tasks_from: ssh-hardening
+    - ansible.builtin.include_role:
+        name: vm
+        tasks_from: updates
+    - name: Install control-plane recovery dependencies with the portable package module
+      ansible.builtin.package:
+        name: "{{ hm_recovery_packages }}"
+        state: present
+    - name: Verify recovery Python modules are available
+      ansible.builtin.command: python3 -c 'import sqlite3, yaml, fcntl'
+      changed_when: false
+    - name: Read effective SSH policy
+      ansible.builtin.command: /usr/sbin/sshd -T
+      register: hm_test_sshd
+      changed_when: false
+    - name: Verify public authentication is key-only
+      ansible.builtin.assert:
+        that:
+          - "'passwordauthentication no' in hm_test_sshd.stdout_lines"
+          - "'kbdinteractiveauthentication no' in hm_test_sshd.stdout_lines"
+          - "'permitrootlogin prohibit-password' in hm_test_sshd.stdout_lines or 'permitrootlogin without-password' in hm_test_sshd.stdout_lines"
+    - ansible.builtin.include_role:
+        name: vm
+        tasks_from: background-services
+    - name: Verify no custom update job remains
+      ansible.builtin.stat:
+        path: /etc/periodic/daily/hm-packages
+      register: hm_test_update_job
+    - name: Read cron state
+      ansible.builtin.command: rc-service crond status
+      register: hm_test_cron_state
+      changed_when: false
+      failed_when: false
+    - name: Read enabled boot services
+      ansible.builtin.command: rc-update show
+      register: hm_test_boot_services
+      changed_when: false
+    - name: Require the optional scheduler to be stopped
+      ansible.builtin.assert:
+        that:
+          - not hm_test_update_job.stat.exists
+          - hm_test_cron_state.rc != 0
+          - "'crond' not in hm_test_boot_services.stdout"

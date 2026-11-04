@@ -6,7 +6,6 @@ vm_firewall_allowed_tcp:
   - 22
   - 80
   - 443
-vm_auto_fail2ban: true
-vm_auto_unattended_upgrades: true
+vm_auto_fail2ban: false
 vm_auto_ssh_harden: true
 vm_extra_packages: []

@@ -1,0 +1,91 @@
+---
+- name: Discover installed systemd unit names
+  ansible.builtin.command: systemctl list-unit-files --no-legend --no-pager
+  register: hm_systemd_units
+  changed_when: false
+  when: ansible_service_mgr == 'systemd'
+
+- name: Disable and mask optional systemd daemons and timers
+  ansible.builtin.systemd:
+    name: '{{ item }}'
+    enabled: false
+    masked: true
+    # Never terminate dpkg in the middle of an existing package transaction.
+    state: "{{ omit if item in ['apt-daily.service', 'apt-daily-upgrade.service', 'unattended-upgrades.service'] else 'stopped' }}"
+  loop: "{{ hm_optional_systemd_units + ([] if hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban) | bool else ['fail2ban.service']) }}"
+  when:
+    - ansible_service_mgr == 'systemd'
+    - item in (hm_systemd_units.stdout_lines | map('split') | map('first') | list)
+
+- name: Remove superseded APT memory throttling policy
+  ansible.builtin.file:
+    path: '/etc/systemd/system/{{ item }}.service.d/20-hm-resources.conf'
+    state: absent
+  loop: [apt-daily, apt-daily-upgrade]
+  register: hm_old_maintenance_policy
+  when: ansible_service_mgr == 'systemd'
+
+- name: Reload systemd after removing the old maintenance policy
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when:
+    - ansible_service_mgr == 'systemd'
+    - hm_old_maintenance_policy.changed
+
+- name: Inspect expensive dynamic MOTD hooks
+  ansible.builtin.stat:
+    path: '/etc/update-motd.d/{{ item }}'
+  loop: [50-landscape-sysinfo, 90-updates-available, 91-release-upgrade]
+  register: hm_motd_hooks
+  when: ansible_os_family == 'Debian'
+
+- name: Disable optional login-time package checks
+  ansible.builtin.file:
+    path: '{{ item.stat.path }}'
+    mode: '0644'
+  loop: '{{ hm_motd_hooks.results | default([]) }}'
+  when:
+    - ansible_os_family == 'Debian'
+    - item.stat.exists | default(false)
+
+- name: Inspect optional OpenRC services
+  ansible.builtin.stat:
+    path: '/etc/init.d/{{ item }}'
+    get_checksum: false
+    get_mime: false
+    get_attributes: false
+  loop: "{{ hm_optional_openrc_services + ([] if hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban) | bool else ['fail2ban']) }}"
+  register: hm_openrc_optional
+  when: ansible_service_mgr == 'openrc'
+
+- name: Stop optional OpenRC services
+  ansible.builtin.service:
+    use: service
+    name: '{{ item.item }}'
+    state: stopped
+  loop: '{{ hm_openrc_optional.results | default([]) }}'
+  loop_control:
+    label: '{{ item.item }}'
+  when:
+    - ansible_service_mgr == 'openrc'
+    - item.stat.exists | default(false)
+
+- name: Locate optional services enabled in any OpenRC runlevel
+  ansible.builtin.find:
+    paths: /etc/runlevels
+    recurse: true
+    file_type: link
+    patterns: "{{ hm_optional_openrc_services + ([] if hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban) | bool else ['fail2ban']) }}"
+  register: hm_optional_runlevel_links
+  when: ansible_service_mgr == 'openrc'
+
+- name: Disable optional services in their registered OpenRC runlevels
+  ansible.builtin.service:
+    use: service
+    name: '{{ item.path | basename }}'
+    runlevel: '{{ item.path | dirname | basename }}'
+    enabled: false
+  loop: '{{ hm_optional_runlevel_links.files | default([]) }}'
+  loop_control:
+    label: '{{ item.path }}'
+  when: ansible_service_mgr == 'openrc'

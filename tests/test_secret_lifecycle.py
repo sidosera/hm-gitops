@@ -33,20 +33,25 @@ class EncryptionLifecycleTests(unittest.TestCase):
             self.assertEqual(yaml.safe_load(config.read_text())['node-name'], 'stable')
 
     def test_existing_cluster_finishes_reencryption_and_keeps_existing_config(self):
-        with tempfile.TemporaryDirectory() as directory:
-            config = Path(directory) / 'config.yaml';config.write_text('secrets-encryption: true\nnode-name: stable\n')
-            server = Path(directory) / 'server';(server / 'cred').mkdir(parents=True)
-            (server / 'cred/encryption-config.json').write_text('{"resources": []}')
-            with patch.object(migration, 'CONFIG', config), patch.object(migration, 'SERVER', server), \
-                 patch.object(migration, 'status', side_effect=[START, START, ENABLED, ENABLED]), \
-                 patch.object(migration, 'command', return_value=NODES) as command, \
-                 patch.object(migration, 'backup') as backup, patch.object(migration, 'wait_ready'):
-                migration.migrate('public-recipient')
-                commands = [call.args for call in command.call_args_list]
-                self.assertEqual(commands.count(('k3s', 'secrets-encrypt', 'rotate-keys')), 1)
-                self.assertEqual(commands.count(('systemctl', 'restart', 'k3s')), 1)
-                self.assertEqual(backup.call_count, 2)
-            self.assertEqual(yaml.safe_load(config.read_text())['node-name'], 'stable')
+        for init_system, restart_command in [
+            ('systemd', ('systemctl', 'restart', 'k3s')),
+            ('openrc', ('rc-service', 'k3s', 'restart')),
+        ]:
+            with self.subTest(init_system=init_system):
+                with tempfile.TemporaryDirectory() as directory:
+                    config = Path(directory) / 'config.yaml';config.write_text('secrets-encryption: true\nnode-name: stable\n')
+                    server = Path(directory) / 'server';(server / 'cred').mkdir(parents=True)
+                    (server / 'cred/encryption-config.json').write_text('{"resources": []}')
+                    with patch.object(migration, 'CONFIG', config), patch.object(migration, 'SERVER', server), \
+                         patch.object(migration, 'status', side_effect=[START, START, ENABLED, ENABLED]), \
+                         patch.object(migration, 'command', return_value=NODES) as command, \
+                         patch.object(migration, 'backup') as backup, patch.object(migration, 'wait_ready'):
+                        migration.migrate('public-recipient', init_system)
+                        commands = [call.args for call in command.call_args_list]
+                        self.assertEqual(commands.count(('k3s', 'secrets-encrypt', 'rotate-keys')), 1)
+                        self.assertEqual(commands.count(restart_command), 1)
+                        self.assertEqual(backup.call_count, 2)
+                    self.assertEqual(yaml.safe_load(config.read_text())['node-name'], 'stable')
 
     def test_existing_ha_cluster_is_not_migrated_as_single_server(self):
         with tempfile.TemporaryDirectory() as directory:

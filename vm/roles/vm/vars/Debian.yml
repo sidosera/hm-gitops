@@ -1,0 +1,7 @@
+---
+hm_platform_packages: [ca-certificates, curl, ufw, python3, sudo, openssh-server, util-linux, kmod]
+hm_recovery_packages: [age, python3-yaml]
+hm_service_backend: systemd
+hm_ssh_service: ssh
+hm_init_system: systemd
+hm_fail2ban_packages: [fail2ban]

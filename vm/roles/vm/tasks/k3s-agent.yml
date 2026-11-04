@@ -45,7 +45,8 @@
   args:
     creates: /usr/local/bin/k3s
 - name: Enable Kubernetes worker
-  ansible.builtin.systemd:
+  ansible.builtin.service:
+    use: "{{ hm_service_backend }}"
     name: k3s-agent
     enabled: true
     state: "{{ 'restarted' if hm_agent_config.changed else 'started' }}"

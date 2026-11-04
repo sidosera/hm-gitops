@@ -1,0 +1,7 @@
+---
+hm_platform_packages: [ca-certificates, curl, ufw, ufw-openrc, python3, sudo, openssh, iptables, ip6tables, openrc, kmod, mount, util-linux-misc]
+hm_recovery_packages: [age, py3-yaml]
+hm_service_backend: service
+hm_ssh_service: sshd
+hm_init_system: openrc
+hm_fail2ban_packages: [fail2ban, fail2ban-openrc]
