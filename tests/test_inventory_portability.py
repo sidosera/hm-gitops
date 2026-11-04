@@ -61,6 +61,7 @@ class InventoryPortabilityTests(unittest.TestCase):
         job = next(j for j in config['scrape_configs'] if j['job_name']=='node-exporter')
         self.assertNotIn('static_configs',job)
         self.assertEqual(job['kubernetes_sd_configs'],[{'role':'node'}])
+        self.assertEqual(job['metric_relabel_configs'],[{'source_labels':['__name__','device'], 'regex':'node_network_.*;hm0', 'action':'drop'}])
         self.assertEqual(job['tls_config']['server_name'],'node-exporter.hm.svc.cluster.local')
         self.assertNotIn('kubelet', {j['job_name'] for j in config['scrape_configs']})
         labels={rule.get('target_label'):rule.get('source_labels') for rule in job['relabel_configs']}
