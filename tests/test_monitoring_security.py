@@ -48,7 +48,7 @@ class MonitoringSecurityTests(unittest.TestCase):
                     self.assertEqual(rule['action'],'block')
                     def blocks(port):
                         return any(int(part.split('-')[0]) <= port <= int(part.split('-')[-1]) for part in rule['port'].split(','))
-                    for port in [22,2379,2380,3000,6443,6444,9090,9100,9550,10085,10250,11111,32142]:
+                    for port in [22,2379,2380,3000,6443,6444,9090,9100,9550,10085,10250,11111,32142,8472,51820,51821,54321,65535]:
                         self.assertTrue(blocks(port),(zone,address,port))
                     self.assertFalse(blocks(80))
                     self.assertFalse(blocks(443))
