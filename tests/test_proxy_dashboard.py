@@ -89,15 +89,9 @@ class ProxyDashboardTests(unittest.TestCase):
         self.assertNotIn('textfile',str(node))
         self.assertFalse(any(d['metadata']['name']=='node-xray-stats' for d in self.resources))
 
-    def test_user_credentials_are_relabelled_before_storage(self):
+    def test_original_client_labels_and_probe_are_retained(self):
         config=yaml.safe_load((ROOT/'conf/monitoring/prometheus.yml').read_text())
         job=next(j for j in config['scrape_configs'] if j['job_name']=='xray')
-        rules=job['metric_relabel_configs']
-        self.assertEqual(rules[0]['action'],'drop')
-        self.assertIn('spb-relay@local',rules[0]['regex'])
-        self.assertIn('probe-e2e@local',rules[0]['regex'])
-        self.assertEqual(rules[1]['action'],'hashmod')
-        self.assertEqual(rules[2]['source_labels'],['dimension','__tmp_client_hash'])
-        self.assertEqual(rules[2]['target_label'],'target')
-        self.assertEqual(rules[2]['replacement'],'client-$1')
-        self.assertEqual(rules[3]['action'],'labeldrop')
+        self.assertEqual(job['metric_relabel_configs'], [{
+            'source_labels':['dimension','target'],
+            'regex':'user;spb-relay@local', 'action':'drop'}])

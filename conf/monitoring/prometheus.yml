@@ -110,22 +110,8 @@ scrape_configs:
   - source_labels:
     - dimension
     - target
-    regex: user;(spb-relay@local|probe-e2e@local)
+    regex: user;spb-relay@local
     action: drop
-  - source_labels:
-    - target
-    target_label: __tmp_client_hash
-    modulus: 18446744073709551615
-    action: hashmod
-  - source_labels:
-    - dimension
-    - __tmp_client_hash
-    regex: user;(.+)
-    target_label: target
-    replacement: client-$1
-    action: replace
-  - regex: __tmp_client_hash
-    action: labeldrop
 - job_name: vpn-client-probes
   scheme: http
   metrics_path: /metrics
