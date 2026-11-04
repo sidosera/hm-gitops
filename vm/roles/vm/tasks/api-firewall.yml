@@ -6,18 +6,19 @@
   ansible.builtin.shell: |
     set -e
     {% if not (hm_is_agent | default(false) | bool) %}
-    {% for peer in hm_cluster_peers | default([]) %}
-    ufw allow from {{ peer | quote }} to any port 6443 proto tcp
-    {% endfor %}
-    {% for peer in hm_cluster_peer_ipv6 | default([]) if peer | length > 0 %}
-    ufw allow from {{ peer | quote }} to any port 6443 proto tcp
-    {% endfor %}
+    ufw allow in on hm0 from {{ hm_network.cidr | quote }} to any port 6443 proto tcp
     {% for interface in hm_api_pod_interfaces %}
     {% for cidr in hm_api_pod_cidrs %}
     ufw allow in on {{ interface | quote }} from {{ cidr | quote }} to any port 6443 proto tcp
     {% endfor %}
     {% endfor %}
     {% endif %}
+    {% for peer in hm_cluster_peers | default([]) %}
+    ufw --force delete allow from {{ peer | quote }} to any port 6443 proto tcp
+    {% endfor %}
+    {% for peer in hm_cluster_peer_ipv6 | default([]) if peer | length > 0 %}
+    ufw --force delete allow from {{ peer | quote }} to any port 6443 proto tcp
+    {% endfor %}
     ufw --force delete allow 6443/tcp
     ufw --force delete allow 6443
   environment:

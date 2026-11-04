@@ -20,8 +20,8 @@ hm_api_pod_cidrs:
   - fd00:42::/48
 hm_api_pod_interfaces:
   - cni0
-  - flannel-wg
-  - flannel-wg-v6
+  - flannel.1
+  - flannel-v6.1
 
 # Public age recipient only; private identities never belong in inventory.
 hm_sops_age_recipient: age1xpd0gspqq4d2neww2gwerv8p7mt2v7lyuazk5mmz2677my9rp93qd76ves

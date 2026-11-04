@@ -1,7 +1,6 @@
 # Bootstrap or refresh Flux in the target cluster.
 # Repository secrets:
 #   GITOPS_DEPLOY_KEY / GITOPS_DEPLOY_KEY_B64  shared cluster SSH identity
-#   GITOPS_KUBECONFIG_B64     base64 kubeconfig for the target cluster
 #   GITOPS_FLUX_AGE_KEY       multiline age private key for SOPS decryption
 #   GITOPS_FLUX_AGE_KEY_B64   optional base64 of that key (useful for `act`)
 name: Flux Bootstrap
@@ -37,23 +36,13 @@ jobs:
           tar -xzf flux.tar.gz flux
           install -m 0755 flux /usr/local/bin/flux
 
-      - name: Write kubeconfig from secret
-        env:
-          GITOPS_KUBECONFIG_B64: ${{ secrets.GITOPS_KUBECONFIG_B64 }}
-        run: |
-          if [ -z "${GITOPS_KUBECONFIG_B64}" ]; then
-            echo "Set repository secret GITOPS_KUBECONFIG_B64" >&2
-            exit 1
-          fi
-          echo "$GITOPS_KUBECONFIG_B64" | base64 -d > kubeconfig
-          chmod 600 kubeconfig
-
       - name: Open authenticated SSH tunnel to the private Kubernetes API
         env:
           GITOPS_DEPLOY_KEY: ${{ secrets.GITOPS_DEPLOY_KEY }}
           GITOPS_DEPLOY_KEY_B64: ${{ secrets.GITOPS_DEPLOY_KEY_B64 }}
           KUBECONFIG: ${{ github.workspace }}/kubeconfig
         run: |
+          umask 077
           python3 -m pip install PyYAML==6.0.3
           install -d -m 700 ~/.ssh
           if [ -n "$GITOPS_DEPLOY_KEY_B64" ]; then
@@ -82,7 +71,11 @@ jobs:
         env:
           KUBECONFIG: ${{ github.workspace }}/kubeconfig
         run: |
-          ssh -i ~/.ssh/gitops -o BatchMode=yes -o StrictHostKeyChecking=yes \
+          umask 077
+          ssh -i ~/.ssh/gitops -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$GITOPS_SSH_TARGET" 'sudo -n cat /etc/rancher/k3s/k3s.yaml' > "$KUBECONFIG"
+          test -s "$KUBECONFIG"
+          ssh -i ~/.ssh/gitops -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o ExitOnForwardFailure=yes -M -S "$RUNNER_TEMP/hm-api-ssh" -fN \
             -L 127.0.0.1:16443:127.0.0.1:6443 "$GITOPS_SSH_TARGET"
           cluster=$(kubectl config view --minify -o jsonpath='{.contexts[0].context.cluster}')
@@ -95,6 +88,7 @@ jobs:
           GITOPS_FLUX_AGE_KEY: ${{ secrets.GITOPS_FLUX_AGE_KEY }}
           GITOPS_FLUX_AGE_KEY_B64: ${{ secrets.GITOPS_FLUX_AGE_KEY_B64 }}
         run: |
+          umask 077
           if [ -n "${GITOPS_FLUX_AGE_KEY_B64}" ]; then
             echo "$GITOPS_FLUX_AGE_KEY_B64" | base64 -d > flux-age.agekey
           elif [ -n "${GITOPS_FLUX_AGE_KEY}" ]; then

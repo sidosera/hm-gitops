@@ -8,20 +8,19 @@
         ufw --force reset >/dev/null
         {% for port in hm_machine_profile.firewall_allowed_tcp | default([]) %}
         {% if port | int == 22 %}
+        {% for peer in (hm_cluster_peers | default([]) + hm_cluster_peer_ipv6 | default([])) if peer != ansible_host and peer != hm_node_ipv6 and peer | length > 0 %}
+        ufw deny from {{ peer | quote }} to any port 22 proto tcp >/dev/null
+        {% endfor %}
         ufw limit 22/tcp >/dev/null
         {% elif port | int != 6443 and (not (hm_is_agent | default(false) | bool) or port | int == 443) %}
         ufw allow {{ port }}/tcp >/dev/null
         {% endif %}
         {% endfor %}
         {% for peer in hm_cluster_peers | default([]) if peer != ansible_host %}
-        ufw allow from {{ peer }} to any port 51820 proto udp >/dev/null
-        ufw allow from {{ peer }} to any port 51821 proto udp >/dev/null
-        ufw allow from {{ peer }} to any port 9100 proto tcp >/dev/null
-        ufw allow from {{ peer }} to any port 10250 proto tcp >/dev/null
+        ufw allow from {{ peer | quote }} to any port 51822 proto udp >/dev/null
         {% endfor %}
-        {% for peer in hm_cluster_peer_ipv6 | default([]) if peer != hm_node_ipv6 %}
-        ufw allow from {{ peer }} to any port 51821 proto udp >/dev/null
-        {% endfor %}
+        ufw allow in on hm0 from {{ hm_network.cidr | quote }} >/dev/null
+        ufw allow in on hm0 from {{ hm_network.cidr_ipv6 | quote }} >/dev/null
         ufw default deny incoming >/dev/null
         ufw default allow outgoing >/dev/null
         ufw --force enable >/dev/null

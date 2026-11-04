@@ -1,0 +1,92 @@
+---
+- name: Create private transport directory
+  ansible.builtin.file:
+    path: /etc/wireguard
+    state: directory
+    mode: '0700'
+- name: Generate host transport identity only once
+  ansible.builtin.shell: umask 077; wg genkey > /etc/wireguard/hm0.key
+  args:
+    creates: /etc/wireguard/hm0.key
+  no_log: true
+- name: Read host transport identity
+  ansible.builtin.slurp:
+    src: /etc/wireguard/hm0.key
+  register: hm_wg_identity
+  no_log: true
+- name: Derive public transport identity
+  ansible.builtin.shell: wg pubkey < /etc/wireguard/hm0.key
+  register: hm_wg_public
+  changed_when: false
+  no_log: true
+- name: Permit authenticated transport from inventoried peers
+  community.general.ufw:
+    rule: allow
+    proto: udp
+    from_ip: '{{ item }}'
+    port: '{{ hm_network.port }}'
+  loop: '{{ hm_cluster_peers | difference([ansible_host]) }}'
+- name: Configure private peer mesh
+  ansible.builtin.template:
+    src: private-network.conf.j2
+    dest: /etc/wireguard/hm0.conf
+    mode: '0600'
+  register: hm_wg_config
+  no_log: true
+  diff: false
+- name: Register native OpenRC interface service
+  ansible.builtin.file:
+    src: /etc/init.d/wg-quick
+    dest: /etc/init.d/wg-quick.hm0
+    state: link
+  when: ansible_distribution == 'Alpine'
+- name: Start private transport before Kubernetes
+  ansible.builtin.service:
+    use: '{{ hm_service_backend }}'
+    name: '{{ "wg-quick.hm0" if ansible_distribution == "Alpine" else "wg-quick@hm0" }}'
+    enabled: true
+    state: started
+- name: Apply peer changes without taking the interface down
+  ansible.builtin.command:
+    argv: [/bin/bash, -c, 'wg syncconf hm0 <(wg-quick strip hm0)']
+  when: hm_wg_config.changed
+  no_log: true
+- name: Verify private peer reachability before Kubernetes changes
+  ansible.builtin.command:
+    argv: [ping, -c, '1', -W, '2', '{{ hm_cluster_machines[item].private_ipv4 }}']
+  loop: '{{ hm_cluster_peers | difference([ansible_host]) }}'
+  register: hm_private_ping
+  until: hm_private_ping.rc == 0
+  retries: 5
+  delay: 2
+  changed_when: false
+- name: Verify private IPv6 peer reachability before Kubernetes changes
+  ansible.builtin.command:
+    argv: [ping, -6, -c, '1', -W, '2', '{{ hm_cluster_machines[item].private_ipv6 }}']
+  loop: '{{ hm_cluster_peers | difference([ansible_host]) }}'
+  register: hm_private_ping6
+  until: hm_private_ping6.rc == 0
+  retries: 5
+  delay: 2
+  changed_when: false
+- name: Create systemd dependency directories
+  ansible.builtin.file:
+    path: '/etc/systemd/system/{{ item }}.service.d'
+    state: directory
+    mode: '0755'
+  loop: [k3s, k3s-agent]
+  when: ansible_distribution != 'Alpine'
+- name: Require private transport at systemd Kubernetes boot
+  ansible.builtin.copy:
+    dest: '/etc/systemd/system/{{ item }}.service.d/20-hm-network.conf'
+    content: |
+      [Unit]
+      Requires=wg-quick@hm0.service
+      After=wg-quick@hm0.service
+    mode: '0644'
+  loop: [k3s, k3s-agent]
+  when: ansible_distribution != 'Alpine'
+- name: Reload systemd dependency declarations
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: ansible_distribution != 'Alpine'

@@ -1,5 +1,3 @@
-# Shared cluster host policy. Values are applied before installing/starting K3s.
-# Application container resources remain in their Kubernetes manifests.
 vm_cluster_profile:
   k3s_version: v1.36.2+k3s1
   host:
@@ -88,3 +86,8 @@ vm_cluster_profile:
         kube-proxy-arg:
         - conntrack-max-per-core=8192
         - conntrack-min=8192
+  network:
+    interface: hm0
+    port: 51822
+    cidr: 10.77.0.0/24
+    cidr_ipv6: fd77::/64

@@ -1,0 +1,13 @@
+# Managed from cluster inventory. No daemon or periodic reconciliation job.
+[Interface]
+Address = {{ hm_private_ipv4 }}/32, {{ hm_private_ipv6 }}/128
+ListenPort = {{ hm_network.port }}
+PrivateKey = {{ hm_wg_identity.content | b64decode | trim }}
+MTU = 1420
+{% for peer in hm_cluster_peers if peer != ansible_host %}
+
+[Peer]
+PublicKey = {{ hostvars[peer].hm_wg_public.stdout | trim }}
+Endpoint = {{ peer }}:{{ hm_network.port }}
+AllowedIPs = {{ hm_cluster_machines[peer].private_ipv4 }}/32, {{ hm_cluster_machines[peer].private_ipv6 }}/128
+{% endfor %}

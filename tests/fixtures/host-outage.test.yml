@@ -4,9 +4,9 @@ evaluation_interval: 30s
 tests:
 - interval: 30s
   input_series:
-  - series: up{job="kubelet",cluster="test",zone="zone-a",node="node-a",host="zone-a/1",machine="192.0.2.1"}
+  - series: up{job="node-exporter",cluster="test",zone="zone-a",node="node-a",host="zone-a/1",machine="192.0.2.1"}
     values: 0+0x120
-  - series: up{job="kubelet",cluster="test",zone="zone-b",node="node-b",host="zone-b/1",machine="192.0.2.2"}
+  - series: up{job="node-exporter",cluster="test",zone="zone-b",node="node-b",host="zone-b/1",machine="192.0.2.2"}
     values: 1+0x120
   promql_expr_test:
   - expr: sum(hm:node:up{node="node-a"})
@@ -31,9 +31,9 @@ tests:
       value: 1
 - interval: 30s
   input_series:
-  - series: up{job="kubelet",cluster="test",zone="zone-a",node="node-a",host="zone-a/1",machine="192.0.2.1"}
+  - series: up{job="node-exporter",cluster="test",zone="zone-a",node="node-a",host="zone-a/1",machine="192.0.2.1"}
     values: 1 1 1 _x117
-  - series: up{job="kubelet",cluster="test",zone="zone-b",node="node-b",host="zone-b/1",machine="192.0.2.2"}
+  - series: up{job="node-exporter",cluster="test",zone="zone-b",node="node-b",host="zone-b/1",machine="192.0.2.2"}
     values: 1+0x120
   promql_expr_test:
   - expr: sum(hm:node:up{node="node-a"})
@@ -50,9 +50,9 @@ tests:
     eval_time: 10m
     exp_samples: []
 - input_series:
-  - series: up{job="kubelet",cluster="test",zone="zone-a",node="node-a",host="zone-a/1",machine="192.0.2.1"}
+  - series: up{job="node-exporter",cluster="test",zone="zone-a",node="node-a",host="zone-a/1",machine="192.0.2.1"}
     values: 1+0x120
-  - series: up{job="kubelet",cluster="test",zone="zone-b",node="node-b",host="zone-b/1",machine="192.0.2.2"}
+  - series: up{job="node-exporter",cluster="test",zone="zone-b",node="node-b",host="zone-b/1",machine="192.0.2.2"}
     values: 1+0x120
   interval: 30s
   promql_expr_test:

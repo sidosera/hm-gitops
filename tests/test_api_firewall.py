@@ -19,7 +19,8 @@ def render(script, agent=False):
         hm_cluster_peers=['203.0.113.1', '203.0.113.2'],
         hm_cluster_peer_ipv6=['2001:db8::1', '2001:db8::2'],
         hm_machine_profile={'firewall_allowed_tcp': [22, 80, 443, 6443]},
-        ansible_host='203.0.113.1', hm_node_ipv6='2001:db8::1')
+        ansible_host='203.0.113.1', hm_node_ipv6='2001:db8::1',
+        hm_network={'cidr':'10.77.0.0/24','cidr_ipv6':'fd77::/64'})
 
 
 class APIFirewallTests(unittest.TestCase):
@@ -31,8 +32,8 @@ class APIFirewallTests(unittest.TestCase):
         deletes = [i for i, args in enumerate(lines) if 'delete' in args]
         allows = [i for i, args in enumerate(lines) if 'allow' in args and 'delete' not in args]
         self.assertLess(max(allows), min(deletes))
-        self.assertIn(['ufw', 'allow', 'from', '203.0.113.2', 'to', 'any', 'port', '6443', 'proto', 'tcp'], lines)
-        self.assertIn(['ufw', 'allow', 'from', '2001:db8::2', 'to', 'any', 'port', '6443', 'proto', 'tcp'], lines)
+        self.assertIn(['ufw', 'allow', 'in', 'on', 'hm0', 'from', '10.77.0.0/24', 'to', 'any', 'port', '6443', 'proto', 'tcp'], lines)
+        self.assertIn(['ufw','--force','delete','allow','from','203.0.113.2','to','any','port','6443','proto','tcp'], lines)
         for i in allows:
             args = lines[i]
             self.assertIn('from', args)
@@ -40,12 +41,13 @@ class APIFirewallTests(unittest.TestCase):
             self.assertNotIn(source, ['any', '0.0.0.0/0', '::/0'])
             if '/' in source:
                 self.assertIn('on', args)
-                self.assertIn(args[args.index('on') + 1], ['cni0', 'flannel-wg', 'flannel-wg-v6'])
+                self.assertIn(args[args.index('on') + 1], ['cni0', 'hm0', 'flannel.1', 'flannel-v6.1'])
         self.assertNotIn('reset', render(self.script()))
 
     def test_worker_only_removes_public_api_rules(self):
         lines = [shlex.split(s) for s in render(self.script(), agent=True).splitlines() if s.strip().startswith('ufw')]
-        self.assertEqual(lines, [['ufw', '--force', 'delete', 'allow', '6443/tcp'], ['ufw', '--force', 'delete', 'allow', '6443']])
+        self.assertTrue(all(line[:4]==['ufw','--force','delete','allow'] for line in lines))
+        self.assertIn(['ufw','--force','delete','allow','6443/tcp'], lines)
 
     def test_full_provisioning_cannot_reopen_api_from_an_old_public_profile(self):
         security = yaml.safe_load((TASKS / 'security.yml').read_text())

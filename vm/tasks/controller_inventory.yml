@@ -79,6 +79,24 @@
   loop: "{{ vm_hosts + (vm_agent_hosts | default([])) }}"
   when: hm_action in ['deploy', 'teardown']
 
+- name: Validate private network identities before connecting to hosts
+  ansible.builtin.assert:
+    that:
+      - vm_cluster_profile.network.interface == 'hm0'
+      - vm_cluster_profile.network.port == 51822
+      - vm_node_settings.values() | map(attribute='private_ipv4') | unique | length == vm_node_settings | length
+      - vm_node_settings[item].private_ipv4 is match('^10\.77\.0\.[1-9][0-9]{0,2}$')
+      - vm_node_settings[item].zone is match('^[a-z0-9]+(-[a-z0-9]+)*$')
+    fail_msg: Invalid or duplicate private network identity.
+  loop: "{{ vm_hosts + (vm_agent_hosts | default([])) }}"
+  when: hm_action in ['deploy', 'teardown']
+
+- name: Validate inventory addresses and logical slots without contacting hosts
+  ansible.builtin.command:
+    argv: ['{{ ansible_playbook_python }}', '{{ playbook_dir }}/../../scripts/cluster_inventory.py', --inventory, '{{ hm_inventory_file }}', --validate-only]
+  changed_when: false
+  when: hm_action == 'deploy'
+
 - name: Resolve bootstrap host
   ansible.builtin.set_fact:
     hm_bootstrap_host_name: "{{ vm_hosts[0] }}"
@@ -92,7 +110,12 @@
     ansible_host: "{{ item }}"
     ansible_user: "{{ vm_node_settings[item].user | default(ansible_user) }}"
     hm_bootstrap_host: "{{ hm_bootstrap_host_name }}"
-    hm_bootstrap_api_host: "{{ hm_bootstrap_host_name }}"
+    hm_bootstrap_api_host: "{{ vm_node_settings[hm_bootstrap_host_name].private_ipv4 }}"
+    hm_inventory_file: "{{ hm_inventory_file }}"
+    hm_private_ipv6: "{{ vm_node_settings[item].private_ipv6 }}"
+    hm_private_ipv4: "{{ vm_node_settings[item].private_ipv4 }}"
+    hm_network: "{{ vm_cluster_profile.network }}"
+    hm_cluster_machines: "{{ vm_node_settings }}"
     hm_is_bootstrap: "{{ item == hm_bootstrap_host_name }}"
     hm_node_ipv6: "{{ vm_node_settings[item].ipv6 | default(vm_node_ipv6 | default('')) }}"
     hm_node_country: "{{ vm_node_settings[item].country | default('') }}"

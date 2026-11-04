@@ -48,11 +48,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('profile', type=Path)
     parser.add_argument('--xray', default='xray')
-    parser.add_argument('--expected-exit-ip', default='87.106.74.217')
+    parser.add_argument('--expected-exit-ip', help='Expected public egress; defaults to the inventory control-plane address')
     args = parser.parse_args()
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
+    if not args.expected_exit_ip:
+        import yaml
+        inventory = yaml.safe_load((Path(__file__).resolve().parents[1] / 'cluster/clusters/hm-cluster/hosts.yml').read_text())
+        args.expected_exit_ip = inventory['vm_hosts'][0]
     config = client_config(args.profile.read_text(), port)
     with tempfile.TemporaryDirectory(prefix='hm-probe-') as temp:
         path = Path(temp) / 'client.json'

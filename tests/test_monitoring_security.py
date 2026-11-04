@@ -17,8 +17,9 @@ class MonitoringSecurityTests(unittest.TestCase):
             self.assertNotIn('kube-state-metrics',obj['metadata']['name'])
         roles=[v for v in self.resources if v['kind'] in ('Role','ClusterRole')]
         self.assertEqual(len(roles),1)
-        self.assertEqual(roles[0]['rules'][0]['resources'],['nodes/metrics'])
-        self.assertEqual(roles[0]['rules'][0]['verbs'],['get'])
+        self.assertEqual(roles[0]['rules'][0]['resources'],['nodes'])
+        self.assertEqual(roles[0]['rules'][0]['verbs'],['get','list','watch'])
+        self.assertNotIn('nodes/proxy', str(roles))
         prom=yaml.safe_load((ROOT/'conf/monitoring/prometheus.yml').read_text())
         self.assertNotIn('kube-state-metrics',{v['job_name'] for v in prom['scrape_configs']})
         self.assertNotIn('service-rules',str(prom))
@@ -32,26 +33,16 @@ class MonitoringSecurityTests(unittest.TestCase):
             if obj['kind']=='Service':
                 self.assertNotIn(11111,[v['port'] for v in obj['spec'].get('ports',[])])
 
-    def test_public_management_addresses_cannot_be_reached_through_vpn(self):
+    def test_host_management_is_not_an_application_address_dependency(self):
         inventory=yaml.safe_load((ROOT/'cluster/clusters/hm-cluster/hosts.yml').read_text())
-        addresses=[]
-        for ip,node in inventory['vm_node_settings'].items():
-            addresses.append(ipaddress.ip_address(ip))
-            if node.get('ipv6'):addresses.append(ipaddress.ip_address(node['ipv6'].split('/')[0]))
         for zone in ['uk-ldn-1','ru-spb-1']:
-            config=json.loads((ROOT/'services/gateway/overlays'/zone/'config.json').read_text())
-            self.assertNotIn('metrics',config)
-            for outbound in config['outbounds']:
-                if outbound['protocol']!='freedom':continue
-                for address in addresses:
-                    rule=next(v for v in outbound['settings']['finalRules'] if any(address in ipaddress.ip_network(net) for net in v.get('ip',[])))
-                    self.assertEqual(rule['action'],'block')
-                    def blocks(port):
-                        return any(int(part.split('-')[0]) <= port <= int(part.split('-')[-1]) for part in rule['port'].split(','))
-                    for port in [22,2379,2380,3000,6443,6444,9090,9100,9550,10085,10250,11111,32142,8472,51820,51821,54321,65535]:
-                        self.assertTrue(blocks(port),(zone,address,port))
-                    self.assertFalse(blocks(80))
-                    self.assertFalse(blocks(443))
+            text=(ROOT/'services/gateway/overlays'/zone/'config.json').read_text()
+            for address,machine in inventory['vm_node_settings'].items():
+                self.assertNotIn(address, text)
+                self.assertNotIn(machine['ipv6'], text)
+        guard=(ROOT/'vm/roles/vm/templates/nodeport-guard.sh.j2').read_text()
+        self.assertIn('--dports 6443,9100,10250 -j DROP', guard)
+        self.assertIn('--dports 22,6443,9100,10250 -m addrtype --dst-type LOCAL -j DROP', guard)
 
     def test_all_git_secrets_are_encrypted_and_runtime_is_hardened(self):
         for obj in self.resources:

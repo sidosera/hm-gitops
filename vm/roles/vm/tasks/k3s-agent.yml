@@ -20,7 +20,8 @@
       server: "https://{{ hm_bootstrap_api_host }}:6443"
       token: "{{ hm_agent_token.content | b64decode | trim }}"
       node-name: "{{ hm_node_name }}"
-      node-ip: "{{ ansible_host }},{{ hm_node_ipv6 }}"
+      node-ip: "{{ hm_private_ipv4 }},{{ hm_private_ipv6 }}"
+      flannel-iface: hm0
       node-external-ip: "{{ ansible_host }}"
       node-taint: "{{ hm_node_taints }}"
   no_log: true

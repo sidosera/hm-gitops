@@ -11,3 +11,21 @@ fi
 {% endfor %}
 {% endfor %}
 {% endfor %}
+
+# Every host exposes management only on its private network, before kube-proxy rules.
+{% for iface in ([ansible_facts['default_ipv4']['interface']] + ([ansible_facts['default_ipv6']['interface']] if ansible_facts['default_ipv6']['interface'] is defined else [])) | unique %}
+{% for tool in ['/usr/sbin/iptables', '/usr/sbin/ip6tables'] %}
+if ! {{ tool }} -w 5 -t raw -C PREROUTING -i {{ iface | quote }} -p tcp -m multiport --dports 6443,9100,10250 -j DROP 2>/dev/null; then
+    {{ tool }} -w 5 -t raw -I PREROUTING 1 -i {{ iface | quote }} -p tcp -m multiport --dports 6443,9100,10250 -j DROP
+    echo 'Installed public management guard'
+fi
+{% endfor %}
+{% endfor %}
+# Block pod access to PUBLIC host management addresses before service DNAT.
+# Private node metrics/API remain reachable to their authorized Kubernetes consumers.
+{% for tool, subnet in [('/usr/sbin/iptables', hm_network.cidr), ('/usr/sbin/ip6tables', hm_network.cidr_ipv6)] %}
+if ! {{ tool }} -w 5 -t raw -C PREROUTING -i cni0 ! -d {{ subnet | quote }} -p tcp -m multiport --dports 22,6443,9100,10250 -m addrtype --dst-type LOCAL -j DROP 2>/dev/null; then
+    {{ tool }} -w 5 -t raw -I PREROUTING 1 -i cni0 ! -d {{ subnet | quote }} -p tcp -m multiport --dports 22,6443,9100,10250 -m addrtype --dst-type LOCAL -j DROP
+    echo 'Installed local management guard'
+fi
+{% endfor %}

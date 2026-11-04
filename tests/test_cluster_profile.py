@@ -77,7 +77,9 @@ class ClusterProfileTests(unittest.TestCase):
                 self.assertNotIn('PLAY [VM]', result.stdout)
 
     def test_common_policy_is_applied_before_either_kubernetes_role(self):
-        order = [t.get('ansible.builtin.include_tasks') for t in tasks('install.yml')]
+        install=tasks('install.yml')
+        expanded=[child for task in install for child in (task.get('block') or [task])]
+        order = [t.get('ansible.builtin.include_tasks') for t in expanded]
         for role in ['k3s.yml', 'k3s-agent.yml']:
             self.assertLess(order.index('low-memory.yml'), order.index(role))
         policy_order = [t.get('ansible.builtin.include_tasks') for t in tasks('low-memory.yml')]

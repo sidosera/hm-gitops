@@ -1,16 +1,24 @@
----
 - ansible.builtin.include_tasks: packages.yml
 - name: Prepare Alpine kernel and service prerequisites
   ansible.builtin.include_tasks: alpine.yml
   when: ansible_distribution == 'Alpine'
-- name: Host hardening (UFW, SSH snippet, etc.)
-  ansible.builtin.include_tasks: security.yml
-  when: (hm_machine_profile.apply_security | default(hm_apply_security)) | bool
-- ansible.builtin.include_tasks: low-memory.yml
-- ansible.builtin.include_tasks: k3s.yml
-  when: not (hm_is_agent | default(false) | bool)
-- ansible.builtin.include_tasks: k3s-agent.yml
-  when: hm_is_agent | default(false) | bool
-
-- name: Label node placement independently of service identity
-  ansible.builtin.include_tasks: node-labels.yml
+- name: Establish private host transport before Kubernetes
+  ansible.builtin.include_tasks: private-network.yml
+- name: Converge Kubernetes only after private transport preparation
+  when: not (hm_prepare_network_only | default(false) | bool)
+  block:
+  - name: Host hardening (UFW, SSH snippet, etc.)
+    ansible.builtin.include_tasks: security.yml
+    when: (hm_machine_profile.apply_security | default(hm_apply_security)) | bool
+  - ansible.builtin.include_tasks: low-memory.yml
+  - ansible.builtin.include_tasks: k3s.yml
+    when: not (hm_is_agent | default(false) | bool)
+  - ansible.builtin.include_tasks: k3s-agent.yml
+    when: hm_is_agent | default(false) | bool
+  - name: Persist private transport dependency after installation
+    ansible.builtin.include_tasks: openrc-dependencies.yml
+    when: ansible_distribution == 'Alpine'
+  - name: Label node placement independently of service identity
+    ansible.builtin.include_tasks: node-labels.yml
+  - name: Publish inventory-owned public probe discovery
+    ansible.builtin.include_tasks: public-discovery.yml

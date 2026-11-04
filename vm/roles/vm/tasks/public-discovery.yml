@@ -1,0 +1,38 @@
+---
+- name: Render public entry discovery from Git inventory on the controller
+  ansible.builtin.command:
+    argv:
+    - '{{ ansible_playbook_python }}'
+    - '{{ playbook_dir }}/../../scripts/cluster_inventory.py'
+    - --inventory
+    - '{{ hm_inventory_file }}'
+  delegate_to: localhost
+  become: false
+  run_once: true
+  changed_when: false
+  register: hm_public_discovery
+- name: Copy inventory-owned discovery records to the control plane
+  ansible.builtin.copy:
+    content: '{{ hm_public_discovery.stdout }}'
+    dest: /etc/rancher/k3s/hm-public-discovery.yaml
+    mode: '0644'
+  delegate_to: '{{ hm_bootstrap_host }}'
+  run_once: true
+- name: Reconcile inventory-owned public entry records
+  ansible.builtin.command:
+    argv:
+    - kubectl
+    - apply
+    - -f
+    - /etc/rancher/k3s/hm-public-discovery.yaml
+    - --prune
+    - -l
+    - hm.gitops/discovery=public-entry
+    - --prune-allowlist=core/v1/Service
+    - --prune-allowlist=discovery.k8s.io/v1/EndpointSlice
+    - -n
+    - hm
+  delegate_to: '{{ hm_bootstrap_host }}'
+  run_once: true
+  register: hm_discovery_apply
+  changed_when: "'created' in hm_discovery_apply.stdout or 'configured' in hm_discovery_apply.stdout or 'pruned' in hm_discovery_apply.stdout"

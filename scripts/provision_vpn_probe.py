@@ -16,7 +16,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 PROBE_EMAIL = 'probe-e2e@local'
-ENTRIES = {'uk-ldn-1': ('87.106.74.217', 'reality-legacy'), 'ru-spb-1': ('212.116.115.29', 'gateway')}
+ENTRIES = {zone: (f'vpn-entry-{zone}.hm.svc.cluster.local', tag)
+           for zone, tag in [('uk-ldn-1', 'reality-legacy'), ('ru-spb-1', 'gateway')]}
 
 
 def add_account(config, candidate=None):
@@ -47,10 +48,18 @@ def client_config(inbound, ident, address):
         {'address': address, 'port': 443, 'users': [{'id': ident, 'encryption': 'none', 'flow': 'xtls-rprx-vision'}]}]},
         'streamSettings': {'network': 'raw', 'security': 'reality', 'realitySettings': {
             'serverName': rs['serverNames'][0], 'fingerprint': 'chrome', 'password': public, 'shortId': rs['shortIds'][0]}}}
-    return {'log': {'loglevel': 'warning'}, 'inbounds': [{'tag': 'probe', 'listen': '127.0.0.1',
+    config = {'log': {'loglevel': 'warning'}, 'inbounds': [{'tag': 'probe', 'listen': '127.0.0.1',
             'port': 10800, 'protocol': 'socks', 'settings': {'auth': 'noauth', 'udp': False}}],
         'outbounds': [{'tag': 'blocked', 'protocol': 'blackhole'}, outbound],
         'routing': {'rules': [{'type': 'field', 'inboundTag': ['probe'], 'outboundTag': 'public-vpn'}]}}
+    if address.endswith('.svc.cluster.local'):
+        # Resolve entry discovery with CoreDNS; direct website checks keep the observer's DNS.
+        config['dns'] = {'servers': ['10.43.0.10'], 'queryStrategy': 'UseIPv4'}
+        outbound['streamSettings']['sockopt'] = {'domainStrategy': 'ForceIPv4'}
+        config['routing']['rules'].insert(0, {'type':'field', 'ip':['10.43.0.10'], 'port':'53', 'outboundTag':'cluster-dns'})
+        config['outbounds'].append({'tag':'cluster-dns', 'protocol':'freedom'})
+    return config
+
 
 
 def encrypt(document, destination):
