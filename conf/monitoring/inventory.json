@@ -254,7 +254,7 @@
     },
     {
       "id": 2,
-      "title": "CPU busy",
+      "title": "CPU execution",
       "type": "stat",
       "gridPos": {
         "x": 0,
@@ -262,7 +262,7 @@
         "w": 8,
         "h": 4
       },
-      "description": "CPU utilization across all workloads on each host.",
+      "description": "Time executing user code, kernel code and interrupts, averaged across CPU cores. Excludes I/O wait and hypervisor steal time.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -270,7 +270,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * (1 - avg by (cluster,zone,host,machine) (rate(node_cpu_seconds_total{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mode=\"idle\"}[$__rate_interval])))",
+          "expr": "100 * avg by (cluster,zone,host,machine) (sum by (cluster,zone,host,machine,cpu) (rate(node_cpu_seconds_total{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mode=~\"user|nice|system|irq|softirq\"}[$__rate_interval])))",
           "legendFormat": "{{host}} \u00b7 {{machine}}",
           "editorMode": "code",
           "instant": true,
@@ -521,7 +521,7 @@
     },
     {
       "id": 5,
-      "title": "CPU busy over time",
+      "title": "CPU execution over time",
       "type": "timeseries",
       "gridPos": {
         "x": 0,
@@ -529,7 +529,7 @@
         "w": 12,
         "h": 6
       },
-      "description": "Total host CPU utilization, averaged across cores.",
+      "description": "Time executing user code, kernel code and interrupts, averaged across CPU cores. Excludes I/O wait and hypervisor steal time.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -537,7 +537,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * (1 - avg by (cluster,zone,host,machine) (rate(node_cpu_seconds_total{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mode=\"idle\"}[$__rate_interval])))",
+          "expr": "100 * avg by (cluster,zone,host,machine) (sum by (cluster,zone,host,machine,cpu) (rate(node_cpu_seconds_total{cluster=~\"${cluster:regex}\",host=~`${host:regex}`,zone=~\"${zone:regex}\",mode=~\"user|nice|system|irq|softirq\"}[$__rate_interval])))",
           "legendFormat": "{{host}} \u00b7 {{machine}}",
           "editorMode": "code",
           "instant": false,
