@@ -46,16 +46,10 @@ scrape_configs:
       country: ru
   sample_limit: 1500
   scheme: https
-  tls_config: &id001
+  tls_config:
     ca_file: /etc/prometheus/spb-tls/ca.crt
     cert_file: /etc/prometheus/spb-tls/tls.crt
     key_file: /etc/prometheus/spb-tls/tls.key
-  metric_relabel_configs:
-  - source_labels:
-    - __name__
-    regex: xray_.*
-    target_label: service
-    replacement: gateway
 - job_name: kubelet
   scheme: https
   metrics_path: /metrics/resource
@@ -122,7 +116,27 @@ scrape_configs:
       zone: ru-spb-1
       cluster: hm-cluster
       country: ru
-  sample_limit: 500
+  sample_limit: 5000
+  metric_relabel_configs:
+  - source_labels:
+    - dimension
+    - target
+    regex: user;(spb-relay@local|probe-e2e@local)
+    action: drop
+  - source_labels:
+    - target
+    target_label: __tmp_client_hash
+    modulus: 18446744073709551615
+    action: hashmod
+  - source_labels:
+    - dimension
+    - __tmp_client_hash
+    regex: user;(.+)
+    target_label: target
+    replacement: client-$1
+    action: replace
+  - regex: __tmp_client_hash
+    action: labeldrop
 - job_name: vpn-client-probes
   scheme: http
   metrics_path: /metrics
