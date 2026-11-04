@@ -1,2 +1,3 @@
 # Trusted control-plane SSH host keys; verify replacements out of band.
 87.106.74.217 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAy9faNpvr0ihiXBFJCefpod4V85YKPEFj9xkbZsJ4DU
+212.116.115.29 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDYoU4HshEMmLZ8jKirFDaGkAkV4rJj5cWQcSFDM7lUK
