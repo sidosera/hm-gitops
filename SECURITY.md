@@ -52,6 +52,6 @@ The legacy website Deployment, Service, ingress, configuration, disruption budge
 
 The `.gitleaksignore` entries identify only the reviewed historical commit/path/rule/line fingerprints. They do not exempt entire paths, credential values or new commits. CI fetches and scans the full reachable history, so a secret introduced and then removed in the same PR still fails validation.
 
-## Prepared host-network cutover
+## Private host-network boundary
 
-The inventory-portability migration is not yet deployed. Its intended boundary is a bootstrap-managed WireGuard host mesh (`hm0`), with private node addresses and Flannel VXLAN inside it. Management and host metrics use that private mesh; public addresses appear only in bootstrap inventory, SSH trust records and generated public-entry discovery. Metrics TLS uses a stable service DNS identity rather than machine-IP SANs. Do not treat the prepared rules as verified live controls until cutover and external checks complete. The audit evidence above describes the earlier deployed revision.
+The inventory-portability configuration uses a bootstrap-managed WireGuard host mesh (`hm0`), with private node addresses and Flannel VXLAN inside it. Management and host metrics use that private mesh; public addresses appear only in bootstrap inventory, SSH trust records and generated public-entry discovery. Metrics TLS uses a stable service DNS identity rather than machine-IP SANs. Recheck private connectivity and public-interface denial after every network change. The dated audit evidence above describes the earlier deployed revision.

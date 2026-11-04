@@ -34,10 +34,11 @@
       flannel-backend: vxlan
       flannel-iface: hm0
       flannel-external-ip: false
+      advertise-address: "{{ hm_private_ipv4 }}"
       node-external-ip: "{{ ansible_host }}"
       node-ip: "{{ hm_private_ipv4 }},{{ hm_private_ipv6 }}"
       node-label: "{{ ['svccontroller.k3s.cattle.io/enablelb=true'] if hm_service_lb | default(false) else [] }}"
-      tls-san: "{{ [hm_bootstrap_api_host, ansible_host] + ([hm_node_ipv6] if hm_node_ipv6 | length > 0 else []) }}"
+      tls-san: "{{ [hm_bootstrap_api_host, hm_private_ipv6, ansible_host] + ([hm_node_ipv6] if hm_node_ipv6 | length > 0 else []) }}"
     _ipv6_extra: >-
       {{
         {
@@ -45,7 +46,7 @@
           'service-cidr': '10.43.0.0/16,fd00:43::/112',
           'flannel-ipv6-masq': true,
           'node-ip': hm_private_ipv4 ~ ',' ~ hm_private_ipv6
-        } if hm_node_ipv6 | length > 0 else {}
+        } if hm_private_ipv6 | length > 0 else {}
       }}
   when: hm_is_bootstrap | bool
 

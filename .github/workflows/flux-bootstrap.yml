@@ -1,7 +1,7 @@
 # Bootstrap or refresh Flux in the target cluster.
 # Repository secrets:
 #   GITOPS_DEPLOY_KEY / GITOPS_DEPLOY_KEY_B64  shared cluster SSH identity
-#   GITOPS_FLUX_AGE_KEY       multiline age private key for SOPS decryption
+#   GITOPS_FLUX_AGE_KEY       optional explicit age identity; otherwise recover with SSH key
 #   GITOPS_FLUX_AGE_KEY_B64   optional base64 of that key (useful for `act`)
 name: Flux Bootstrap
 
@@ -35,6 +35,13 @@ jobs:
           echo "208dd7012c04fedeed5b2d0b6e63df3b15b1c34a381527811685c098bc9f8659  flux.tar.gz" | sha256sum --check --strict
           tar -xzf flux.tar.gz flux
           install -m 0755 flux /usr/local/bin/flux
+
+      - name: Install pinned recovery tool
+        run: |
+          curl -fsSL --retry 3 -o age.tar.gz https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz
+          echo "cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10  age.tar.gz" | sha256sum --check --strict
+          tar -xzf age.tar.gz age/age
+          install -m 0755 age/age /usr/local/bin/age
 
       - name: Open authenticated SSH tunnel to the private Kubernetes API
         env:
@@ -83,7 +90,7 @@ jobs:
             --tls-server-name="$GITOPS_API_HOST"
           kubectl get --raw=/readyz
 
-      - name: Write SOPS age private key from secret
+      - name: Recover SOPS identity using the administrative SSH key
         env:
           GITOPS_FLUX_AGE_KEY: ${{ secrets.GITOPS_FLUX_AGE_KEY }}
           GITOPS_FLUX_AGE_KEY_B64: ${{ secrets.GITOPS_FLUX_AGE_KEY_B64 }}
@@ -94,8 +101,7 @@ jobs:
           elif [ -n "${GITOPS_FLUX_AGE_KEY}" ]; then
             printf '%s\n' "${GITOPS_FLUX_AGE_KEY}" > flux-age.agekey
           else
-            echo "Set repository secret GITOPS_FLUX_AGE_KEY or GITOPS_FLUX_AGE_KEY_B64" >&2
-            exit 1
+            age --decrypt --identity ~/.ssh/gitops conf/bootstrap/flux-age-identity.age > flux-age.agekey
           fi
           chmod 600 flux-age.agekey
 

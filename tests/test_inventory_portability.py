@@ -76,6 +76,7 @@ class InventoryPortabilityTests(unittest.TestCase):
         self.assertIn('--tls-server-name="$GITOPS_API_HOST"',text)
         self.assertNotIn('insecure-skip-tls-verify',text)
         self.assertIn('-o StrictHostKeyChecking=yes',text)
+        self.assertIn('age --decrypt --identity ~/.ssh/gitops conf/bootstrap/flux-age-identity.age > flux-age.agekey',text)
 
     def test_services_and_dashboards_do_not_contain_physical_addresses(self):
         paths=list((ROOT/'services').rglob('*.json'))+[ROOT/'conf/monitoring/prometheus.yml']
@@ -112,6 +113,16 @@ class InventoryPortabilityTests(unittest.TestCase):
         self.assertIn('-i cni0 ! -d 10.77.0.0/24',script)
         self.assertIn('-i cni0 ! -d fd77::/64',script)
         self.assertIn('--dports 22,6443,9100,10250 -m addrtype --dst-type LOCAL -j DROP',script)
+
+    def test_private_dual_stack_does_not_depend_on_public_ipv6(self):
+        from jinja2.nativetypes import NativeEnvironment
+        tasks=yaml.safe_load((ROOT/'vm/roles/vm/tasks/k3s.yml').read_text())
+        task=next(t for t in tasks if t.get('name')=='Build k3s server config')
+        result=NativeEnvironment().from_string(task['vars']['_ipv6_extra']).render(
+            hm_node_ipv6='',hm_private_ipv4='10.77.0.1',hm_private_ipv6='fd77::1')
+        self.assertEqual(result['node-ip'],'10.77.0.1,fd77::1')
+        self.assertEqual(task['vars']['_base']['advertise-address'],'{{ hm_private_ipv4 }}')
+        self.assertIn('fd00:42::/48',result['cluster-cidr'])
 
     def test_public_probe_dns_changes_only_transport_destination_not_website_dns(self):
         spec=importlib.util.spec_from_file_location('provision',ROOT/'scripts/provision_vpn_probe.py')

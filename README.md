@@ -53,7 +53,7 @@ ANSIBLE_CONFIG=vm/ansible.cfg ansible-playbook -i vm/inventory/localhost.yml \
   --private-key ~/.ssh/hm-gitops
 ```
 
-For administration, run kubectl over SSH on the control-plane host, or forward `127.0.0.1:16443` to its `127.0.0.1:6443`. A local kubeconfig using that tunnel must retain CA verification and set `tls-server-name` to the inventory control-plane IP. The Flux Bootstrap workflow uses this tunnel with the shared deploy key and host keys pinned in `vm/ssh_known_hosts`; it does not require public API access. Verify and update pinned SSH host keys when replacing a control-plane machine. Adding a node requires applying the updated inventory firewall policy on existing servers before the node joins.
+For administration, run kubectl over SSH on the control-plane host, or forward `127.0.0.1:16443` to its `127.0.0.1:6443`. A local kubeconfig using that tunnel must retain CA verification and set `tls-server-name` to the inventory control-plane IP. The Flux Bootstrap workflow fetches the current kubeconfig over pinned SSH, uses this tunnel, and can recover the age identity from its encrypted Git artifact with the same deploy key. It requires neither a saved machine-specific kubeconfig nor public API access. SSH host keys are pinned in `vm/ssh_known_hosts`. Verify and update pinned SSH host keys when replacing a control-plane machine. Adding a node requires applying the updated inventory firewall policy on existing servers before the node joins.
 
 ## GitOps
 
@@ -301,9 +301,9 @@ Host availability is anchored to discovered node-exporter targets (`hm:node:info
 
 Management access through VPN is denied by both freedom outbounds at the final destination stage, including after DNS resolution. The rule covers all inventoried public IPv4/IPv6 addresses on every port except public web/VPN ingress 80/443 (TCP and UDP, including future management ports). Update this destination set when onboarding a host; security tests require it to match inventory. Historical monitoring PVCs are retained with Flux pruning disabled; removing unused code must not erase historical data.
 
-## Private-network migration (prepared, not yet applied)
+## Private-network provisioning and recovery
 
-This revision changes the host transport and K3s node addresses. Do not publish the monitoring/credential changes to the live Flux branch before the host cutover. Existing production still uses the previous host network until the migration is approved and completed.
+Host transport and K3s node addresses are bootstrapped before application reconciliation. For an existing cluster, apply host transport changes before publishing dependent monitoring/credential changes to the live Flux branch.
 
 1. Keep an independent administrative SSH session to each host and confirm provider-console recovery. Save an encrypted backup of current K3s/UFW configuration and the control-plane datastore using the existing recovery procedure; retain the previous Git revision for rollback. Never publish that backup or credentials.
 2. Run the common bootstrap with `-e hm_prepare_network_only=true`. This installs/starts the kernel WireGuard interface and opens its peer-restricted UDP port, without changing K3s configuration or replacing existing firewall policy. Check bidirectional private IPv4 and IPv6 reachability; confirm no long-running userspace network process is added.

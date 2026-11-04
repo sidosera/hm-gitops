@@ -85,7 +85,7 @@
       - vm_cluster_profile.network.interface == 'hm0'
       - vm_cluster_profile.network.port == 51822
       - vm_node_settings.values() | map(attribute='private_ipv4') | unique | length == vm_node_settings | length
-      - vm_node_settings[item].private_ipv4 is match('^10\.77\.0\.[1-9][0-9]{0,2}$')
+      - vm_node_settings[item].private_ipv4 is match('^10\.77\.[0-9]{1,3}\.[0-9]{1,3}$')
       - vm_node_settings[item].zone is match('^[a-z0-9]+(-[a-z0-9]+)*$')
     fail_msg: Invalid or duplicate private network identity.
   loop: "{{ vm_hosts + (vm_agent_hosts | default([])) }}"
@@ -131,7 +131,7 @@
     hm_node_taints: "{{ vm_node_settings[item].taints | default([]) }}"
     hm_edge_node: "{{ vm_node_settings[item].edge | default(false) }}"
     hm_service_lb: "{{ vm_node_settings[item].service_lb | default(false) }}"
-    hm_cluster_peer_ipv6: "{{ vm_node_settings.values() | map(attribute='ipv6') | list }}"
+    hm_cluster_peer_ipv6: "{{ vm_node_settings.values() | map(attribute='ipv6', default='') | list }}"
     hm_cluster_peers: "{{ vm_hosts + (vm_agent_hosts | default([])) }}"
     hm_k3s_version: "{{ vm_cluster_profile.k3s_version }}"
     hm_machine_profile: "{{ vm_cluster_profile.host }}"
