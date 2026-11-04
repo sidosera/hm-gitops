@@ -1,4 +1,6 @@
 ---
+- name: Reconcile agent registration when replacing or reimaging a machine
+  ansible.builtin.include_tasks: agent-registration.yml
 - name: Create Kubernetes configuration directory
   ansible.builtin.file:
     path: /etc/rancher/k3s

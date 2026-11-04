@@ -100,6 +100,20 @@ class InventoryPortabilityTests(unittest.TestCase):
         self.assertNotIn('PersistentKeepalive',tasks)
         self.assertNotIn('timer',tasks)
 
+    def test_fresh_agent_replaces_only_stale_registration_and_keeps_app_secrets(self):
+        tasks=yaml.safe_load((ROOT/'vm/roles/vm/tasks/agent-registration.yml').read_text())
+        block=next(t for t in tasks if 'block' in t)
+        env=jinja2.Environment(undefined=jinja2.StrictUndefined)
+        condition=env.compile_expression(block['when'])
+        for exists,password_present,expected in [(0,False,True),(0,True,False),(1,False,False)]:
+            self.assertEqual(condition(hm_agent_registration={'rc':exists},
+                hm_agent_password={'stat':{'exists':password_present}}),expected)
+        deletes=[t['ansible.builtin.command']['argv'] for t in block['block']
+                 if 'delete' in t.get('ansible.builtin.command',{}).get('argv',[])]
+        self.assertEqual(deletes,[['kubectl','delete','node','{{ hm_node_name }}','--wait=true','--timeout=30s']])
+        self.assertNotIn('xray-credentials',str(tasks))
+        self.assertNotIn('PersistentVolume',str(tasks))
+
     def test_management_guard_covers_public_interfaces_and_local_pod_bypass(self):
         env=jinja2.Environment(undefined=jinja2.StrictUndefined)
         env.filters['quote']=shlex.quote

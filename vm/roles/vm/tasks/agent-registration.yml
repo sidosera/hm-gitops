@@ -1,0 +1,31 @@
+---
+# A fresh/reimaged agent cannot reuse an old node's password hash. Reset only its
+# stale registration; application Secrets and persistent volumes are untouched.
+- name: Check whether this agent already has its local registration password
+  ansible.builtin.stat:
+    path: /etc/rancher/node/password
+  register: hm_agent_password
+- name: Check for an existing registration of the logical node
+  ansible.builtin.command:
+    argv: [kubectl, get, node, '{{ hm_node_name }}', -o, name]
+  delegate_to: '{{ hm_bootstrap_host }}'
+  register: hm_agent_registration
+  changed_when: false
+  failed_when: hm_agent_registration.rc != 0 and 'NotFound' not in hm_agent_registration.stderr
+- name: Replace stale registration only for a fresh agent filesystem
+  when: hm_agent_registration.rc == 0 and not hm_agent_password.stat.exists
+  block:
+  - name: Retire the replaced machine's logical node registration
+    ansible.builtin.command:
+      argv: [kubectl, delete, node, '{{ hm_node_name }}', --wait=true, --timeout=30s]
+    delegate_to: '{{ hm_bootstrap_host }}'
+  - name: Wait for K3s to remove its stale node-password hash
+    ansible.builtin.command:
+      argv: [kubectl, -n, kube-system, get, secret, '{{ hm_node_name }}.node-password.k3s', -o, name]
+    delegate_to: '{{ hm_bootstrap_host }}'
+    register: hm_old_agent_password
+    until: hm_old_agent_password.rc != 0 and 'NotFound' in hm_old_agent_password.stderr
+    retries: 30
+    delay: 1
+    changed_when: false
+    failed_when: hm_old_agent_password.rc != 0 and 'NotFound' not in hm_old_agent_password.stderr
