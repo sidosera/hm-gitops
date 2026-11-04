@@ -1,11 +1,12 @@
 apiVersion: 1
 providers:
-  - name: Hackamonth
-    orgId: 1
-    folder: Hackamonth
-    type: file
-    disableDeletion: false
-    editable: false
-    updateIntervalSeconds: 30
-    options:
-      path: /etc/grafana/dashboards
+- name: HM
+  orgId: 1
+  folder: HM
+  type: file
+  disableDeletion: false
+  editable: false
+  updateIntervalSeconds: 30
+  options:
+    path: /etc/grafana/dashboards
+  folderUid: hm

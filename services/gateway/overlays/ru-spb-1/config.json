@@ -164,7 +164,8 @@
   "policy": {
     "levels": {
       "0": {
-        "statsUserOnline": true
+        "statsUserUplink": true,
+        "statsUserDownlink": true
       }
     },
     "system": {

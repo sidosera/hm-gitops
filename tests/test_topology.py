@@ -42,7 +42,7 @@ class TopologyTests(unittest.TestCase):
                     self.assertNotEqual(labels['source_zone'], labels['target_zone'])
 
     def test_dashboards_scope_every_query_to_cluster_and_use_zone_filters(self):
-        for name in ['overview', 'inventory', 'vpn']:
+        for name in ['inventory', 'proxy']:
             dashboard = json.loads((ROOT / f'conf/monitoring/{name}.json').read_text())
             names = {v['name'] for v in dashboard['templating']['list']}
             self.assertIn('cluster', names)

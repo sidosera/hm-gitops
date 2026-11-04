@@ -66,8 +66,7 @@
     "levels": {
       "0": {
         "statsUserUplink": true,
-        "statsUserDownlink": true,
-        "statsUserOnline": true
+        "statsUserDownlink": true
       }
     },
     "system": {

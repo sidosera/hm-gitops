@@ -52,7 +52,7 @@ spec:
         - name: GF_PLUGINS_PREINSTALL_DISABLED
           value: 'true'
         - name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH
-          value: /etc/grafana/dashboards/overview.json
+          value: /etc/grafana/dashboards/proxy.json
         - name: GF_LOG_MODE
           value: console
         - name: GF_SECURITY_ADMIN_USER

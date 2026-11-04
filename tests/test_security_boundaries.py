@@ -40,15 +40,6 @@ class SecurityBoundaryTests(unittest.TestCase):
                 profiles.write_private_profile(link, 'replacement')
             self.assertEqual(target.read_text(), 'test-profile\n')
 
-    def test_environment_cannot_redirect_collector_execution_or_output(self):
-        with patch.dict(os.environ, {'XRAY_CLI':'/tmp/evil', 'METRICS_OUTPUT':'/tmp/evil-output', 'XRAY_STATS_SERVER':'attacker:123'}):
-            collector = load('hardened_collector', 'conf/monitoring/online_clients.py')
-            response = subprocess.CompletedProcess([], 0, '{"users":[]}')
-            with patch.object(collector.subprocess, 'run', return_value=response) as run:
-                collector.collect()
-            self.assertEqual(run.call_args.args[0][0], '/tools/xray')
-            self.assertIn('--server=node-xray-stats.hm.svc.cluster.local:10085', run.call_args.args[0])
-            self.assertEqual(str(collector.OUTPUT), '/textfile/xray_online.prom')
 
 
 class GatewayFinalDestinationTests(unittest.TestCase):

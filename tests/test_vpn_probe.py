@@ -83,31 +83,6 @@ class VPNProbeTests(unittest.TestCase):
         self.assertEqual((remote['address'], remote['port']), ('203.0.113.10', 443))
         self.assertEqual(client['routing']['rules'][0]['outboundTag'], 'public-vpn')
 
-    def test_vpn_matrix_uses_one_minute_minimum_and_unknown_telemetry(self):
-        d = json.loads((ROOT / 'conf/monitoring/vpn.json').read_text())
-        main = next(p for p in d['panels'] if p['id'] == 30)
-        expr = main['targets'][0]['expr']
-        for selector in ['${source_zone:regex}', '${site:regex}', 'min_over_time(', '[1m]', 'probe_last_run_timestamp_seconds', 'time() - 60']:
-            self.assertIn(selector, expr)
-        self.assertEqual(main['type'], 'table')
-        self.assertTrue(main['targets'][0]['instant'])
-        self.assertEqual(main['transformations'][0]['options'], {'columnField': 'access', 'rowField': 'site', 'valueField': 'Value', 'emptyValue': 'null'})
-        self.assertNotIn('target_zone', {v['name'] for v in d['templating']['list']})
-        self.assertFalse(any(p['id'] == 20 for p in d['panels']))
-
-    def test_observer_outage_keeps_zone_and_target_rows_visible(self):
-        d = json.loads((ROOT / 'conf/monitoring/vpn.json').read_text())
-        variables = {v['name']: v for v in d['templating']['list']}
-        zone_query = variables['source_zone']['query']['query']
-        self.assertIn('up{', zone_query)
-        self.assertNotIn('probe_target_info', zone_query)
-        self.assertIn('max_over_time(', variables['site']['query']['query'])
-        matrix = next(p for p in d['panels'] if p['id'] == 30)
-        self.assertIn('max_over_time(probe_target_info{', matrix['targets'][0]['expr'])
-        self.assertIn('[24h]', matrix['targets'][0]['expr'])
-        status = next(p for p in d['panels'] if p['id'] == 4)
-        self.assertIn('up{', status['targets'][0]['expr'])
-        self.assertNotIn('probe_success', status['targets'][0]['expr'])
 
 
 if __name__ == '__main__':

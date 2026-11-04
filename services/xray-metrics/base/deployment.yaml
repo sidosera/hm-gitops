@@ -29,6 +29,7 @@ spec:
         - --listen=:9550
         - --log-path=
         - --scrape-timeout=5
+        - --user-traffic-metrics
         ports:
         - name: http
           containerPort: 9550

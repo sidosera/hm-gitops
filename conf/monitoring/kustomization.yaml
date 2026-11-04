@@ -1,27 +1,22 @@
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 resources:
-  - grafana-auth-secret.sops.yaml
-  - client-tls-secret.sops.yaml
-  - fleet-tls-secret.sops.yaml
+- grafana-auth-secret.sops.yaml
+- client-tls-secret.sops.yaml
+- fleet-tls-secret.sops.yaml
 configMapGenerator:
-  - name: prometheus-config
-    files:
-      - prometheus.yml
-      - spb-rules.yml
-      - service-rules.yml
-  - name: grafana-datasources
-    files:
-      - datasources.yaml
-  - name: grafana-providers
-    files:
-      - dashboards.yaml
-  - name: grafana-dashboards
-    files:
-      - overview.json
-      - inventory.json
-      - vpn.json
-      - proxy.json
-  - name: online-client-code
-    files:
-      - online_clients.py
+- name: prometheus-config
+  files:
+  - prometheus.yml
+  - spb-rules.yml
+  - service-rules.yml
+- name: grafana-datasources
+  files:
+  - datasources.yaml
+- name: grafana-providers
+  files:
+  - dashboards.yaml
+- name: grafana-dashboards
+  files:
+  - inventory.json
+  - proxy.json

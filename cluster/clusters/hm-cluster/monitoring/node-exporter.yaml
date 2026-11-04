@@ -19,39 +19,6 @@ spec:
         fsGroup: 65534
         seccompProfile:
           type: RuntimeDefault
-      initContainers:
-      - name: stats-client
-        image: docker.io/library/python:3.13-alpine@sha256:7984cf56ceaddebe4fefeb75d64000b9f45d8b77b11a09b24524da6cdc3af0c8
-        command:
-        - /usr/local/bin/python3
-        - -I
-        - -c
-        - "import urllib.request,hashlib,zipfile,pathlib,os,shutil\nh=hashlib.sha256()\n\
-          with urllib.request.urlopen('https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip',timeout=60)\
-          \ as response,open('/tools/client.zip','wb') as target:\n while chunk:=response.read(65536):\n\
-          \  h.update(chunk);target.write(chunk)\nif h.hexdigest()!='e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214':\n\
-          \ raise RuntimeError('Xray client checksum mismatch')\nstaged=pathlib.Path('/tools/xray.next')\n\
-          staged.unlink(missing_ok=True)\nwith zipfile.ZipFile('/tools/client.zip')\
-          \ as archive:\n with archive.open('xray') as source,open(staged,'xb') as\
-          \ target:\n  shutil.copyfileobj(source,target)\nos.chmod(staged,0o555);os.replace(staged,'/tools/xray');os.unlink('/tools/client.zip')\n"
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 65534
-          runAsGroup: 65534
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-            - ALL
-        resources:
-          requests:
-            cpu: 10m
-            memory: 32Mi
-          limits:
-            memory: 48Mi
-        volumeMounts:
-        - name: tools
-          mountPath: /tools
       containers:
       - name: node-exporter
         image: docker.io/prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
@@ -71,8 +38,6 @@ spec:
         - --collector.uname
         - --collector.vmstat
         - --collector.pressure
-        - --collector.textfile
-        - --collector.textfile.directory=/textfile
         - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+|var/lib/rancher/k3s/agent/containerd/.+)($|/)
         - --web.config.file=/tls/web.yml
         ports:
@@ -108,43 +73,9 @@ spec:
           mountPath: /host/root
           readOnly: true
           mountPropagation: HostToContainer
-        - name: textfile
-          mountPath: /textfile
-          readOnly: true
         - name: node-tls
           mountPath: /tls
           readOnly: true
-      - name: online-clients
-        image: docker.io/library/python:3.13-alpine@sha256:7984cf56ceaddebe4fefeb75d64000b9f45d8b77b11a09b24524da6cdc3af0c8
-        command:
-        - /usr/local/bin/python3
-        - -I
-        - -B
-        - /app/online_clients.py
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 65534
-          runAsGroup: 65534
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-            - ALL
-        resources:
-          requests:
-            cpu: 5m
-            memory: 24Mi
-          limits:
-            memory: 96Mi
-        volumeMounts:
-        - name: online-client-code
-          mountPath: /app
-          readOnly: true
-        - name: tools
-          mountPath: /tools
-          readOnly: true
-        - name: textfile
-          mountPath: /textfile
       volumes:
       - name: host-proc
         hostPath:
@@ -158,15 +89,6 @@ spec:
         hostPath:
           path: /
           type: Directory
-      - name: tools
-        emptyDir:
-          sizeLimit: 128Mi
-      - name: textfile
-        emptyDir:
-          sizeLimit: 1Mi
-      - name: online-client-code
-        configMap:
-          name: online-client-code
       - name: node-tls
         secret:
           secretName: fleet-monitoring-server-tls
