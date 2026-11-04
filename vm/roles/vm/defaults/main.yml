@@ -26,55 +26,6 @@ hm_api_pod_interfaces:
 # Public age recipient only; private identities never belong in inventory.
 hm_sops_age_recipient: age1xpd0gspqq4d2neww2gwerv8p7mt2v7lyuazk5mmz2677my9rp93qd76ves
 
-# Explicit minimal-host policy. Keep SSH, firewall, networking, DNS, time sync,
-# logging and Kubernetes; do not install or run an extra scheduler for updates.
-hm_optional_systemd_units:
-  - apt-daily.timer
-  - apt-daily-upgrade.timer
-  - apt-daily.service
-  - apt-daily-upgrade.service
-  - unattended-upgrades.service
-  - cron.service
-  - anacron.service
-  - anacron.timer
-  - fwupd.service
-  - fwupd-refresh.service
-  - fwupd-refresh.timer
-  - packagekit.service
-  - multipathd.service
-  - multipathd.socket
-  - motd-news.service
-  - motd-news.timer
-  - update-notifier-download.service
-  - update-notifier-download.timer
-  - update-notifier-motd.service
-  - update-notifier-motd.timer
-  - man-db.service
-  - man-db.timer
-  - plocate-updatedb.service
-  - plocate-updatedb.timer
-  - fstrim.timer
-  - e2scrub_all.timer
-  - ua-timer.timer
-  - snapd.service
-  - snapd.socket
-  - snapd.seeded.service
-  - snapd.snap-repair.timer
-  - apport.service
-  - whoopsie.service
-  - ModemManager.service
-  - avahi-daemon.service
-  - avahi-daemon.socket
-  - bluetooth.service
-  - cups.service
-  - cups.socket
-hm_optional_openrc_services:
-  - crond
-  - dcron
-  - cronie
-  - fcron
-  - acpid
-  - avahi-daemon
-  - bluetooth
-  - cupsd
-  - modemmanager
+# Adapter fallback only. Cluster policy lists come from profile.yml.
+hm_optional_systemd_units: []
+hm_optional_openrc_services: []

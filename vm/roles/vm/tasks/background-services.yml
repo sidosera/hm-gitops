@@ -3,6 +3,7 @@
   ansible.builtin.command: systemctl list-unit-files --no-legend --no-pager
   register: hm_systemd_units
   changed_when: false
+  check_mode: false
   when: ansible_service_mgr == 'systemd'
 
 - name: Disable and mask optional systemd daemons and timers
@@ -12,7 +13,7 @@
     masked: true
     # Never terminate dpkg in the middle of an existing package transaction.
     state: "{{ omit if item in ['apt-daily.service', 'apt-daily-upgrade.service', 'unattended-upgrades.service'] else 'stopped' }}"
-  loop: "{{ hm_optional_systemd_units + ([] if hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban) | bool else ['fail2ban.service']) }}"
+  loop: "{{ (hm_machine_profile.disabled_services.systemd | default(hm_optional_systemd_units)) + ([] if hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban) | bool else ['fail2ban.service']) }}"
   when:
     - ansible_service_mgr == 'systemd'
     - item in (hm_systemd_units.stdout_lines | map('split') | map('first') | list)
@@ -54,7 +55,7 @@
     get_checksum: false
     get_mime: false
     get_attributes: false
-  loop: "{{ hm_optional_openrc_services + ([] if hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban) | bool else ['fail2ban']) }}"
+  loop: "{{ (hm_machine_profile.disabled_services.openrc | default(hm_optional_openrc_services)) + ([] if hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban) | bool else ['fail2ban']) }}"
   register: hm_openrc_optional
   when: ansible_service_mgr == 'openrc'
 
@@ -75,7 +76,7 @@
     paths: /etc/runlevels
     recurse: true
     file_type: link
-    patterns: "{{ hm_optional_openrc_services + ([] if hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban) | bool else ['fail2ban']) }}"
+    patterns: "{{ (hm_machine_profile.disabled_services.openrc | default(hm_optional_openrc_services)) + ([] if hm_machine_profile.auto_fail2ban | default(hm_auto_fail2ban) | bool else ['fail2ban']) }}"
   register: hm_optional_runlevel_links
   when: ansible_service_mgr == 'openrc'
 

@@ -5,6 +5,10 @@
 - name: Alpine host adapter smoke test
   hosts: all
   gather_facts: false
+  vars_files:
+    - ../../cluster/clusters/hm-cluster/profile.yml
+  vars:
+    hm_machine_profile: "{{ vm_cluster_profile.host }}"
   pre_tasks:
     - ansible.builtin.include_tasks: ../../vm/tasks/python-bootstrap.yml
     - name: Account for the container test harness PID 1

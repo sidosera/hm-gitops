@@ -53,8 +53,8 @@ class APIFirewallTests(unittest.TestCase):
         for agent in [False, True]:
             rendered = render(script, agent=agent)
             self.assertNotIn('ufw allow 6443', rendered)
-        defaults = yaml.safe_load((ROOT / 'vm/group_vars/all.yml').read_text())
-        self.assertNotIn(6443, defaults['vm_firewall_allowed_tcp'])
+        profile = yaml.safe_load((ROOT / 'cluster/clusters/hm-cluster/profile.yml').read_text())['vm_cluster_profile']
+        self.assertNotIn(6443, profile['host']['firewall_allowed_tcp'])
         self.assertTrue(any(task.get('ansible.builtin.include_tasks') == 'api-firewall.yml' for task in security))
 
 

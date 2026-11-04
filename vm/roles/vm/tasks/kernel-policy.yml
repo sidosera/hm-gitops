@@ -1,0 +1,78 @@
+---
+- name: Read required cgroup v2 controllers
+  ansible.builtin.command: cat /sys/fs/cgroup/cgroup.controllers
+  register: hm_cgroup_controllers
+  changed_when: false
+  check_mode: false
+- name: Require kernel support before installing Kubernetes
+  ansible.builtin.assert:
+    that:
+      - "'cpu' in hm_cgroup_controllers.stdout.split()"
+      - "'memory' in hm_cgroup_controllers.stdout.split()"
+      - "'pids' in hm_cgroup_controllers.stdout.split()"
+      - "'cpuset' in hm_cgroup_controllers.stdout.split()"
+    fail_msg: "The running host kernel needs cgroup v2 CPU, memory, pids and cpuset controllers. Correct boot settings and reboot before joining; provisioning does not reboot hosts."
+# node-exporter's read-only HostToContainer mount needs shared host mounts.
+# Persist this in the existing mount configuration; no extra boot service.
+- name: Persist shared root mount propagation
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#\n]+\s+/\s+\S+\s+)(?!\S*\brshared\b)(\S+)([ \t]+[0-9]+[ \t]+[0-9]+[ \t]*)$'
+    replace: '\1\2,rshared\3'
+  when: hm_machine_profile.shared_root_mount | bool
+- name: Enable shared host mount propagation
+  ansible.builtin.command:
+    argv: [/bin/mount, --make-rshared, /]
+  changed_when: false
+  when: hm_machine_profile.shared_root_mount | bool
+# Both init adapters persist the same cluster policy before Kubernetes starts.
+# Neither needs an additional daemon or scheduled job.
+- name: Disable transparent huge pages before services start
+  ansible.builtin.blockinfile:
+    path: /etc/conf.d/localmount
+    create: true
+    owner: root
+    group: root
+    mode: '0644'
+    marker: '# {mark} HM SMALL HOST MEMORY POLICY'
+    block: |
+      start_post() {
+          if [ -e /sys/kernel/mm/transparent_hugepage/enabled ]; then
+              printf '%s\n' {{ hm_machine_profile.transparent_hugepages | quote }} > /sys/kernel/mm/transparent_hugepage/enabled
+              printf '%s\n' {{ hm_machine_profile.transparent_hugepages | quote }} > /sys/kernel/mm/transparent_hugepage/defrag
+          fi
+      }
+    validate: /bin/sh -n %s
+  when: ansible_service_mgr == 'openrc'
+- name: Persist transparent huge page policy with the existing systemd boot service
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/hm-memory.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      w /sys/kernel/mm/transparent_hugepage/enabled - - - - {{ hm_machine_profile.transparent_hugepages }}
+      w /sys/kernel/mm/transparent_hugepage/defrag - - - - {{ hm_machine_profile.transparent_hugepages }}
+  when: ansible_service_mgr == 'systemd'
+- name: Apply transparent huge page policy to the running host
+  ansible.builtin.shell: |
+    if [ -e /sys/kernel/mm/transparent_hugepage/enabled ]; then
+        printf '%s\n' {{ hm_machine_profile.transparent_hugepages | quote }} > /sys/kernel/mm/transparent_hugepage/enabled
+        printf '%s\n' {{ hm_machine_profile.transparent_hugepages | quote }} > /sys/kernel/mm/transparent_hugepage/defrag
+    fi
+  changed_when: false
+- name: Create kernel module configuration directory
+  ansible.builtin.file:
+    path: /etc/modules-load.d
+    state: directory
+    mode: '0755'
+- name: Persist Kubernetes kernel modules
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/hm-kubernetes.conf
+    mode: '0644'
+    content: "{{ hm_machine_profile.kernel_modules | join('\n') }}\n"
+- name: Load required kernel modules before joining
+  ansible.builtin.command:
+    argv: [modprobe, '{{ item }}']
+  loop: "{{ hm_machine_profile.kernel_modules }}"
+  changed_when: false

@@ -1,16 +1,16 @@
 ---
+- name: Apply the cluster kernel and memory profile before Kubernetes
+  ansible.builtin.include_tasks: kernel-policy.yml
 - name: Keep IPv6 router advertisements while forwarding pod traffic
   ansible.builtin.copy:
     dest: /etc/sysctl.d/90-hm-kubernetes.conf
     mode: '0644'
     content: |
-      net.ipv6.conf.all.accept_ra=2
-      net.ipv6.conf.default.accept_ra=2
+      {% for key, value in hm_machine_profile.sysctls | dictsort %}
+      {{ key }}={{ value }}
+      {% endfor %}
 - name: Apply IPv6 router advertisement setting
   ansible.builtin.command: sysctl -p /etc/sysctl.d/90-hm-kubernetes.conf
-  changed_when: false
-- name: Enable WireGuard kernel module
-  ansible.builtin.command: modprobe wireguard
   changed_when: false
 - name: Disable optional background services
   ansible.builtin.include_tasks: background-services.yml

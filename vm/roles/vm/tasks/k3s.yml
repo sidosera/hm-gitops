@@ -25,7 +25,7 @@
 
 - name: Build k3s server config
   ansible.builtin.set_fact:
-    _k3s_server_config: "{{ _base | combine(_ipv6_extra) }}"
+    _k3s_server_config: "{{ _base | combine(_ipv6_extra) | combine(hm_role_profile.k3s_config) }}"
   vars:
     _base:
       node-name: "{{ hm_node_name }}"

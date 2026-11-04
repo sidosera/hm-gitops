@@ -9,6 +9,6 @@
     group: root
     mode: '0600'
     marker: '# {mark} HM KUBERNETES BOOT DEPENDENCIES'
-    block: 'rc_need="${rc_need:-} cgroups{{ " ufw" if (hm_machine_profile.apply_security | default(hm_apply_security) | bool) and (hm_machine_profile.auto_firewall | default(hm_auto_firewall) | bool) else "" }}"'
+    block: 'rc_need="${rc_need:-} cgroups localmount{{ " ufw" if (hm_machine_profile.apply_security | default(hm_apply_security) | bool) and (hm_machine_profile.auto_firewall | default(hm_auto_firewall) | bool) else "" }}"'
     validate: /bin/sh -n %s
   loop: [k3s, k3s-agent]

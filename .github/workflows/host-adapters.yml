@@ -1,10 +1,10 @@
 name: Host adapter validation
 on:
   pull_request:
-    paths: ['vm/**', 'tests/provisioning/**', '.github/workflows/host-adapters.yml']
+    paths: ['vm/**', 'cluster/clusters/**/hosts.yml', 'cluster/clusters/**/profile.yml', 'tests/provisioning/**', 'tests/test_cluster_profile.py', '.github/workflows/host-adapters.yml']
   push:
     branches: [main]
-    paths: ['vm/**', 'tests/provisioning/**', '.github/workflows/host-adapters.yml']
+    paths: ['vm/**', 'cluster/clusters/**/hosts.yml', 'cluster/clusters/**/profile.yml', 'tests/provisioning/**', 'tests/test_cluster_profile.py', '.github/workflows/host-adapters.yml']
 permissions:
   contents: read
 jobs:
@@ -20,6 +20,13 @@ jobs:
           echo "$RUNNER_TEMP/host-adapters-venv/bin" >> "$GITHUB_PATH"
       - name: Install pinned provisioning collection
         run: ansible-galaxy collection install -r vm/requirements.yml
+      - name: Validate cluster profile and role inventory without host access
+        env:
+          ANSIBLE_CONFIG: vm/ansible.cfg
+        run: |
+          python -m unittest discover -s tests -p test_cluster_profile.py -v
+          ansible-playbook -i vm/inventory/localhost.yml vm/playbooks/bootstrap.yml \
+            -e vm_hosts_file="$PWD/cluster/clusters/hm-cluster/hosts.yml" --limit localhost
       - name: Validate Alpine host adapter
         run: |
           export PATH="$HOME/.local/bin:$PATH"

@@ -3,47 +3,11 @@
   ansible.builtin.assert:
     that: ansible_service_mgr == 'openrc'
     fail_msg: Alpine hosts must boot OpenRC before provisioning.
-# node-exporter's read-only HostToContainer mount needs shared host mounts.
-# Persist this in the existing mount configuration; no extra boot service.
-- name: Persist shared root mount propagation
-  ansible.builtin.replace:
-    path: /etc/fstab
-    regexp: '^([^#\n]+\s+/\s+\S+\s+)(?!\S*\brshared\b)(\S+)([ \t]+[0-9]+[ \t]+[0-9]+[ \t]*)$'
-    replace: '\1\2,rshared\3'
-- name: Enable shared host mount propagation
-  ansible.builtin.command:
-    argv: [/bin/mount, --make-rshared, /]
-  changed_when: false
-# The provider's THP=always default wastes memory on this small Go workload.
-# Use the existing localmount boot hook, with no daemon or scheduled job.
-- name: Disable transparent huge pages before services start
-  ansible.builtin.blockinfile:
-    path: /etc/conf.d/localmount
-    create: true
-    owner: root
-    group: root
-    mode: '0644'
-    marker: '# {mark} HM SMALL HOST MEMORY POLICY'
-    block: |
-      start_post() {
-          if [ -e /sys/kernel/mm/transparent_hugepage/enabled ]; then
-              printf 'never\n' > /sys/kernel/mm/transparent_hugepage/enabled
-              printf 'never\n' > /sys/kernel/mm/transparent_hugepage/defrag
-          fi
-      }
-    validate: /bin/sh -n %s
-- name: Apply transparent huge page policy to the running host
-  ansible.builtin.shell: |
-    if [ -e /sys/kernel/mm/transparent_hugepage/enabled ]; then
-        printf 'never\n' > /sys/kernel/mm/transparent_hugepage/enabled
-        printf 'never\n' > /sys/kernel/mm/transparent_hugepage/defrag
-    fi
-  changed_when: false
 - name: Persist unified cgroup mode
   ansible.builtin.lineinfile:
     path: /etc/rc.conf
     regexp: '^rc_cgroup_mode='
-    line: 'rc_cgroup_mode="unified"'
+    line: 'rc_cgroup_mode="{{ hm_machine_profile.cgroup_mode }}"'
 - name: Enable cgroups at boot
   ansible.builtin.service:
     name: cgroups
@@ -51,36 +15,6 @@
     runlevel: boot
     enabled: true
     state: started
-- name: Read required cgroup v2 controllers
-  ansible.builtin.command: cat /sys/fs/cgroup/cgroup.controllers
-  register: hm_cgroup_controllers
-  changed_when: false
-- name: Require kernel support before installing Kubernetes
-  ansible.builtin.assert:
-    that:
-      - "'cpu' in hm_cgroup_controllers.stdout.split()"
-      - "'memory' in hm_cgroup_controllers.stdout.split()"
-      - "'pids' in hm_cgroup_controllers.stdout.split()"
-      - "'cpuset' in hm_cgroup_controllers.stdout.split()"
-    fail_msg: "The running Alpine kernel needs cgroup v2 CPU, memory, pids and cpuset controllers. Correct boot settings and reboot before joining; provisioning does not reboot hosts."
-- name: Create kernel module configuration directory
-  ansible.builtin.file:
-    path: /etc/modules-load.d
-    state: directory
-    mode: '0755'
-- name: Persist Kubernetes kernel modules
-  ansible.builtin.copy:
-    dest: /etc/modules-load.d/hm-kubernetes.conf
-    mode: '0644'
-    content: |
-      overlay
-      br_netfilter
-      wireguard
-- name: Load required kernel modules before joining
-  ansible.builtin.command:
-    argv: [modprobe, '{{ item }}']
-  loop: [overlay, br_netfilter, wireguard]
-  changed_when: false
 - name: Enable module loading at boot
   ansible.builtin.service:
     name: modules

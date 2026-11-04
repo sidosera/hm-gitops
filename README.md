@@ -40,7 +40,7 @@ The provisioning contract is:
 - the GitHub workflow uses the shared gitops SSH key
 - the SSH user comes from `vm/group_vars/all.yml`
 
-To add a new VM to a cluster, append its IPv4 to `cluster/clusters/<cluster>/hosts.yml` and run the `Cluster Converge` workflow for that cluster.
+To add a new VM to a cluster, add its address and explicit `control_plane` or `agent` role to `cluster/clusters/<cluster>/hosts.yml` and run `Cluster Converge`. The adjacent [cluster profile](cluster/clusters/hm-cluster/profile.yml) supplies common host policy and role resource settings before K3s starts; new machines inherit that policy.
 
 Kubernetes API TCP 6443 is not a public port. Ansible permits it on server nodes only from inventory node addresses and the pod CIDRs on CNI/WireGuard interfaces. Worker nodes do not expose an API listener. Public TCP defaults are SSH 22, HTTP 80 (server only) and HTTPS/VPN 443. The API port is excluded even if an old public-port profile still lists it.
 

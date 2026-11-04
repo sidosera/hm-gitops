@@ -1,0 +1,89 @@
+# Shared cluster host policy. Values are applied before installing/starting K3s.
+# Application container resources remain in their Kubernetes manifests.
+vm_cluster_profile:
+  host:
+    apply_security: true
+    auto_firewall: true
+    firewall_allowed_tcp:
+    - 22
+    - 80
+    - 443
+    auto_fail2ban: false
+    automatic_package_updates: false
+    auto_ssh_harden: true
+    extra_packages: []
+    k3s_channel: stable
+    cgroup_mode: unified
+    shared_root_mount: true
+    transparent_hugepages: never
+    kernel_modules:
+    - overlay
+    - br_netfilter
+    - wireguard
+    sysctls:
+      net.ipv6.conf.all.accept_ra: 2
+      net.ipv6.conf.default.accept_ra: 2
+    disabled_services:
+      systemd:
+      - apt-daily.timer
+      - apt-daily-upgrade.timer
+      - apt-daily.service
+      - apt-daily-upgrade.service
+      - unattended-upgrades.service
+      - cron.service
+      - anacron.service
+      - anacron.timer
+      - fwupd.service
+      - fwupd-refresh.service
+      - fwupd-refresh.timer
+      - packagekit.service
+      - multipathd.service
+      - multipathd.socket
+      - motd-news.service
+      - motd-news.timer
+      - update-notifier-download.service
+      - update-notifier-download.timer
+      - update-notifier-motd.service
+      - update-notifier-motd.timer
+      - man-db.service
+      - man-db.timer
+      - plocate-updatedb.service
+      - plocate-updatedb.timer
+      - fstrim.timer
+      - e2scrub_all.timer
+      - ua-timer.timer
+      - snapd.service
+      - snapd.socket
+      - snapd.seeded.service
+      - snapd.snap-repair.timer
+      - apport.service
+      - whoopsie.service
+      - ModemManager.service
+      - avahi-daemon.service
+      - avahi-daemon.socket
+      - bluetooth.service
+      - cups.service
+      - cups.socket
+      openrc:
+      - crond
+      - dcron
+      - cronie
+      - fcron
+      - acpid
+      - avahi-daemon
+      - bluetooth
+      - cupsd
+      - modemmanager
+  roles:
+    control_plane:
+      k3s_config: {}
+    agent:
+      k3s_config:
+        kubelet-arg:
+        - system-reserved=memory=64Mi
+        - kube-reserved=memory=96Mi
+        - eviction-hard=memory.available<40Mi,nodefs.available<5%,imagefs.available<5%
+        - max-pods=20
+        kube-proxy-arg:
+        - conntrack-max-per-core=8192
+        - conntrack-min=8192
