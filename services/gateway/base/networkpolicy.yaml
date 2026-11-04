@@ -12,7 +12,7 @@ spec:
   - from:
     - podSelector:
         matchLabels:
-          app.kubernetes.io/name: node-exporter
+          app.kubernetes.io/name: xray-exporter
     ports:
     - protocol: TCP
       port: 10085

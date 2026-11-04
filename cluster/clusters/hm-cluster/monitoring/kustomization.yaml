@@ -5,7 +5,6 @@ resources:
   - grafana.yaml
   - prometheus.yaml
   - node-exporter.yaml
-  - kube-state-metrics.yaml
   - ../../../../services/xray-metrics/overlays/uk-ldn-1
   - ../../../../services/xray-metrics/overlays/ru-spb-1
   - archived-dashboard-storage.yaml

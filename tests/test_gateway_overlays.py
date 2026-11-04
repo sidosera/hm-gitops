@@ -67,8 +67,8 @@ class GatewayOverlayTests(unittest.TestCase):
         self.assertIn('@sha256:', images[0])
 
     def test_source_selectors_are_not_rewritten_as_gateway_selectors(self):
-        for name, expected in [('proxy-service', {'traefik', 'xray-exporter', 'node-exporter'}),
-                               ('spb-gateway', {'node-exporter', 'xray-exporter'})]:
+        for name, expected in [('proxy-service', {'traefik', 'xray-exporter'}),
+                               ('spb-gateway', {'xray-exporter'})]:
             policy = self.resources['NetworkPolicy', name + '-ingress']['spec']
             self.assertEqual(policy['podSelector']['matchLabels'], {'app.kubernetes.io/name': name})
             sources = {source['podSelector']['matchLabels']['app.kubernetes.io/name']

@@ -1,12 +1,14 @@
-# Retain the previous SQLite history volume after replacing the custom dashboard.
+# Historical data only; no workload mounts this volume. Keep until explicit data-retention decision.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: metrics-dashboard-data
   namespace: hm
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   accessModes:
-    - ReadWriteOnce
+  - ReadWriteOnce
   storageClassName: local-path
   resources:
     requests:

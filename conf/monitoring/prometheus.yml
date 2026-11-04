@@ -83,20 +83,9 @@ scrape_configs:
   metric_relabel_configs:
   - source_labels:
     - __name__
-    regex: node_cpu_usage_seconds_total|node_memory_working_set_bytes|container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_start_time_seconds|pod_cpu_usage_seconds_total|pod_memory_working_set_bytes
+    regex: node_cpu_usage_seconds_total|node_memory_working_set_bytes
     action: keep
   sample_limit: 2000
-- job_name: kube-state-metrics
-  static_configs:
-  - targets:
-    - kube-state-metrics.hm.svc.cluster.local:8080
-    labels:
-      service: kubernetes
-      pop: uk-ldn
-      zone: uk-ldn-1
-      cluster: hm-cluster
-      country: uk
-  sample_limit: 1500
 - job_name: xray
   metrics_path: /scrape
   static_configs:
@@ -158,4 +147,4 @@ scrape_configs:
   honor_timestamps: true
 rule_files:
 - /etc/prometheus/spb-rules.yml
-- /etc/prometheus/service-rules.yml
+- /etc/prometheus/host-rules.yml

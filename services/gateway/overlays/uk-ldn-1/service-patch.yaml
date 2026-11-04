@@ -18,6 +18,3 @@ spec:
   - name: stats-api
     port: 10085
     targetPort: stats-api
-  - name: metrics
-    port: 11111
-    targetPort: metrics

@@ -8,18 +8,18 @@ spec:
     matchLabels:
       app.kubernetes.io/name: grafana
   policyTypes:
-    - Ingress
+  - Ingress
   ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: traefik
-          namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - protocol: TCP
-          port: 3000
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: TCP
+      port: 3000
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -31,35 +31,15 @@ spec:
     matchLabels:
       app.kubernetes.io/name: prometheus
   policyTypes:
-    - Ingress
+  - Ingress
   ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: grafana
-      ports:
-        - protocol: TCP
-          port: 9090
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: kube-state-metrics-ingress
-  namespace: hm
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: kube-state-metrics
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: prometheus
-      ports:
-        - protocol: TCP
-          port: 8080
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: grafana
+    ports:
+    - protocol: TCP
+      port: 9090
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -71,15 +51,15 @@ spec:
     matchLabels:
       app.kubernetes.io/name: xray-exporter
   policyTypes:
-    - Ingress
+  - Ingress
   ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: prometheus
-      ports:
-        - protocol: TCP
-          port: 9550
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 9550
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -91,27 +71,27 @@ spec:
     matchLabels:
       app.kubernetes.io/name: grafana
   policyTypes:
-    - Egress
+  - Egress
   egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: prometheus
-      ports:
-        - protocol: TCP
-          port: 9090
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              k8s-app: kube-dns
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 9090
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -123,17 +103,17 @@ spec:
     matchLabels:
       app.kubernetes.io/name: www-service
   policyTypes:
-    - Ingress
-    - Egress
+  - Ingress
+  - Egress
   ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: traefik
-      ports:
-        - protocol: TCP
-          port: 8080
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 8080
   egress: []

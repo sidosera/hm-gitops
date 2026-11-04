@@ -1,15 +1,12 @@
-"""Security regressions for private exports and fixed collector execution."""
+"""Security regressions for private exports and gateway destination isolation."""
 import base64
 import importlib.util
 import ipaddress
 import json
-import os
 from pathlib import Path
 import stat
-import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 def load(name, path):

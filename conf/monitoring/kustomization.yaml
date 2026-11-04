@@ -9,7 +9,7 @@ configMapGenerator:
   files:
   - prometheus.yml
   - spb-rules.yml
-  - service-rules.yml
+  - host-rules.yml
 - name: grafana-datasources
   files:
   - datasources.yaml

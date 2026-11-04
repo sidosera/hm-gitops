@@ -1,0 +1,10 @@
+groups:
+- name: host-availability
+  interval: 30s
+  rules:
+  - record: hm:node:info
+    expr: max by(cluster,zone,host,machine,node) (0 * up{job="kubelet",cluster!="",zone!="",node!=""}
+      + 1)
+  - record: hm:node:up
+    expr: (max by(cluster,node) (up{job="kubelet",cluster!="",node!=""} * (timestamp(up{job="kubelet",cluster!="",node!=""})
+      > bool time() - 90))) or on(cluster,node) (0 * hm:node:info)

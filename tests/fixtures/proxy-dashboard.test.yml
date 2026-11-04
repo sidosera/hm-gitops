@@ -1,80 +1,97 @@
+# Current client chart: cross-zone aggregation, upstream/scrape failure, stale collector and absent zone.
 fuzzy_compare: true
 evaluation_interval: 30s
 tests:
 - interval: 30s
   input_series:
-  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a",dimension="inbound",target="same-listener"}
-    values: 0+3000x10
-  - series: xray_up{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a"}
+  - series: up{cluster="test",zone="zone-a",service="gateway",job="xray",instance="a"}
     values: 1+0x10
-  - series: up{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a"}
+  - series: xray_up{cluster="test",zone="zone-a",service="gateway",job="xray",instance="a"}
     values: 1+0x10
-  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a",dimension="inbound",target="probe-direct"}
-    values: 0+900000x10
-  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a",dimension="inbound",target="api-in"}
-    values: 0+900000x10
-  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="zone-a",dimension="user",target="private-profile"}
-    values: 0+900000x10
-  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b",dimension="inbound",target="same-listener"}
-    values: 0+6000x10
-  - series: xray_up{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b"}
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="a",dimension="user",target="client-shared"}
+    values: 0+30x10
+  - series: xray_traffic_downlink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="a",dimension="user",target="client-shared"}
+    values: 0+60x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="a",dimension="inbound",target="public"}
+    values: 0+999999x10
+  - series: up{cluster="test",zone="zone-b",service="gateway",job="xray",instance="b"}
     values: 1+0x10
-  - series: up{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b"}
+  - series: xray_up{cluster="test",zone="zone-b",service="gateway",job="xray",instance="b"}
     values: 1+0x10
-  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b",dimension="inbound",target="probe-direct"}
-    values: 0+900000x10
-  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b",dimension="inbound",target="api-in"}
-    values: 0+900000x10
-  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="zone-b",dimension="user",target="private-profile"}
-    values: 0+900000x10
-  - series: up{cluster="test",zone="zone-a",service="gateway",job="xray",instance="removed-collector"}
-    values: 1 1 1
-  - series: xray_up{cluster="test",zone="zone-a",service="gateway",job="xray",instance="removed-collector"}
-    values: 1 1 1
-  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="removed-collector",dimension="inbound",target="same-listener"}
-    values: 0+900000x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="b",dimension="user",target="client-shared"}
+    values: 0+120x10
+  - series: xray_traffic_downlink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="b",dimension="user",target="client-shared"}
+    values: 0+150x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-b",service="gateway",job="xray",instance="b",dimension="inbound",target="public"}
+    values: 0+999999x10
+  - series: up{cluster="test",zone="zone-c",service="gateway",job="xray",instance="failed"}
+    values: 1+0x10
+  - series: xray_up{cluster="test",zone="zone-c",service="gateway",job="xray",instance="failed"}
+    values: 0+0x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-c",service="gateway",job="xray",instance="failed",dimension="user",target="client-shared"}
+    values: 0+120x10
+  - series: xray_traffic_downlink_bytes_total{cluster="test",zone="zone-c",service="gateway",job="xray",instance="failed",dimension="user",target="client-shared"}
+    values: 0+150x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-c",service="gateway",job="xray",instance="failed",dimension="inbound",target="public"}
+    values: 0+999999x10
+  - series: up{cluster="test",zone="zone-a",service="gateway",job="xray",instance="stale"}
+    values: 1 1 1 _x8
+  - series: xray_up{cluster="test",zone="zone-a",service="gateway",job="xray",instance="stale"}
+    values: 1+0x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="stale",dimension="user",target="client-shared"}
+    values: 0+120x10
+  - series: xray_traffic_downlink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="stale",dimension="user",target="client-shared"}
+    values: 0+150x10
+  - series: xray_traffic_uplink_bytes_total{cluster="test",zone="zone-a",service="gateway",job="xray",instance="stale",dimension="inbound",target="public"}
+    values: 0+999999x10
   promql_expr_test:
-  - expr: (sum by(cluster,zone) ((rate(xray_traffic_uplink_bytes_total{cluster=~"test",service="gateway",zone=~".*",dimension="inbound",target=~".*",target!~"api-in|stats-api|probe-.*"}[2m])
-      and on(job,instance) ((xray_up{cluster=~"test",service="gateway",zone=~".*"}
-      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~".*",job="xray"}
-      == 1) and on(job,instance) ((time() - timestamp(up{cluster=~"test",service="gateway",zone=~".*",job="xray"}))
-      < 90)))) * 8) and on(cluster,zone) ((xray_up{cluster=~"test",service="gateway",zone=~".*"}
-      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~".*",job="xray"}
-      == 1))
+  - expr: (8 * (sum by(cluster,target) ((rate(xray_traffic_uplink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~".*",dimension="user"}[2m])
+      and on(job,instance) (((xray_up{job="xray",service="gateway",cluster=~"test",zone=~".*"} == 1) and on(job,instance)
+      (up{job="xray",service="gateway",cluster=~"test",zone=~".*"} == 1)) and on(job,instance) (timestamp(up{job="xray",service="gateway",cluster=~"test",zone=~".*"})
+      > time() - 90)))) + sum by(cluster,target) ((rate(xray_traffic_downlink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~".*",dimension="user"}[2m])
+      and on(job,instance) (((xray_up{job="xray",service="gateway",cluster=~"test",zone=~".*"} == 1) and on(job,instance)
+      (up{job="xray",service="gateway",cluster=~"test",zone=~".*"} == 1)) and on(job,instance) (timestamp(up{job="xray",service="gateway",cluster=~"test",zone=~".*"})
+      > time() - 90)))))) and on(cluster,target) topk(100, sum by(cluster,target) (increase(xray_traffic_uplink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~".*",dimension="user"}[5m]
+      @ end())) + sum by(cluster,target) (increase(xray_traffic_downlink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~".*",dimension="user"}[5m]
+      @ end())))
     eval_time: 5m
     exp_samples:
-    - labels: '{cluster="test",zone="zone-a"}'
-      value: 800
-    - labels: '{cluster="test",zone="zone-b"}'
-      value: 1600
-  - expr: (sum by(cluster,zone) ((rate(xray_traffic_uplink_bytes_total{cluster=~"test",service="gateway",zone=~"zone-a",dimension="inbound",target=~".*",target!~"api-in|stats-api|probe-.*"}[2m])
-      and on(job,instance) ((xray_up{cluster=~"test",service="gateway",zone=~"zone-a"}
-      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~"zone-a",job="xray"}
-      == 1) and on(job,instance) ((time() - timestamp(up{cluster=~"test",service="gateway",zone=~"zone-a",job="xray"}))
-      < 90)))) * 8) and on(cluster,zone) ((xray_up{cluster=~"test",service="gateway",zone=~"zone-a"}
-      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~"zone-a",job="xray"}
-      == 1))
+    - labels: '{cluster="test",target="client-shared"}'
+      value: 96
+  - expr: (8 * (sum by(cluster,target) ((rate(xray_traffic_uplink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"zone-a",dimension="user"}[2m])
+      and on(job,instance) (((xray_up{job="xray",service="gateway",cluster=~"test",zone=~"zone-a"} == 1) and on(job,instance)
+      (up{job="xray",service="gateway",cluster=~"test",zone=~"zone-a"} == 1)) and on(job,instance) (timestamp(up{job="xray",service="gateway",cluster=~"test",zone=~"zone-a"})
+      > time() - 90)))) + sum by(cluster,target) ((rate(xray_traffic_downlink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"zone-a",dimension="user"}[2m])
+      and on(job,instance) (((xray_up{job="xray",service="gateway",cluster=~"test",zone=~"zone-a"} == 1) and on(job,instance)
+      (up{job="xray",service="gateway",cluster=~"test",zone=~"zone-a"} == 1)) and on(job,instance) (timestamp(up{job="xray",service="gateway",cluster=~"test",zone=~"zone-a"})
+      > time() - 90)))))) and on(cluster,target) topk(100, sum by(cluster,target) (increase(xray_traffic_uplink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"zone-a",dimension="user"}[5m]
+      @ end())) + sum by(cluster,target) (increase(xray_traffic_downlink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"zone-a",dimension="user"}[5m]
+      @ end())))
     eval_time: 5m
     exp_samples:
-    - labels: '{cluster="test",zone="zone-a"}'
-      value: 800
-  - expr: (sum by(cluster,zone) ((rate(xray_traffic_uplink_bytes_total{cluster=~"test",service="gateway",zone=~"zone-b",dimension="inbound",target=~".*",target!~"api-in|stats-api|probe-.*"}[2m])
-      and on(job,instance) ((xray_up{cluster=~"test",service="gateway",zone=~"zone-b"}
-      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~"zone-b",job="xray"}
-      == 1) and on(job,instance) ((time() - timestamp(up{cluster=~"test",service="gateway",zone=~"zone-b",job="xray"}))
-      < 90)))) * 8) and on(cluster,zone) ((xray_up{cluster=~"test",service="gateway",zone=~"zone-b"}
-      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~"zone-b",job="xray"}
-      == 1))
+    - labels: '{cluster="test",target="client-shared"}'
+      value: 24
+  - expr: (8 * (sum by(cluster,target) ((rate(xray_traffic_uplink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"zone-b",dimension="user"}[2m])
+      and on(job,instance) (((xray_up{job="xray",service="gateway",cluster=~"test",zone=~"zone-b"} == 1) and on(job,instance)
+      (up{job="xray",service="gateway",cluster=~"test",zone=~"zone-b"} == 1)) and on(job,instance) (timestamp(up{job="xray",service="gateway",cluster=~"test",zone=~"zone-b"})
+      > time() - 90)))) + sum by(cluster,target) ((rate(xray_traffic_downlink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"zone-b",dimension="user"}[2m])
+      and on(job,instance) (((xray_up{job="xray",service="gateway",cluster=~"test",zone=~"zone-b"} == 1) and on(job,instance)
+      (up{job="xray",service="gateway",cluster=~"test",zone=~"zone-b"} == 1)) and on(job,instance) (timestamp(up{job="xray",service="gateway",cluster=~"test",zone=~"zone-b"})
+      > time() - 90)))))) and on(cluster,target) topk(100, sum by(cluster,target) (increase(xray_traffic_uplink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"zone-b",dimension="user"}[5m]
+      @ end())) + sum by(cluster,target) (increase(xray_traffic_downlink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"zone-b",dimension="user"}[5m]
+      @ end())))
     eval_time: 5m
     exp_samples:
-    - labels: '{cluster="test",zone="zone-b"}'
-      value: 1600
-  - expr: (sum by(cluster,zone) ((rate(xray_traffic_uplink_bytes_total{cluster=~"test",service="gateway",zone=~"missing",dimension="inbound",target=~".*",target!~"api-in|stats-api|probe-.*"}[2m])
-      and on(job,instance) ((xray_up{cluster=~"test",service="gateway",zone=~"missing"}
-      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~"missing",job="xray"}
-      == 1) and on(job,instance) ((time() - timestamp(up{cluster=~"test",service="gateway",zone=~"missing",job="xray"}))
-      < 90)))) * 8) and on(cluster,zone) ((xray_up{cluster=~"test",service="gateway",zone=~"missing"}
-      == 1) and on(job,instance) (up{cluster=~"test",service="gateway",zone=~"missing",job="xray"}
-      == 1))
+    - labels: '{cluster="test",target="client-shared"}'
+      value: 72
+  - expr: (8 * (sum by(cluster,target) ((rate(xray_traffic_uplink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"missing",dimension="user"}[2m])
+      and on(job,instance) (((xray_up{job="xray",service="gateway",cluster=~"test",zone=~"missing"} == 1) and on(job,instance)
+      (up{job="xray",service="gateway",cluster=~"test",zone=~"missing"} == 1)) and on(job,instance) (timestamp(up{job="xray",service="gateway",cluster=~"test",zone=~"missing"})
+      > time() - 90)))) + sum by(cluster,target) ((rate(xray_traffic_downlink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"missing",dimension="user"}[2m])
+      and on(job,instance) (((xray_up{job="xray",service="gateway",cluster=~"test",zone=~"missing"} == 1) and on(job,instance)
+      (up{job="xray",service="gateway",cluster=~"test",zone=~"missing"} == 1)) and on(job,instance) (timestamp(up{job="xray",service="gateway",cluster=~"test",zone=~"missing"})
+      > time() - 90)))))) and on(cluster,target) topk(100, sum by(cluster,target) (increase(xray_traffic_uplink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"missing",dimension="user"}[5m]
+      @ end())) + sum by(cluster,target) (increase(xray_traffic_downlink_bytes_total{job="xray",service="gateway",cluster=~"test",zone=~"missing",dimension="user"}[5m]
+      @ end())))
     eval_time: 5m
     exp_samples: []

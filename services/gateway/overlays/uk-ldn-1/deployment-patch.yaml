@@ -19,8 +19,6 @@ spec:
           containerPort: 11443
         - name: stats-api
           containerPort: 10085
-        - name: metrics
-          containerPort: 11111
         resources:
           requests:
             cpu: 50m

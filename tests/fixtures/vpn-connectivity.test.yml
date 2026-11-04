@@ -1,3 +1,5 @@
+# Current sparkline queries. Comparison encoding: NaN=0, failed=1, reachable=2.
+# NaN != NaN in promtool expected-sample comparison; this preserves all three states.
 rule_files: []
 evaluation_interval: 15s
 tests:
@@ -36,23 +38,42 @@ tests:
   - series: probe_target_info{cluster="hm-cluster",job="vpn-client-probes",source_zone="ru-spb-1",instance="observer:9115",check="client-web",site="stale",access="vpn"}
     values: 1 1 1 1 1
   promql_expr_test:
-  - expr: min by(site,access) (min_over_time(probe_success{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}[1m])
-      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}
-      > time() - 60) and on(job,instance) (up{cluster=~"hm-cluster",job="vpn-client-probes",source_zone=~"ru-spb-1"}
-      == 1)) or on(site,access) (0 * max by(site,access) (max_over_time(probe_target_info{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}[24h]))
-      - 1)
+  - expr: ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[24h]))
+      / 0)) == bool 0) + 2 * ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[24h]))
+      / 0)) == bool 1)
     eval_time: 1m
     exp_samples:
-    - labels: '{site="ok",access="vpn"}'
+    - labels: '{source_zone="ru-spb-1",site="ok"}'
       value: 1
-    - labels: '{site="ok",access="direct"}'
+  - expr: ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[24h]))
+      / 0)) == bool 0) + 2 * ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[24h]))
+      / 0)) == bool 1)
+    eval_time: 1m
+    exp_samples:
+    - labels: '{source_zone="ru-spb-1",site="ok"}'
+      value: 2
+    - labels: '{source_zone="ru-spb-1",site="failed"}'
+      value: 1
+    - labels: '{source_zone="ru-spb-1",site="missing"}'
       value: 0
-    - labels: '{site="failed",access="vpn"}'
+    - labels: '{source_zone="ru-spb-1",site="stale"}'
       value: 0
-    - labels: '{site="missing",access="vpn"}'
-      value: -1
-    - labels: '{site="stale",access="vpn"}'
-      value: -1
 - interval: 15s
   input_series:
   - series: up{cluster="hm-cluster",job="vpn-client-probes",source_zone="ru-spb-1",instance="observer:9115"}
@@ -88,23 +109,42 @@ tests:
   - series: probe_target_info{cluster="hm-cluster",job="vpn-client-probes",source_zone="ru-spb-1",instance="observer:9115",check="client-web",site="stale",access="vpn"}
     values: 1 1 1 1 1
   promql_expr_test:
-  - expr: min by(site,access) (min_over_time(probe_success{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}[1m])
-      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}
-      > time() - 60) and on(job,instance) (up{cluster=~"hm-cluster",job="vpn-client-probes",source_zone=~"ru-spb-1"}
-      == 1)) or on(site,access) (0 * max by(site,access) (max_over_time(probe_target_info{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}[24h]))
-      - 1)
+  - expr: ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[24h]))
+      / 0)) == bool 0) + 2 * ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[24h]))
+      / 0)) == bool 1)
     eval_time: 1m
     exp_samples:
-    - labels: '{site="ok",access="vpn"}'
-      value: -1
-    - labels: '{site="ok",access="direct"}'
-      value: -1
-    - labels: '{site="failed",access="vpn"}'
-      value: -1
-    - labels: '{site="missing",access="vpn"}'
-      value: -1
-    - labels: '{site="stale",access="vpn"}'
-      value: -1
+    - labels: '{source_zone="ru-spb-1",site="ok"}'
+      value: 0
+  - expr: ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[24h]))
+      / 0)) == bool 0) + 2 * ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[24h]))
+      / 0)) == bool 1)
+    eval_time: 1m
+    exp_samples:
+    - labels: '{source_zone="ru-spb-1",site="ok"}'
+      value: 0
+    - labels: '{source_zone="ru-spb-1",site="failed"}'
+      value: 0
+    - labels: '{source_zone="ru-spb-1",site="missing"}'
+      value: 0
+    - labels: '{source_zone="ru-spb-1",site="stale"}'
+      value: 0
 - interval: 15s
   input_series:
   - series: up{cluster="hm-cluster",job="vpn-client-probes",source_zone="ru-spb-1",instance="observer:9115"}
@@ -114,14 +154,33 @@ tests:
   - series: probe_target_info{cluster="hm-cluster",job="vpn-client-probes",source_zone="ru-spb-1",instance="observer:9115",check="client-web",site="known",access="vpn"}
     values: 1 stale
   promql_expr_test:
-  - expr: min by(site,access) (min_over_time(probe_success{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}[1m])
-      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}
-      > time() - 60) and on(job,instance) (up{cluster=~"hm-cluster",job="vpn-client-probes",source_zone=~"ru-spb-1"}
-      == 1)) or on(site,access) (0 * max by(site,access) (max_over_time(probe_target_info{cluster=~"hm-cluster",job="vpn-client-probes",check="client-web",source_zone=~"ru-spb-1",site=~".*"}[24h]))
-      - 1)
+  - expr: ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[24h]))
+      / 0)) == bool 0) + 2 * ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="direct"}[24h]))
+      / 0)) == bool 1)
     eval_time: 1h
     exp_samples:
-    - labels: '{site="known",access="direct"}'
-      value: -1
-    - labels: '{site="known",access="vpn"}'
-      value: -1
+    - labels: '{source_zone="ru-spb-1",site="known"}'
+      value: 0
+  - expr: ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[24h]))
+      / 0)) == bool 0) + 2 * ((min by(source_zone,site) (min_over_time(probe_success{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[1m])
+      and on(job,instance,site,access,check) (probe_last_run_timestamp_seconds{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}
+      > time() - 60) and on(job,instance) ((up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"}
+      == 1) and on(job,instance) (timestamp(up{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1"})
+      > time() - 45))) or on(source_zone,site) (0 * max by(source_zone,site) (max_over_time(probe_target_info{job="vpn-client-probes",cluster=~"hm-cluster",source_zone=~"ru-spb-1",check="client-web",access="vpn"}[24h]))
+      / 0)) == bool 1)
+    eval_time: 1h
+    exp_samples:
+    - labels: '{source_zone="ru-spb-1",site="known"}'
+      value: 0

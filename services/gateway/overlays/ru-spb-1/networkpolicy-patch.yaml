@@ -8,11 +8,6 @@ spec:
     - protocol: TCP
       port: 14443
   - from:
-    - ipBlock:
-        cidr: 212.116.115.29/32
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: node-exporter
     - podSelector:
         matchLabels:
           app.kubernetes.io/name: xray-exporter
