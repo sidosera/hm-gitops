@@ -55,7 +55,7 @@ def main():
         temp = OUTPUT.with_suffix('.tmp')
         temp.write_text('\n'.join(lines) + '\n')
         os.replace(temp, OUTPUT)
-        time.sleep(15)
+        time.sleep(30)
 
 
 if __name__ == '__main__':

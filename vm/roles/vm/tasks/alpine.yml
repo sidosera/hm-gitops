@@ -14,6 +14,31 @@
   ansible.builtin.command:
     argv: [/bin/mount, --make-rshared, /]
   changed_when: false
+# The provider's THP=always default wastes memory on this small Go workload.
+# Use the existing localmount boot hook, with no daemon or scheduled job.
+- name: Disable transparent huge pages before services start
+  ansible.builtin.blockinfile:
+    path: /etc/conf.d/localmount
+    create: true
+    owner: root
+    group: root
+    mode: '0644'
+    marker: '# {mark} HM SMALL HOST MEMORY POLICY'
+    block: |
+      start_post() {
+          if [ -e /sys/kernel/mm/transparent_hugepage/enabled ]; then
+              printf 'never\n' > /sys/kernel/mm/transparent_hugepage/enabled
+              printf 'never\n' > /sys/kernel/mm/transparent_hugepage/defrag
+          fi
+      }
+    validate: /bin/sh -n %s
+- name: Apply transparent huge page policy to the running host
+  ansible.builtin.shell: |
+    if [ -e /sys/kernel/mm/transparent_hugepage/enabled ]; then
+        printf 'never\n' > /sys/kernel/mm/transparent_hugepage/enabled
+        printf 'never\n' > /sys/kernel/mm/transparent_hugepage/defrag
+    fi
+  changed_when: false
 - name: Persist unified cgroup mode
   ansible.builtin.lineinfile:
     path: /etc/rc.conf

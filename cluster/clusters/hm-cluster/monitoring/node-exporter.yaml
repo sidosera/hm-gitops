@@ -133,9 +133,9 @@ spec:
         resources:
           requests:
             cpu: 5m
-            memory: 12Mi
+            memory: 24Mi
           limits:
-            memory: 40Mi
+            memory: 96Mi
         volumeMounts:
         - name: online-client-code
           mountPath: /app
