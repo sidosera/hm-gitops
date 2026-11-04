@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
 - ../../base
 - traefik-acme.yaml
-- www-service
 - ../../../services/gateway/overlays/uk-ldn-1
 - monitoring
 - ../../../services/gateway/overlays/ru-spb-1

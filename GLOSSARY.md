@@ -21,7 +21,7 @@ A capacity slot within a zone, named `<zone>/<ordinal>`, such as `uk-ldn-1/1`. I
 The physical or virtual machine occupying a host slot, identified in inventory by its management IP address. A replacement machine can occupy the same host slot with a different IP.
 
 **Service**:
-An application capability deployed within the cluster, independent of host and placement. Gateway, Website and VPN Probe are services.
+An application capability deployed within the cluster, independent of host and placement. Gateway and VPN Probe are services.
 _Avoid_: UK service, SPB service (when referring to placement)
 
 **Gateway service**:

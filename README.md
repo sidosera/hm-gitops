@@ -146,7 +146,7 @@ Two independent transports share the existing VPS:
 
 The primary connects directly to the VPS. Do not enable Cloudflare's HTTP proxy for a hostname used as its connection address. Its SNI is the actual REALITY target hostname, which Traefik passes through without terminating TLS. The HTTPS backup uses a separate random path and credential behind Traefik and can traverse Cloudflare's HTTP proxy. The random path is routing configuration, not a substitute for authentication. Both transports still depend on this VPS; an outage or destination-network block can affect both.
 
-The website and backup share the existing HTTPS certificate. ACME uses HTTP-01 on port 80, because TLS-ALPN-01 cannot be passed through Cloudflare's ordinary HTTP proxy. Keep the challenge URL reachable through Cloudflare without a challenge page or access policy.
+Grafana and the HTTPS VPN backup share the existing HTTPS certificate. No website is served at `/`; unmatched requests return 404. Grafana remains at `/status/` and the XHTTP VPN transport retains its configured path. ACME uses HTTP-01 on port 80, because TLS-ALPN-01 cannot be passed through Cloudflare's ordinary HTTP proxy. Keep the challenge URL reachable through Cloudflare without a challenge page or access policy.
 
 Export profiles privately (Python with PyYAML and cryptography, plus SOPS, are required):
 
@@ -176,7 +176,7 @@ sudo kubectl -n flux-system get gitrepositories,kustomizations
 sudo kubectl -n hm logs deployment/proxy-service --tail=20
 ```
 
-The website ownership init container needs only `CHOWN`; all other capabilities remain dropped. Nginx uses the official unprivileged image pinned by digest, listens on 8080 internally, and runs as UID/GID 101 with no capabilities and a read-only root filesystem. Xray runs as a non-root user with all capabilities dropped and a read-only root filesystem.
+Xray runs as a non-root user with all capabilities dropped and a read-only root filesystem.
 
 ## Grafana and Prometheus
 
@@ -238,7 +238,7 @@ Zone is the scheduling and observability dimension. Country and PoP are descript
 
 Machine inventory names are IP addresses. Host slots are independent, so replacing a machine does not rename a slot. The existing Kubernetes registration IDs `machine` and `spb-01` remain internal compatibility identifiers for node/pod joins, certificates and volumes; they are not the user-facing machine names. Slash-containing host names are Prometheus labels and Kubernetes annotations; node labels use a label-safe encoded host ID.
 
-Gateway is one service with deployments in both zones. The SPB deployment supplies Russian direct egress and upstream routing; the UK deployment supplies foreign egress. Website and VPN Probe are separate services. Proxy filters traffic by cluster and zone; Hosts additionally filters by host slot and displays machine IPs. Service dashboards do not depend on host slot identity.
+Gateway is one service with deployments in both zones. The SPB deployment supplies Russian direct egress and upstream routing; the UK deployment supplies foreign egress. VPN Probe is a separate service. Proxy filters traffic by cluster and zone; Hosts additionally filters by host slot and displays machine IPs. Service dashboards do not depend on host slot identity.
 
 ## Gateway configuration with Kustomize
 

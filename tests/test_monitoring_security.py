@@ -63,14 +63,21 @@ class MonitoringSecurityTests(unittest.TestCase):
             spec=obj['spec']['template']['spec']
             if obj['metadata']['name']!='prometheus':self.assertFalse(spec['automountServiceAccountToken'])
             self.assertNotIn('hostPID',spec)
-            # Runtime containers; legacy website build init containers are a documented separate finding.
-            for container in spec['containers']:
+            for container in spec['containers'] + spec.get('initContainers', []):
                 security=container['securityContext']
                 self.assertTrue(security['runAsNonRoot'])
                 self.assertTrue(security['readOnlyRootFilesystem'])
                 self.assertFalse(security['allowPrivilegeEscalation'])
                 self.assertEqual(security['capabilities']['drop'],['ALL'])
                 self.assertIn('@sha256:',container['image'])
+
+    def test_public_routes_preserve_observability_and_both_vpn_transports(self):
+        routes={v['metadata']['name']:v for v in self.resources if v['kind'] in ('IngressRoute','IngressRouteTCP')}
+        self.assertIn('/status/', routes['grafana']['spec']['routes'][0]['match'])
+        self.assertIn('/assets/', routes['proxy-service-https']['spec']['routes'][0]['match'])
+        self.assertTrue(routes['proxy-service']['spec']['tls']['passthrough'])
+        self.assertFalse(any(v['kind']=='Ingress' for v in self.resources))
+        self.assertFalse(any(v['metadata']['name'].startswith('www-service') for v in self.resources))
 
     def test_archived_data_cannot_be_pruned_by_cleanup(self):
         archive=next(v for v in self.resources if v['kind']=='PersistentVolumeClaim' and v['metadata']['name']=='metrics-dashboard-data')
