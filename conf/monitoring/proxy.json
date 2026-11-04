@@ -248,7 +248,7 @@
                     },
                     {
                       "color": "green",
-                      "value": 1
+                      "value": 0.5
                     }
                   ]
                 }
@@ -300,7 +300,7 @@
                     },
                     {
                       "color": "green",
-                      "value": 1
+                      "value": 0.5
                     }
                   ]
                 }
