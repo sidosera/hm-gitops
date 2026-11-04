@@ -25,7 +25,7 @@ class RoutingSafetyTests(unittest.TestCase):
 
     def test_everything_else_including_unknown_ru_and_suffix_spoofs_goes_upstream(self):
         for domain in ['example.com', 'unknown.ru', 'yandex.ru.attacker.com', 'evilyandex.ru', '8.8.8.8']:
-            self.assertEqual(self.route(domain), 'uk-egress')
+            self.assertEqual(self.route(domain), 'uk-primary')
 
     def test_private_and_metadata_ips_cannot_escape_through_a_probe(self):
         for inbound in ['gateway', 'probe-primary', 'probe-backup', 'probe-direct', 'probe-split']:
@@ -33,11 +33,10 @@ class RoutingSafetyTests(unittest.TestCase):
                 self.assertEqual(self.route(host, inbound), 'blocked')
 
     def test_no_direct_failover_or_dns_resolution_for_unknown_destinations(self):
-        b = self.config['routing']['balancers'][0]
-        self.assertEqual(set(b['selector']), {'uk-primary', 'uk-backup'})
-        self.assertEqual(b['fallbackTag'], 'uk-backup')
+        self.assertNotIn('balancers', self.config['routing'])
+        self.assertNotIn('observatory', self.config)
         self.assertEqual(self.config['routing']['domainStrategy'], 'AsIs')
-        self.assertEqual(self.config['routing']['rules'][-1]['balancerTag'], 'uk-egress')
+        self.assertEqual(self.config['routing']['rules'][-1]['outboundTag'], 'uk-primary')
         self.assertEqual(self.config['routing']['rules'][-1]['network'], 'tcp,udp')
 
     def test_only_stats_inbound_remains_in_public_config(self):

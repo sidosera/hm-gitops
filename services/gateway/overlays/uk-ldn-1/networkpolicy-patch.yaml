@@ -21,6 +21,13 @@ spec:
   - from:
     - podSelector:
         matchLabels:
+          app.kubernetes.io/name: spb-gateway
+    ports:
+    - protocol: TCP
+      port: 10443
+  - from:
+    - podSelector:
+        matchLabels:
           app.kubernetes.io/name: xray-exporter
     ports:
     - protocol: TCP

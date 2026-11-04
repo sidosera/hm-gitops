@@ -67,13 +67,24 @@ class GatewayOverlayTests(unittest.TestCase):
         self.assertIn('@sha256:', images[0])
 
     def test_source_selectors_are_not_rewritten_as_gateway_selectors(self):
-        for name, expected in [('proxy-service', {'traefik', 'xray-exporter'}),
+        for name, expected in [('proxy-service', {'traefik', 'xray-exporter', 'spb-gateway'}),
                                ('spb-gateway', {'xray-exporter'})]:
             policy = self.resources['NetworkPolicy', name + '-ingress']['spec']
             self.assertEqual(policy['podSelector']['matchLabels'], {'app.kubernetes.io/name': name})
             sources = {source['podSelector']['matchLabels']['app.kubernetes.io/name']
                        for rule in policy['ingress'] for source in rule.get('from', []) if 'podSelector' in source}
             self.assertEqual(sources, expected)
+
+    def test_internal_upstream_is_cluster_ip_and_only_accepts_gateway_pods(self):
+        service=self.resources['Service', 'proxy-service']
+        self.assertEqual(service['spec']['type'], 'ClusterIP')
+        self.assertEqual(next(p for p in service['spec']['ports'] if p['port']==10443)['targetPort'], 'reality')
+        policy=self.resources['NetworkPolicy', 'proxy-service-ingress']['spec']
+        internal=next(rule for rule in policy['ingress'] if any(
+            source.get('podSelector', {}).get('matchLabels', {}).get('app.kubernetes.io/name')=='spb-gateway'
+            for source in rule.get('from', [])))
+        self.assertEqual(internal, {'from':[{'podSelector':{'matchLabels':{'app.kubernetes.io/name':'spb-gateway'}}}],
+                                    'ports':[{'protocol':'TCP','port':10443}]})
 
     def test_host_port_and_pod_ingress_stay_aligned(self):
         pod = self.resources['Deployment', 'spb-gateway']['spec']['template']['spec']
