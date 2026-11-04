@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Install validation tools
         run: |
           python3 -m venv "$RUNNER_TEMP/gitops-venv"
@@ -28,8 +29,8 @@ jobs:
           echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check --strict
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
           install -m 0755 "$RUNNER_TEMP/gitleaks" /usr/local/bin/gitleaks
-      - name: Scan current source with redacted findings
-        run: gitleaks dir . --redact=100 --no-banner
+      - name: Scan complete Git history with redacted findings
+        run: gitleaks git --log-opts=--all --redact=100 --no-banner
       - name: Validate manifests and security contracts
         run: |
           python -m unittest discover -s tests -v

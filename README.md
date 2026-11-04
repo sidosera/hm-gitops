@@ -261,7 +261,7 @@ For any new VM or bare-metal host, register it through the existing inventory/bo
 
 VPN collectors use `service="gateway"` and `zone` for the measurement location; `target` identifies an inbound/outbound route or a pseudonymous user. Dedicated relay/probe users are dropped before metric storage. Probes use `source_zone`, `target_zone` and `check` independently of exporter location. Adding an exporter with these labels adds its measurements without editing dashboards. Each exporter still needs a distinct gateway instance target before scaling replicas.
 
-The two dashboards add no database or controller. Regression checks cover host outages, missing data and connectivity history. `GitOps validation` runs tests, Kustomize, Prometheus fixtures and a redacted current-source Gitleaks scan on pushes/PRs; it has read-only GitHub permissions and uses no infrastructure credentials.
+The two dashboards add no database or controller. Regression checks cover host outages, missing data and connectivity history. `GitOps validation` runs tests, Kustomize, Prometheus fixtures and a redacted full-history Gitleaks scan on pushes/PRs; it has read-only GitHub permissions and uses no infrastructure credentials.
 
 
 ## Independent VPN Probe service
