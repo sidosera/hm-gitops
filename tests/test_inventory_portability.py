@@ -138,18 +138,3 @@ class InventoryPortabilityTests(unittest.TestCase):
         self.assertEqual(result['node-ip'],'10.77.0.1,fd77::1')
         self.assertEqual(task['vars']['_base']['advertise-address'],'{{ hm_private_ipv4 }}')
         self.assertIn('fd00:42::/48',result['cluster-cidr'])
-
-    def test_public_probe_dns_changes_only_transport_destination_not_website_dns(self):
-        spec=importlib.util.spec_from_file_location('provision',ROOT/'scripts/provision_vpn_probe.py')
-        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-        inbound={'streamSettings':{'realitySettings':{
-            'privateKey':'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-            'serverNames':['example.org'],'shortIds':['0011223344556677']}}}
-        config=module.client_config(inbound,'test-only-probe','vpn-entry-test.hm.svc.cluster.local')
-        self.assertEqual(config['outbounds'][0]['protocol'],'blackhole')
-        public=next(o for o in config['outbounds'] if o['tag']=='public-vpn')
-        self.assertEqual(public['settings']['vnext'][0]['port'],443)
-        self.assertEqual(public['streamSettings']['sockopt']['domainStrategy'],'ForceIPv4')
-        rules=config['routing']['rules']
-        self.assertEqual(rules[0],{'type':'field','ip':['10.43.0.10'],'port':'53','outboundTag':'cluster-dns'})
-        self.assertEqual(rules[1]['outboundTag'],'public-vpn')

@@ -148,32 +148,62 @@ The primary connects directly to the VPS. Do not enable Cloudflare's HTTP proxy 
 
 Grafana and the HTTPS VPN backup share the existing HTTPS certificate. No website is served at `/`; unmatched requests return 404. Grafana remains at `/status/` and the XHTTP VPN transport retains its configured path. ACME uses HTTP-01 on port 80, because TLS-ALPN-01 cannot be passed through Cloudflare's ordinary HTTP proxy. Keep the challenge URL reachable through Cloudflare without a challenge page or access policy.
 
-Create a client in the encrypted Git source; UUID generation is automatic:
+`hmctl` is the single operator CLI, built in Go. It embeds native SOPS/age encryption and needs neither Python nor the `sops` executable. Git and authenticated GitButler CLI (`but`) are needed only for repository discovery/PR operations; `--repo` plus `--local-only` or `--dry-run` can work without them. Profile connectivity checks additionally need Xray in PATH. The deployed Python probe runtime and internal Ansible helpers are separate from the operator CLI.
+
+Build with Go 1.27.3 or newer, or download the `hmctl` artifact from its GitHub Actions check. The artifact contains Linux/macOS binaries for amd64 and arm64 plus `SHA256SUMS`; verify the checksum before installation.
+
+```sh
+make build                       # bin/hmctl
+make test vet                    # native lifecycle/security tests, race detection and static checks
+make dist VERSION=0.1.0           # four standalone binaries and checksums
+bin/hmctl --help
+bin/hmctl completion zsh          # also bash, fish and PowerShell
+```
+
+Run from a GitOps checkout, or pass `--repo /path/to/hm-gitops`. `--cluster` selects the cluster inventory (default `hm-cluster`). Supply the existing native age identity through `SOPS_AGE_KEY_FILE` or `--age-key-file`; the owned identity file must have mode 0600. Only native age recipients/identities are supported, with SOPS MAC verification always enabled: no key-command subprocesses, plugins or remote KMS. Plaintext credentials stay in memory, and exported profiles are written only to an owned private directory outside Git, with file mode 0600. Existing files and symlinks are never overwritten.
+
+Create or revoke access through a PR:
 
 ```sh
 export SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey
-python3 scripts/xray_clients.py add --email person@example.com --zone ru-spb-1 --zone uk-ldn-1
+bin/hmctl service-cfg gateway --add-client --name alice
+bin/hmctl service-cfg gateway --remove-client --name alice --zone ru-spb-1
+bin/hmctl service-cfg gateway --list-clients --json
 ```
 
-Repeat `--zone` for the public gateways the client may use. The command reuses the existing UUID for that email, creates one UUID for a new client across the selected public transports, and refuses ambiguous existing identities. It does not grant access to the private relay listener, print credentials, commit, or contact Kubernetes. Review and publish the encrypted change through GitOps before using the profile. Existing accounts are preserved. Service labels end in `@service-account`; `migrate-service-labels` renames the known legacy service labels without rotating UUIDs. New end-user emails must not use this reserved suffix. Emails are visible to authorized monitoring users; UUIDs remain secret.
+The service name is `gateway`; probe credential maintenance uses `vpn-probe`. A short client name is sufficient; an email is optional. Account edits default to all configured public gateway zones; repeat `--zone` or comma-separate zones to restrict access. A new UUID is generated securely once and reused across selected public transports. Existing accounts, unknown configuration fields and private relay permissions are preserved. Service labels use the reserved `@service-account` suffix. No credentials or client labels are included in public branch names, commits or PR descriptions. PR creation requires a clean, current `main` checkout; unrelated changes are never included. Failed publishing preserves prepared work for recovery.
 
-Export profiles privately (Python with PyYAML and cryptography, plus SOPS, are required):
+Use `--dry-run` to validate without writes or PRs; `--local-only` writes the encrypted edit for manual review. These flags cannot combine. After merging the account PR, let Flux apply it before distributing the profile. JSON output uses `schema_version: 1` and contains metadata only, never UUIDs or connection URLs. Usage/validation errors exit 2, operational errors exit 1, and interruption exits 130. Success exits 0. Commands are noninteractive and have a configurable `--timeout` (default two minutes).
+
+Export or reissue a client's profile without changing the UUID:
 
 ```sh
-SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey python3 scripts/xray_share_url.py \
-  --zone uk-ldn-1 --email person@example.com --output-dir /secure/path/proxy-profiles
+bin/hmctl service-cfg gateway --export-client --name alice --zone ru-spb-1 \
+  --output-dir /secure/path/alice
+bin/hmctl service-cfg gateway --export-client --name alice --zone ru-spb-1 \
+  --endpoint vpn.example.com --output-dir /secure/path/alice-updated
 ```
 
-The exporter refuses to write profiles inside this repository, to a directory readable by others, or over existing files/symlinks. Public-key derivation happens in memory, without passing the private key to another process. Imports include IPv4 and IPv6 variants with Chrome, Firefox, and Safari TLS fingerprints, plus the HTTPS backup. Fingerprint variants require client support. The backup requires XHTTP support; “V2Ray” alone does not identify a compatible iOS app or core version. Keep the current installed app until the replacement profile works.
+`--endpoint` changes the exported connection IP/DNS only: it does not create DNS records, provision a server, or change profiles already imported on phones. REALITY SNI and server key settings remain unchanged. `--https-host` selects the HTTPS/XHTTP backup hostname. A stable DNS-only hostname can move to a replacement server without reissuing the profile if its credentials and REALITY settings are preserved. A blocked hostname or old IP-literal profile requires reimporting an updated profile.
 
-Test a profile from the network you need to use:
+Prepare a physical replacement through the same binary:
 
 ```sh
-python3 scripts/check_proxy.py /secure/path/proxy-profiles/hm-reality-ipv4-chrome.txt
-python3 scripts/check_proxy.py /secure/path/proxy-profiles/hm-https-backup.txt
+bin/hmctl host replace ru-spb-1/1 --ip NEW_PUBLIC_IPV4 \
+  --ssh-host-key 'ssh-ed25519 VERIFIED_PUBLIC_HOST_KEY'
 ```
 
-The probe binds SOCKS only on loopback, verifies the exit IP and an HTTPS response, downloads 1 MB, and stops its temporary Xray process. It never prints the profile. Tests outside a filtered network do not establish reachability inside it. Compare mobile and Wi-Fi results, timestamps, and errors; change one setting at a time. IPv6 profiles require working IPv6 on the client network.
+Verify the new SSH key through the provider console first. The PR updates inventory and pinned SSH trust, preserving the logical host slot, node name, zone and private addresses. `--ipv6` supplies the new public IPv6; otherwise the old public IPv6 is removed. The CLI does not purchase, provision or cut over a host: after review use Cluster Converge, verify the new gateway, then move DNS or reissue profiles. Replacing the sole control plane additionally requires datastore recovery or an explicit cluster rebuild/rejoin; an inventory edit alone cannot recover it. The encrypted client Secret is untouched.
+
+Maintain service accounts and check connectivity:
+
+```sh
+bin/hmctl service-cfg vpn-probe --sync-credentials --dry-run
+bin/hmctl service-cfg gateway --migrate-service-labels --dry-run
+bin/hmctl service-cfg gateway --check-profile /secure/path/alice/hm-reality-ipv4-chrome.txt
+```
+
+The check passes configuration to local Xray over stdin, binds SOCKS only to loopback, verifies the expected exit IP, HTTPS and a 1 MB transfer, then stops the process. It writes no temporary plaintext configuration. It never prints the profile or Xray logs. `--expected-exit-ip` overrides the default control-plane inventory address. An external check does not establish reachability from every mobile/home ISP. Probe credentials are derived from the entry discovery names already recorded in the encrypted probe configs, preserving the configured observer/entry mapping as the fleet grows. Neither maintenance command changes the live cluster directly.
 
 For future changes, deploy a separate canary Service and ingress route, validate both transports and transfers, then reconcile production and remove the canary. Verify that old credentials fail after rotation. Keep rollback snapshots private and outside Git. Do not restore revoked credentials as a routine rollback; roll back the image while retaining fresh credentials when possible.
 
@@ -290,7 +320,7 @@ The Proxy connectivity table has website rows and Direct/VPN sparkline columns o
 
 Probe workloads use `hm.gitops/service: vpn-probe`, so operational metrics retain their independent service identity. Probe accounts use `probe-e2e@local` and are included in client traffic metrics. Credentials are distinct from existing user profiles and relay accounts; each observer receives only the credential for the public entry it tests. They are SOPS encrypted. The account grants normal authenticated VPN egress to that dedicated probe client; it does not grant host or Kubernetes administration.
 
-Dedicated probe accounts and their runtime configs are keys in the same canonical Secret as Gateway. The credential maintenance command is `SOPS_AGE_KEY_FILE=/secure/path/age.key python3 scripts/provision_vpn_probe.py --write`. It preserves existing users, adds/reuses one dedicated account on each Gateway, derives the matching public-listener client configuration, updates the canonical encrypted Secret only when the account/config data changes. An unchanged run is a no-op, and existing users are retained. Kustomize derives workload revisions from SOPS metadata. It makes no cluster writes. Before publishing, render the cluster, run tests, inspect only encrypted changes and verify direct and VPN results from SPB. Keep all referenced runtime keys in the canonical Secret before deploying overlays. Notifications still require an Alertmanager receiver.
+Dedicated probe accounts and their runtime configs are keys in the same canonical Secret as Gateway. The credential maintenance command is `hmctl service-cfg vpn-probe --sync-credentials`. It preserves existing users, adds/reuses one dedicated account on each Gateway, derives the matching public-listener client configuration, updates the canonical encrypted Secret only when the account/config data changes. An unchanged run is a no-op, and existing users are retained. Kustomize derives workload revisions from SOPS metadata. It makes no cluster writes. Before publishing, render the cluster, run tests, inspect only encrypted changes and verify direct and VPN results from SPB. Keep all referenced runtime keys in the canonical Secret before deploying overlays. Notifications still require an Alertmanager receiver.
 
 
 Cluster configuration lives in `cluster/clusters/hm-cluster`; Gateway and VPN Probe overlays are named by zone. Bootstrap defaults to `hm-cluster`. Node placement uses `topology.kubernetes.io/zone`, and central services use the `hm.gitops/control-plane` role label. VM or bare-metal machine identity does not change this deployment path. Inventory keeps stable Kubernetes registration IDs explicitly so naming changes do not require draining/rejoining a healthy cluster or regenerating VPN profiles.

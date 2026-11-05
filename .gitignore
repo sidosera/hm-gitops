@@ -7,3 +7,8 @@ local-env.yaml
 proxy-profiles/
 *.agekey
 __pycache__/
+
+# hmctl build output and local mutation lock
+/bin/
+/dist/
+.hmctl.lock
