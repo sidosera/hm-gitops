@@ -93,7 +93,7 @@ scrape_configs:
   - source_labels:
     - dimension
     - target
-    regex: user;spb-relay@local
+    regex: user;spb-relay@(?:local|service-account)
     action: drop
 - job_name: vpn-client-probes
   scheme: http

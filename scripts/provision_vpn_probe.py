@@ -15,7 +15,8 @@ import uuid
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-PROBE_EMAIL = 'probe-e2e@local'
+PROBE_EMAIL = 'probe-e2e@service-account'
+LEGACY_PROBE_EMAIL = 'probe-e2e@local'
 ENTRIES = {zone: (f'vpn-entry-{zone}.hm.svc.cluster.local', tag)
            for zone, tag in [('uk-ldn-1', 'reality-legacy'), ('ru-spb-1', 'gateway')]}
 
@@ -24,13 +25,16 @@ def add_account(config, candidate=None):
     result = copy.deepcopy(config)
     existing = {c['id'] for inbound in result['inbounds']
                 for c in inbound.get('settings', {}).get('clients', [])
-                if c.get('email') == PROBE_EMAIL}
+                if c.get('email') in (PROBE_EMAIL, LEGACY_PROBE_EMAIL)}
     if len(existing) > 1:
         raise ValueError('Inconsistent probe accounts; inspect encrypted source')
     ident = next(iter(existing), None)
     if ident is None:
         ident = candidate or str(uuid.uuid4())
     for inbound in result['inbounds']:
+        for client in inbound.get('settings', {}).get('clients', []):
+            if client.get('email') == LEGACY_PROBE_EMAIL:
+                client['email'] = PROBE_EMAIL
         if inbound.get('streamSettings', {}).get('security') == 'reality':
             users = inbound['settings']['clients']
             if not any(c.get('email') == PROBE_EMAIL for c in users):

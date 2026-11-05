@@ -94,4 +94,4 @@ class ProxyDashboardTests(unittest.TestCase):
         job=next(j for j in config['scrape_configs'] if j['job_name']=='xray')
         self.assertEqual(job['metric_relabel_configs'], [{
             'source_labels':['dimension','target'],
-            'regex':'user;spb-relay@local', 'action':'drop'}])
+            'regex':'user;spb-relay@(?:local|service-account)', 'action':'drop'}])

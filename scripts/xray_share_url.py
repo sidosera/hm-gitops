@@ -18,10 +18,15 @@ def build_vless_url(user_id: str, host: str, port: int, query: dict, name: str) 
     return f'vless://{user_id}@{authority}:{port}?{urllib.parse.urlencode(query)}#{urllib.parse.quote(name, safe="")}'
 
 
-def export_profiles(config: dict, hosts: list[str], public_key: str, https_host: str) -> dict[str, str]:
+def export_profiles(config: dict, hosts: list[str], public_key: str, https_host: str, email: str | None = None) -> dict[str, str]:
     profiles = {}
     for inbound in config['inbounds']:
         stream = inbound['streamSettings']
+        if email is not None:
+            selected = [c for c in inbound['settings']['clients'] if c.get('email') == email]
+            if not selected:
+                continue
+            inbound = {**inbound, 'settings': {**inbound['settings'], 'clients': selected}}
         if stream.get('security') == 'reality':
             reality = stream['realitySettings']
             client = inbound['settings']['clients'][0]
@@ -62,6 +67,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     repo_default = Path(__file__).resolve().parent.parent
     parser.add_argument('--repo', type=Path, default=repo_default)
+    parser.add_argument('--email', help='Select a client by its server-side email label')
     parser.add_argument('--zone', default='uk-ldn-1', help='Gateway zone to export')
     parser.add_argument('--host', action='append', help='Direct VPS address; repeat for both address families')
     parser.add_argument('--https-host', default='www.hackamonth.io')
@@ -93,7 +99,9 @@ def main() -> None:
         ipv6 = machine.get('ipv6')
         if ipv6:
             hosts.append(ipv6)
-    profiles = export_profiles(config, hosts, public_key, args.https_host)
+    profiles = export_profiles(config, hosts, public_key, args.https_host, args.email)
+    if not profiles:
+        raise SystemExit('No public client profiles match the requested email')
     if args.output_dir:
         output = args.output_dir.resolve()
         if output == repo or repo in output.parents:
