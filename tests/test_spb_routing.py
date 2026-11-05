@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 import unittest
 
@@ -16,15 +17,22 @@ class RoutingSafetyTests(unittest.TestCase):
                 except ValueError: continue
                 if not any(address in ipaddress.ip_network(n) for n in r['ip']): continue
             if 'domain' in r:
-                if not any(host == d.removeprefix('domain:') or host.endswith('.' + d.removeprefix('domain:')) for d in r['domain']): continue
+                if not any(
+                    re.search(d.removeprefix('regexp:'), host) is not None
+                    if d.startswith('regexp:') else
+                    host == d.removeprefix('domain:') or host.endswith('.' + d.removeprefix('domain:'))
+                    for d in r['domain']
+                ): continue
             return r.get('outboundTag', r.get('balancerTag'))
 
     def test_known_russian_domains_and_subdomains_exit_in_russia(self):
-        for domain in ['yandex.ru', 'passport.yandex.ru', 'vk.com', 'gosuslugi.ru', 'www.ozon.ru']:
+        for domain in ['yandex.ru', 'passport.yandex.ru', 'vk.com', 'gosuslugi.ru', 'www.ozon.ru',
+                       'unknown.ru', 'sub.unknown.ru', 'evilyandex.ru', 'EXAMPLE.RU', 'example.ru.']:
             self.assertEqual(self.route(domain), 'ru-direct')
 
-    def test_everything_else_including_unknown_ru_and_suffix_spoofs_goes_upstream(self):
-        for domain in ['example.com', 'unknown.ru', 'yandex.ru.attacker.com', 'evilyandex.ru', '8.8.8.8']:
+    def test_foreign_domains_and_suffix_spoofs_go_upstream(self):
+        for domain in ['example.com', 'yandex.ru.attacker.com', 'example.ru.com', 'example.russia',
+                       'exampleru', 'ru', '8.8.8.8']:
             self.assertEqual(self.route(domain), 'uk-primary')
 
     def test_private_and_metadata_ips_cannot_escape_through_a_probe(self):
@@ -45,9 +53,10 @@ class RoutingSafetyTests(unittest.TestCase):
         self.assertEqual([x['tag'] for x in inbounds if x['listen'] != '127.0.0.1'], ['api-in'])
         self.assertEqual(self.config['api']['services'], ['StatsService'])
 
-    def test_direct_policy_uses_only_explicit_domain_suffixes(self):
+    def test_direct_policy_uses_one_ru_regex_and_explicit_other_suffixes(self):
         rule = next(x for x in self.config['routing']['rules'] if x.get('outboundTag') == 'ru-direct' and 'domain' in x)
         self.assertTrue(rule['domain'])
-        self.assertTrue(all(x.startswith('domain:') and '*' not in x and x != 'domain:ru' for x in rule['domain']))
+        self.assertEqual([x for x in rule['domain'] if x.startswith('regexp:')], [r'regexp:(?i)\.ru\.?$'])
+        self.assertTrue(all(x.startswith('regexp:') or (x.startswith('domain:') and not x.endswith('.ru')) for x in rule['domain']))
 
 if __name__ == '__main__': unittest.main()
