@@ -126,8 +126,23 @@ def main():
     add.add_argument('--email', required=True)
     add.add_argument('--zone', action='append', help='Limit access to these zones; default: all configured public gateways')
     add.add_argument('--local-only', action='store_true', help='Only prepare the encrypted file; skip commit and PR')
+    message = sub.add_parser('prepare-message', help='Prepare a private email draft after merge and successful Flux deployment')
+    message.add_argument('--email', required=True)
+    message.add_argument('--pr', required=True, type=int)
+    message.add_argument('--zone', action='append')
+    message.add_argument('--template', required=True, type=Path, help='Private text template with $email and $profiles placeholders')
+    message.add_argument('--subject', required=True)
+    message.add_argument('--output', required=True, type=Path, help='New .eml file in an existing private directory outside Git')
+    message.add_argument('--ssh-key', type=Path, default=Path.home() / '.ssh/hm-gitops')
     sub.add_parser('migrate-service-labels', help='Rename existing service labels without changing any UUID')
     args = parser.parse_args()
+    if args.command == 'prepare-message':
+        from xray_delivery import prepare_message
+        try:
+            prepare_message(ROOT, args)
+        except (ValueError, KeyError, OSError, subprocess.CalledProcessError):
+            raise SystemExit('Cannot prepare email: verify merged account PR, deployed revision, template and private output path. No email sent.')
+        return
     create_pr = args.command == 'add' and not args.local_only
     if create_pr:
         prepare_pr()

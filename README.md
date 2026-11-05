@@ -166,6 +166,16 @@ SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey python3 scripts/xray_share_url.py
 
 The exporter refuses to write profiles inside this repository, to a directory readable by others, or over existing files/symlinks. Public-key derivation happens in memory, without passing the private key to another process. Imports include IPv4 and IPv6 variants with Chrome, Firefox, and Safari TLS fingerprints, plus the HTTPS backup. Fingerprint variants require client support. The backup requires XHTTP support; “V2Ray” alone does not identify a compatible iOS app or core version. Keep the current installed app until the replacement profile works.
 
+Prepare connection instructions after merging the account PR and deploying it:
+
+```sh
+python3 scripts/xray_clients.py prepare-message --email person@example.com --pr 123 \
+  --template /secure/path/instructions.txt --subject "Connection instructions" \
+  --output /secure/path/client-instructions.eml
+```
+
+The text template supports `$email` and `$profiles`. Keep templates and output outside Git, with the output directory mode 0700. The command checks that the PR changed the encrypted credentials, was merged into main, is included in the local checkout, and that Flux is Ready at exactly that checkout revision. It reads Flux status over pinned SSH; Kubernetes API exposure is unnecessary. The resulting email draft has mode 0600 and contains the selected client's private connection profiles. It never sends email. Choose and configure the delivery provider separately before enabling sending; delivery is an explicit operator action, not a background job.
+
 Test a profile from the network you need to use:
 
 ```sh
