@@ -3,6 +3,10 @@ import copy
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
+import subprocess
+import contextlib
+import io
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +77,52 @@ class ClientLifecycleTests(unittest.TestCase):
         self.assertTrue(urls)
         self.assertTrue(all(url.startswith('vless://selected-id@') for url in urls.values()))
         self.assertEqual({},profiles.export_profiles(config,['203.0.113.1'],'public-key','example.org','missing@example.org'))
+
+
+class PullRequestWorkflowTests(unittest.TestCase):
+    def test_dirty_or_wrong_branch_checkout_is_rejected_before_fetch_or_commit(self):
+        for status, branch in [(b' M README.md\n', b'main\n'), (b'', b'feature\n')]:
+            with patch.object(accounts.shutil, 'which', return_value='/usr/bin/but'), \
+                 patch.object(accounts.subprocess, 'run', side_effect=[
+                     subprocess.CompletedProcess([], 0, stdout=status),
+                     subprocess.CompletedProcess([], 0, stdout=branch)]) as run:
+                with self.assertRaises(SystemExit):accounts.prepare_pr()
+                self.assertTrue(all(call.args[0][0]=='git' for call in run.call_args_list))
+
+    def test_stale_main_is_rejected_without_changing_source(self):
+        with patch.object(accounts.shutil, 'which', return_value='/usr/bin/but'), \
+             patch.object(accounts.subprocess, 'run', side_effect=[
+                 subprocess.CompletedProcess([],0,stdout=value)
+                 for value in (b'',b'main\n',b'',b'old\n',b'new\n')]) as run:
+            with self.assertRaisesRegex(SystemExit,'not current'):accounts.prepare_pr()
+            self.assertEqual(run.call_args_list[2].args[0],['but','pull','--check'])
+            self.assertFalse(any('commit' in c.args[0] for c in run.call_args_list))
+
+    def test_pr_only_commits_expected_file_and_uses_nonidentifying_metadata(self):
+        with patch.object(accounts.secrets,'token_hex',return_value='opaque-branch'), \
+             patch.object(accounts.subprocess,'run',side_effect=[
+                 subprocess.CompletedProcess([],0,stdout=b' M conf/xray/credentials-secret.sops.yaml\n'),
+                 subprocess.CompletedProcess([],0,stdout=b''),
+                 subprocess.CompletedProcess([],0,stdout=b'PR created\n')]) as run, \
+             contextlib.redirect_stdout(io.StringIO()):
+            accounts.open_client_pr()
+            self.assertEqual(run.call_args_list[1].args[0],
+                             ['but','commit','-b','codex/vpn-client-opaque-branch','-m','Add VPN client'])
+            self.assertEqual(run.call_args_list[2].args[0],
+                             ['but','pr','new','codex/vpn-client-opaque-branch','-F','-'])
+            self.assertNotIn(b'@',run.call_args_list[2].kwargs['input'])
+        with patch.object(accounts.subprocess,'run',return_value=
+                          subprocess.CompletedProcess([],0,stdout=b' M README.md\n')) as run:
+            with self.assertRaisesRegex(SystemExit,'Unexpected'):accounts.open_client_pr()
+            self.assertEqual(run.call_count,1)
+
+    def test_forge_failure_keeps_committed_encrypted_work_and_explains_recovery(self):
+        with patch.object(accounts.subprocess,'run',side_effect=[
+                subprocess.CompletedProcess([],0,stdout=b' M conf/xray/credentials-secret.sops.yaml\n'),
+                subprocess.CompletedProcess([],0,stdout=b''),
+                subprocess.CalledProcessError(1,['but','pr','new'])]):
+            with self.assertRaisesRegex(SystemExit,'encrypted work is preserved'):
+                accounts.open_client_pr()
 
 
 if __name__=='__main__':unittest.main()

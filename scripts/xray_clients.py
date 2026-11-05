@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manage accounts in the encrypted Git source; never print UUIDs or change the cluster."""
+"""Manage accounts in the encrypted Git source; open a pull request without printing UUIDs or changing the cluster."""
 import argparse
 import base64
 import copy
@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
+import shutil
 import subprocess
 import tempfile
 import uuid
@@ -64,21 +66,78 @@ def migrate_service_labels(configs):
     return result
 
 
+def prepare_pr():
+    if not shutil.which('but'):
+        raise SystemExit('Install GitButler CLI (but) to create a PR, or use --local-only.')
+    try:
+        status = subprocess.run(['git', 'status', '--porcelain'], cwd=ROOT, capture_output=True, check=True).stdout
+        branch = subprocess.run(['git', 'symbolic-ref', '--short', 'HEAD'], cwd=ROOT, capture_output=True, check=True).stdout.strip()
+        if status or branch != b'main':
+            raise SystemExit('Start from a clean main checkout; existing work will not be committed.')
+        subprocess.run(['but', 'pull', '--check'], cwd=ROOT, capture_output=True, check=True)
+        local = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, check=True).stdout
+        remote = subprocess.run(['git', 'rev-parse', 'origin/main'], cwd=ROOT, capture_output=True, check=True).stdout
+        if local != remote:
+            raise SystemExit('main is not current with origin/main. Update with but pull and retry.')
+    except subprocess.CalledProcessError:
+        raise SystemExit('Could not verify clean, current main. Check GitButler and remote access; no changes written.')
+
+
+def open_client_pr():
+    branch = 'codex/vpn-client-' + secrets.token_hex(6)
+    # Client identities belong only in the encrypted file, never public GitHub metadata.
+    message = """Add VPN client
+
+## Summary
+
+email → generated/reused UUID → SOPS-encrypted Secret → Flux after merge
+
+Grants client access to the selected public gateways. Existing accounts and service credentials are preserved. Client identity is deliberately omitted from public PR metadata.
+
+## Evidence
+
+- Before: requested access was absent from the encrypted source.
+- After: the account is present in the selected gateway configurations; UUIDs are not printed or committed in plaintext.
+
+## Merge Danger
+
+**Door:** two-way; remove the account in a subsequent encrypted Git change to revoke access.
+
+**Blast Radius:** VPN access. Flux rolls Xray workloads after merge; active sessions may reconnect.
+"""
+    try:
+        status = subprocess.run(['git', 'status', '--porcelain', '--untracked-files=all'], cwd=ROOT,
+                                capture_output=True, check=True).stdout.decode().strip()
+        if status != 'M conf/xray/credentials-secret.sops.yaml':
+            raise SystemExit('Unexpected working-tree changes; encrypted account prepared, but nothing committed.')
+        subprocess.run(['but', 'commit', '-b', branch, '-m', 'Add VPN client'],
+                       cwd=ROOT, capture_output=True, check=True)
+        result = subprocess.run(['but', 'pr', 'new', branch, '-F', '-'],
+                                input=message.encode(), cwd=ROOT, capture_output=True, check=True)
+        print(result.stdout.decode().strip())
+    except subprocess.CalledProcessError:
+        raise SystemExit('PR creation failed; encrypted work is preserved. Inspect but status and retry but pr new <branch> -t.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
     add = sub.add_parser('add', help='Generate or reuse one UUID for an email; update selected public gateways')
     add.add_argument('--email', required=True)
-    add.add_argument('--zone', action='append', required=True, help='Repeat to grant access to additional zones')
+    add.add_argument('--zone', action='append', help='Limit access to these zones; default: all configured public gateways')
+    add.add_argument('--local-only', action='store_true', help='Only prepare the encrypted file; skip commit and PR')
     sub.add_parser('migrate-service-labels', help='Rename existing service labels without changing any UUID')
     args = parser.parse_args()
+    create_pr = args.command == 'add' and not args.local_only
+    if create_pr:
+        prepare_pr()
     source = ROOT / 'conf/xray/credentials-secret.sops.yaml'
     try:
         decrypted = subprocess.run(['sops', '--decrypt', str(source)], capture_output=True, check=True).stdout
         document = yaml.safe_load(decrypted)
         configs = {k.removesuffix('.gateway.json'): json.loads(base64.b64decode(v))
                    for k, v in document['data'].items() if k.endswith('.gateway.json')}
-        updated = add_client(configs, args.email, args.zone) if args.command == 'add' else migrate_service_labels(configs)
+        updated = add_client(configs, args.email, args.zone or sorted(configs)) if args.command == 'add' else migrate_service_labels(configs)
         if updated == configs:
             print('Already configured; no UUIDs or encrypted files changed.')
             return
@@ -102,7 +161,10 @@ def main():
         finally:
             if temporary and os.path.exists(temporary):
                 os.unlink(temporary)
-        print('Updated encrypted Git source. No credentials printed; commit and publish to deploy.')
+        if create_pr:
+            open_client_pr()
+        else:
+            print('Updated encrypted Git source. No credentials printed; commit and publish to deploy.')
     except (ValueError, KeyError):
         raise SystemExit('Invalid account request or source configuration; no changes written.')
     except (subprocess.CalledProcessError, FileNotFoundError):

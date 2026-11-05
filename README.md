@@ -148,14 +148,14 @@ The primary connects directly to the VPS. Do not enable Cloudflare's HTTP proxy 
 
 Grafana and the HTTPS VPN backup share the existing HTTPS certificate. No website is served at `/`; unmatched requests return 404. Grafana remains at `/status/` and the XHTTP VPN transport retains its configured path. ACME uses HTTP-01 on port 80, because TLS-ALPN-01 cannot be passed through Cloudflare's ordinary HTTP proxy. Keep the challenge URL reachable through Cloudflare without a challenge page or access policy.
 
-Create a client in the encrypted Git source; UUID generation is automatic:
+Create a client and open a pull request with one command (SOPS and authenticated GitButler CLI `but` are required):
 
 ```sh
 export SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey
-python3 scripts/xray_clients.py add --email person@example.com --zone ru-spb-1 --zone uk-ldn-1
+python3 scripts/xray_clients.py add --email person@example.com
 ```
 
-Repeat `--zone` for the public gateways the client may use. The command reuses the existing UUID for that email, creates one UUID for a new client across the selected public transports, and refuses ambiguous existing identities. It does not grant access to the private relay listener, print credentials, commit, or contact Kubernetes. Review and publish the encrypted change through GitOps before using the profile. Existing accounts are preserved. Service labels end in `@service-account`; `migrate-service-labels` renames the known legacy service labels without rotating UUIDs. New end-user emails must not use this reserved suffix. Emails are visible to authorized monitoring users; UUIDs remain secret.
+Run from a clean, current `main` checkout. By default access is granted to all configured public gateways; repeat `--zone` to restrict it. The CLI creates a branch, commits only the encrypted Secret and opens a PR; it never merges or deploys directly. Email and UUID are omitted from the public branch name, commit message and PR text. Use `--local-only` to prepare a local encrypted edit instead. The command reuses the existing UUID for that email, creates one UUID for a new client across the selected public transports, and refuses ambiguous existing identities. It does not grant access to the private relay listener, print credentials, or contact Kubernetes. Review and merge the PR; Flux deploys it before the profile can be used. Existing accounts are preserved. Service labels end in `@service-account`; `migrate-service-labels` renames the known legacy service labels without rotating UUIDs. New end-user emails must not use this reserved suffix. Emails are visible to authorized monitoring users; UUIDs remain secret.
 
 Export profiles privately (Python with PyYAML and cryptography, plus SOPS, are required):
 
