@@ -148,33 +148,35 @@ The primary connects directly to the VPS. Do not enable Cloudflare's HTTP proxy 
 
 Grafana and the HTTPS VPN backup share the existing HTTPS certificate. No website is served at `/`; unmatched requests return 404. Grafana remains at `/status/` and the XHTTP VPN transport retains its configured path. ACME uses HTTP-01 on port 80, because TLS-ALPN-01 cannot be passed through Cloudflare's ordinary HTTP proxy. Keep the challenge URL reachable through Cloudflare without a challenge page or access policy.
 
-Create a client and open a pull request with one command (SOPS and authenticated GitButler CLI `but` are required):
+Create a client and open a PR. A short client name is sufficient; `--email` remains an alias for `--name`:
 
 ```sh
 export SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey
-python3 scripts/xray_clients.py add --email person@example.com
+python3 scripts/xray_clients.py add --name alice
 ```
 
-Run from a clean, current `main` checkout. By default access is granted to all configured public gateways; repeat `--zone` to restrict it. The CLI creates a branch, commits only the encrypted Secret and opens a PR; it never merges or deploys directly. Email and UUID are omitted from the public branch name, commit message and PR text. Use `--local-only` to prepare a local encrypted edit instead. The command reuses the existing UUID for that email, creates one UUID for a new client across the selected public transports, and refuses ambiguous existing identities. It does not grant access to the private relay listener, print credentials, or contact Kubernetes. Review and merge the PR; Flux deploys it before the profile can be used. Existing accounts are preserved. Service labels end in `@service-account`; `migrate-service-labels` renames the known legacy service labels without rotating UUIDs. New end-user emails must not use this reserved suffix. Emails are visible to authorized monitoring users; UUIDs remain secret.
+Run from a clean, current main checkout with authenticated GitButler CLI `but`. Access defaults to all configured public gateways; use `--zone` to restrict it. The UUID is generated once and reused on repeat runs. Only the encrypted Secret is committed. Client name and UUID are absent from public PR metadata. Merge the PR and let Flux deploy it before handing out the profile. No email service or background task is required.
 
-Export profiles privately (Python with PyYAML and cryptography, plus SOPS, are required):
+Export a private profile, optionally with a new connection IP or DNS name while keeping the UUID:
 
 ```sh
-SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey python3 scripts/xray_share_url.py \
-  --zone uk-ldn-1 --email person@example.com --output-dir /secure/path/proxy-profiles
+python3 scripts/xray_clients.py config --name alice --zone ru-spb-1 \
+  --output-dir /secure/path/alice
+# Reissue for another endpoint on an already provisioned server:
+python3 scripts/xray_clients.py config --name alice --zone ru-spb-1 \
+  --host vpn.example.com --output-dir /secure/path/alice-updated
 ```
 
-The exporter refuses to write profiles inside this repository, to a directory readable by others, or over existing files/symlinks. Public-key derivation happens in memory, without passing the private key to another process. Imports include IPv4 and IPv6 variants with Chrome, Firefox, and Safari TLS fingerprints, plus the HTTPS backup. Fingerprint variants require client support. The backup requires XHTTP support; “V2Ray” alone does not identify a compatible iOS app or core version. Keep the current installed app until the replacement profile works.
+Output files are mode 0600 in a private directory outside Git. `config --host` changes the exported profile only: it does not create DNS records, provision a server or modify profiles already imported on phones. A stable DNS-only hostname in a REALITY profile allows its A/AAAA records to move to a replacement server without reissuing the profile, provided its credentials and REALITY settings are preserved. A blocked hostname or an old IP-literal profile requires reimporting an updated profile. The REALITY server name is separate from the connection address and remains unchanged.
 
-Prepare connection instructions after merging the account PR and deploying it:
+Prepare a physical host replacement PR without changing client keys:
 
 ```sh
-python3 scripts/xray_clients.py prepare-message --email person@example.com --pr 123 \
-  --template /secure/path/instructions.txt --subject "Connection instructions" \
-  --output /secure/path/client-instructions.eml
+python3 scripts/xray_clients.py server --host ru-spb-1/1 --ip NEW_PUBLIC_IPV4 \
+  --ssh-host-key 'ssh-ed25519 VERIFIED_PUBLIC_HOST_KEY'
 ```
 
-The text template supports `$email` and `$profiles`. Keep templates and output outside Git, with the output directory mode 0700. The command checks that the PR changed the encrypted credentials, was merged into main, is included in the local checkout, and that Flux is Ready at exactly that checkout revision. It reads Flux status over pinned SSH; Kubernetes API exposure is unnecessary. The resulting email draft has mode 0600 and contains the selected client's private connection profiles. It never sends email. Choose and configure the delivery provider separately before enabling sending; delivery is an explicit operator action, not a background job.
+Verify the new SSH key through the provider console first. This updates machine inventory and pinned SSH trust, preserving the logical host slot, Kubernetes node name, zone and private addresses. Supply `--ipv6` for the new IPv6; otherwise the old public IPv6 is removed. The CLI does not purchase, provision or cut over a host: after review use the existing Cluster Converge bootstrap, verify the new gateway, then move public DNS or reissue profiles. Control-plane replacement also needs datastore recovery or an explicit cluster rebuild/rejoin; an inventory edit alone cannot restore it. Client UUIDs stay in the unchanged encrypted Secret. `--local-only` prepares edits without a PR.
 
 Test a profile from the network you need to use:
 

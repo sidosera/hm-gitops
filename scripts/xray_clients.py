@@ -10,6 +10,7 @@ import re
 import secrets
 import shutil
 import subprocess
+import sys
 import tempfile
 import uuid
 
@@ -29,8 +30,9 @@ def public_inbounds(config):
 
 
 def add_client(configs, email, zones):
-    if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email) or email.endswith('@service-account'):
-        raise ValueError('Provide a real client email; @service-account is reserved')
+    if not (re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}', email) or
+            re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email)) or email.endswith('@service-account'):
+        raise ValueError('Provide a client name or email; @service-account is reserved')
     result = copy.deepcopy(configs)
     if not zones or any(z not in result for z in zones):
         raise ValueError('Select existing gateway zones with --zone')
@@ -83,7 +85,7 @@ def prepare_pr():
         raise SystemExit('Could not verify clean, current main. Check GitButler and remote access; no changes written.')
 
 
-def open_client_pr():
+def open_client_pr(changed_files=None, title="Add VPN client", details=None):
     branch = 'codex/vpn-client-' + secrets.token_hex(6)
     # Client identities belong only in the encrypted file, never public GitHub metadata.
     message = """Add VPN client
@@ -105,12 +107,15 @@ Grants client access to the selected public gateways. Existing accounts and serv
 
 **Blast Radius:** VPN access. Flux rolls Xray workloads after merge; active sessions may reconnect.
 """
+    if details is not None:
+        message = title + '\n\n' + details
+    expected_files = set(changed_files or ['conf/xray/credentials-secret.sops.yaml'])
     try:
         status = subprocess.run(['git', 'status', '--porcelain', '--untracked-files=all'], cwd=ROOT,
-                                capture_output=True, check=True).stdout.decode().strip()
-        if status != 'M conf/xray/credentials-secret.sops.yaml':
+                                capture_output=True, check=True).stdout.decode().splitlines()
+        if {line[3:] for line in status} != expected_files or any(line[:2] not in (' M', 'M ') for line in status):
             raise SystemExit('Unexpected working-tree changes; encrypted account prepared, but nothing committed.')
-        subprocess.run(['but', 'commit', '-b', branch, '-m', 'Add VPN client'],
+        subprocess.run(['but', 'commit', '-b', branch, '-m', title],
                        cwd=ROOT, capture_output=True, check=True)
         result = subprocess.run(['but', 'pr', 'new', branch, '-F', '-'],
                                 input=message.encode(), cwd=ROOT, capture_output=True, check=True)
@@ -122,26 +127,59 @@ Grants client access to the selected public gateways. Existing accounts and serv
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
-    add = sub.add_parser('add', help='Generate or reuse one UUID for an email; update selected public gateways')
-    add.add_argument('--email', required=True)
+    add = sub.add_parser('add', help='Generate or reuse one UUID for a client name; open an encrypted account PR')
+    add.add_argument('--name', '--email', dest='email', required=True, help='Client label; an email address is optional')
     add.add_argument('--zone', action='append', help='Limit access to these zones; default: all configured public gateways')
     add.add_argument('--local-only', action='store_true', help='Only prepare the encrypted file; skip commit and PR')
-    message = sub.add_parser('prepare-message', help='Prepare a private email draft after merge and successful Flux deployment')
-    message.add_argument('--email', required=True)
-    message.add_argument('--pr', required=True, type=int)
-    message.add_argument('--zone', action='append')
-    message.add_argument('--template', required=True, type=Path, help='Private text template with $email and $profiles placeholders')
-    message.add_argument('--subject', required=True)
-    message.add_argument('--output', required=True, type=Path, help='New .eml file in an existing private directory outside Git')
-    message.add_argument('--ssh-key', type=Path, default=Path.home() / '.ssh/hm-gitops')
+    config = sub.add_parser('config', help='Export a private client profile; preserve UUID when changing its address')
+    config.add_argument('--name', '--email', dest='email', required=True)
+    config.add_argument('--zone', required=True)
+    config.add_argument('--host', help='New connection IP or DNS name; defaults to gateway inventory')
+    config.add_argument('--output-dir', type=Path, required=True)
+    server = sub.add_parser('server', help='Prepare a PR replacing a physical host address; preserve client UUIDs')
+    server.add_argument('--host', required=True, help='Stable inventory slot, e.g. ru-spb-1/1')
+    server.add_argument('--ip', required=True, help='New public IPv4 address')
+    server.add_argument('--ipv6', help='New public IPv6; omitted means remove the old IPv6')
+    server.add_argument('--ssh-host-key', required=True, help='New ed25519 public key, verified out of band')
+    server.add_argument('--local-only', action='store_true')
     sub.add_parser('migrate-service-labels', help='Rename existing service labels without changing any UUID')
     args = parser.parse_args()
-    if args.command == 'prepare-message':
-        from xray_delivery import prepare_message
+    if args.command == 'server':
+        from xray_servers import replace_server
+        from cluster_inventory import validate
+        if not args.local_only:
+            prepare_pr()
+        inventory_file = ROOT / 'cluster/clusters/hm-cluster/hosts.yml'
+        known_file = ROOT / 'vm/ssh_known_hosts'
         try:
-            prepare_message(ROOT, args)
-        except (ValueError, KeyError, OSError, subprocess.CalledProcessError):
-            raise SystemExit('Cannot prepare email: verify merged account PR, deployed revision, template and private output path. No email sent.')
+            inventory, known = replace_server(yaml.safe_load(inventory_file.read_text()), known_file.read_text(),
+                                              args.host, args.ip, args.ssh_host_key, args.ipv6)
+            validate(inventory, yaml.safe_load(inventory_file.with_name('profile.yml').read_text()))
+        except (ValueError, KeyError):
+            raise SystemExit('Invalid server replacement; verify host slot, new addresses and independently verified SSH key. No changes written.')
+        inventory_file.write_text(yaml.safe_dump(inventory, sort_keys=False))
+        known_file.write_text(known)
+        if not args.local_only:
+            open_client_pr(['cluster/clusters/hm-cluster/hosts.yml', 'vm/ssh_known_hosts'], 'Replace VPN host',
+                '## Summary\n\nNew physical address → inventory and pinned SSH key → existing Ansible bootstrap.\n\n'
+                'Logical host, zone, private network identities and all client UUIDs remain unchanged.\n\n'
+                '## Evidence\n\nInventory validation passed. No credential file is modified. No live host or DNS record is changed by this command.\n\n'
+                '## Merge Danger\n\n**Door:** two-way inventory change; actual cutover requires a maintenance plan.\n\n'
+                '**Blast Radius:** host replacement. Prepare key-based SSH on the new host, provision with Cluster Converge, '
+                'verify VPN connectivity, then move public DNS or issue updated client profiles. '
+                'Control-plane replacement also requires datastore recovery or an explicit cluster rebuild/rejoin; merging this PR does not perform that recovery.\n')
+        else:
+            print('Prepared inventory and pinned SSH key. No live host, DNS record or client UUID changed.')
+        return
+    if args.command == 'config':
+        command = [sys.executable, str(ROOT / 'scripts/xray_share_url.py'), '--email', args.email,
+                   '--zone', args.zone, '--output-dir', str(args.output_dir)]
+        if args.host:
+            command.extend(['--host', args.host])
+        result = subprocess.run(command, cwd=ROOT, capture_output=True)
+        if result.returncode:
+            raise SystemExit('Profile export failed; verify account label, zone, SOPS identity and private output directory.')
+        print(result.stdout.decode().strip())
         return
     create_pr = args.command == 'add' and not args.local_only
     if create_pr:

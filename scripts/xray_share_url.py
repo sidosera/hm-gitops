@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import ipaddress
+import re
 import os
 from pathlib import Path
 import subprocess
@@ -11,6 +13,20 @@ import urllib.parse
 import yaml
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+
+
+def normalize_endpoint(host: str) -> str:
+    try:
+        return str(ipaddress.ip_address(host))
+    except ValueError:
+        domain = host.rstrip('.').encode('idna').decode('ascii').lower()
+        if len(domain) > 253 or not domain or any(
+            not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', label)
+            for label in domain.split('.')
+        ):
+            raise ValueError('Invalid connection IP or DNS name')
+        return domain
 
 
 def build_vless_url(user_id: str, host: str, port: int, query: dict, name: str) -> str:
@@ -99,6 +115,10 @@ def main() -> None:
         ipv6 = machine.get('ipv6')
         if ipv6:
             hosts.append(ipv6)
+    try:
+        hosts = [normalize_endpoint(host) for host in hosts]
+    except (ValueError, UnicodeError):
+        raise SystemExit('Invalid connection IP or DNS name')
     profiles = export_profiles(config, hosts, public_key, args.https_host, args.email)
     if not profiles:
         raise SystemExit('No public client profiles match the requested email')

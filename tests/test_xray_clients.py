@@ -53,7 +53,7 @@ class ClientLifecycleTests(unittest.TestCase):
         self.assertEqual(updated['b']['inbounds'][0]['settings']['clients'][-1]['id'],'existing-id')
         configs['b']['inbounds'][0]['settings']['clients']=[{'email':'existing@example.org','id':'different-id'}]
         with self.assertRaises(ValueError):accounts.add_client(configs,'existing@example.org',['a'])
-        for email,zones in [('bad',['a']),('probe@service-account',['a']),('person@example.org',['missing'])]:
+        for email,zones in [('bad name',['a']),('probe@service-account',['a']),('person@example.org',['missing'])]:
             with self.assertRaises(ValueError):accounts.add_client(configs,email,zones)
 
     def test_service_migration_only_changes_known_labels_and_probe_reuses_legacy_id(self):
@@ -77,6 +77,21 @@ class ClientLifecycleTests(unittest.TestCase):
         self.assertTrue(urls)
         self.assertTrue(all(url.startswith('vless://selected-id@') for url in urls.values()))
         self.assertEqual({},profiles.export_profiles(config,['203.0.113.1'],'public-key','example.org','missing@example.org'))
+
+
+class SimpleLabelAndEndpointTests(unittest.TestCase):
+    def test_email_is_optional_and_changing_endpoint_keeps_client_uuid(self):
+        config={'a':{'inbounds':[inbound('gateway')]}}
+        updated=accounts.add_client(config,'alice',['a'])
+        chosen=next(c for c in updated['a']['inbounds'][0]['settings']['clients'] if c['email']=='alice')
+        before=profiles.export_profiles(updated['a'],['203.0.113.1'],'key','example.org','alice')
+        after=profiles.export_profiles(updated['a'],['vpn.example.org'],'key','example.org','alice')
+        self.assertTrue(before and after)
+        self.assertTrue(all('vless://'+chosen['id']+'@vpn.example.org:' in value for value in after.values()))
+        self.assertEqual(updated,accounts.add_client(updated,'alice',['a']))
+        for host in ['evil@attacker.example','https://example.org','bad host','-bad.example','a..example']:
+            with self.assertRaises(ValueError):profiles.normalize_endpoint(host)
+        self.assertEqual(profiles.normalize_endpoint('VPN.Example.org.'),'vpn.example.org')
 
 
 class PullRequestWorkflowTests(unittest.TestCase):
