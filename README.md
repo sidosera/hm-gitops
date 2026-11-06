@@ -148,7 +148,7 @@ The primary connects directly to the VPS. Do not enable Cloudflare's HTTP proxy 
 
 Grafana and the HTTPS VPN backup share the existing HTTPS certificate. No website is served at `/`; unmatched requests return 404. Grafana remains at `/status/` and the XHTTP VPN transport retains its configured path. ACME uses HTTP-01 on port 80, because TLS-ALPN-01 cannot be passed through Cloudflare's ordinary HTTP proxy. Keep the challenge URL reachable through Cloudflare without a challenge page or access policy.
 
-`hmctl` is the single operator CLI, built in Go. It embeds native SOPS/age encryption and needs neither Python nor the `sops` executable. Git and authenticated GitButler CLI (`but`) are needed only for repository discovery/PR operations; `--repo` plus `--local-only` or `--dry-run` can work without them. Profile connectivity checks additionally need Xray in PATH. The deployed Python probe runtime and internal Ansible helpers are separate from the operator CLI.
+`hmctl` is the single operator CLI, built in Go. It embeds native SOPS/age encryption and needs neither Python nor the `sops` executable. Git and authenticated GitHub CLI (`gh`) are needed only for repository discovery/PR operations; `--repo` plus `--local-only` or `--dry-run` can work without them. Profile connectivity checks additionally need Xray in PATH. The deployed Python probe runtime and internal Ansible helpers are separate from the operator CLI.
 
 Build with Go 1.27.3 or newer, or download the `hmctl` artifact from its GitHub Actions check. The artifact contains Linux/macOS binaries for amd64 and arm64 plus `SHA256SUMS`; verify the checksum before installation.
 

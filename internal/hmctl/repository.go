@@ -163,7 +163,7 @@ func (r *repository) preparePR() error {
 	if len(status) > 0 || strings.TrimSpace(string(branch)) != "main" {
 		return errors.New("start from a clean main checkout; existing work will not be committed")
 	}
-	if _, err = r.run("but", "pull", "--check"); err != nil {
+	if _, err = r.run("git", "fetch", "--no-tags", "origin", "main:refs/remotes/origin/main"); err != nil {
 		return err
 	}
 	local, err := r.run("git", "rev-parse", "HEAD")
@@ -175,7 +175,7 @@ func (r *repository) preparePR() error {
 		return err
 	}
 	if !bytes.Equal(local, remote) {
-		return errors.New("main differs from origin/main; run but pull and retry")
+		return errors.New("main differs from origin/main; run git pull --ff-only and retry")
 	}
 	return nil
 }
@@ -215,16 +215,25 @@ func (r *repository) openPR(paths []string, title, body string) (string, error) 
 		return "", err
 	}
 	branch := "codex/hmctl-" + hex.EncodeToString(b[:])
-	if _, err = r.run("but", "commit", "-b", branch, "-m", title); err != nil {
+	if _, err = r.run("git", "switch", "-c", branch); err != nil {
+		return "", fmt.Errorf("branch creation failed; prepared changes preserved: %w", err)
+	}
+	if _, err = r.run("git", append([]string{"add", "--"}, paths...)...); err != nil {
+		return "", fmt.Errorf("staging failed; prepared changes preserved: %w", err)
+	}
+	if _, err = r.run("git", "commit", "-m", title); err != nil {
 		return "", fmt.Errorf("commit failed; prepared changes preserved: %w", err)
 	}
-	out, err := r.execute([]byte(title+"\n\n"+body), "but", "pr", "new", branch, "-F", "-")
+	if _, err = r.run("git", "push", "--set-upstream", "origin", branch); err != nil {
+		return "", fmt.Errorf("push failed; commit preserved on %s; retry git push --set-upstream origin %s", branch, branch)
+	}
+	out, err := r.execute([]byte(body), "gh", "pr", "create", "--base", "main", "--head", branch, "--title", title, "--body-file", "-")
 	if err != nil {
-		return "", fmt.Errorf("PR failed; encrypted/configuration commit preserved; retry but pr new %s -t", branch)
+		return "", fmt.Errorf("PR failed; commit preserved on %s; retry gh pr create --base main --head %s", branch, branch)
 	}
 	found := prURL.Find(out)
 	if len(found) == 0 {
-		return "", errors.New("PR command completed; inspect but status for its URL")
+		return "", errors.New("PR command completed; run gh pr view --web to inspect it")
 	}
 	return string(found), nil
 }

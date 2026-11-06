@@ -54,8 +54,17 @@ func TestPRMetadataNeverContainsAccountIdentityAndFailurePreservesCommit(t *test
 		commits := 0
 		r := &repository{ctx: context.Background()}
 		r.execCommand = func(_ context.Context, _ string, input []byte, name string, args ...string) ([]byte, error) {
-			if name == "git" {
+			if name == "git" && args[0] == "status" {
 				return []byte(" M " + secretPath + "\x00"), nil
+			}
+			if name == "git" && (args[0] == "switch" || args[0] == "push") {
+				return nil, nil
+			}
+			if name == "git" && args[0] == "add" {
+				if len(args) != 3 || args[1] != "--" || args[2] != secretPath {
+					t.Fatal("staged unrelated files")
+				}
+				return nil, nil
 			}
 			if args[0] == "commit" {
 				commits++
@@ -64,7 +73,7 @@ func TestPRMetadataNeverContainsAccountIdentityAndFailurePreservesCommit(t *test
 				}
 				return nil, nil
 			}
-			if name == "but" && args[0] == "pr" {
+			if name == "gh" && args[0] == "pr" {
 				if strings.Contains(string(input), "@") || strings.Contains(string(input), "alice") {
 					t.Fatal("client identity in PR text")
 				}
