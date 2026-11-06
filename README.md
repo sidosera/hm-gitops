@@ -148,72 +148,11 @@ The primary connects directly to the VPS. Do not enable Cloudflare's HTTP proxy 
 
 Grafana and the HTTPS VPN backup share the existing HTTPS certificate. No website is served at `/`; unmatched requests return 404. Grafana remains at `/status/` and the XHTTP VPN transport retains its configured path. ACME uses HTTP-01 on port 80, because TLS-ALPN-01 cannot be passed through Cloudflare's ordinary HTTP proxy. Keep the challenge URL reachable through Cloudflare without a challenge page or access policy.
 
-`hmctl` is the single operator CLI, built in Go. It embeds native SOPS/age encryption and needs neither Python nor the `sops` executable. Git and authenticated GitHub CLI (`gh`) are needed only for repository discovery/PR operations; `--repo` plus `--local-only` or `--dry-run` can work without them. Profile connectivity checks additionally need Xray in PATH. The deployed Python probe runtime and internal Ansible helpers are separate from the operator CLI.
+## Operations
 
-Build with Go 1.27.3 or newer, or download the `hmctl` artifact from its GitHub Actions check. The artifact contains Linux/macOS binaries for amd64 and arm64 plus `SHA256SUMS`; verify the checksum before installation.
+Use `hmctl` for account changes, client profiles, probe configuration and host replacement. See [Common operations](docs/operations.md) for setup, command examples and the PR → merge → Flux workflow.
 
-```sh
-make build                       # bin/hmctl
-make test vet                    # native lifecycle/security tests, race detection and static checks
-make dist VERSION=0.1.0           # four standalone binaries and checksums
-bin/hmctl --help
-bin/hmctl completion zsh          # also bash, fish and PowerShell
-```
-
-Run from a GitOps checkout, or pass `--repo /path/to/hm-gitops`. Common flags can precede `service` or follow the service name; place them before `cluster` for cluster operations. `--cluster` selects the cluster inventory (default `hm-cluster`). Supply the existing native age identity through `SOPS_AGE_KEY_FILE` or `--age-key-file`; the owned identity file must have mode 0600. Only native age recipients/identities are supported, with SOPS MAC verification always enabled: no key-command subprocesses, plugins or remote KMS. Plaintext credentials stay in memory, and exported profiles are written only to an owned private directory outside Git, with file mode 0600. Existing files and symlinks are never overwritten.
-
-Create or revoke access through a PR:
-
-```sh
-export SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey
-bin/hmctl service gateway -- --add-account --label alice
-bin/hmctl service gateway -- --remove-account --label alice --zone ru-spb-1
-bin/hmctl service gateway -- --list-accounts --json
-```
-
-The source follows the same boundary: shared GitOps helpers in `internal/hmctl`, host management in `internal/hmctl/cluster`, and Xray handlers, profiles and credentials in `internal/hmctl/services/xray`. Cluster operations live under `hmctl cluster`; `hmctl service <service> -- <arguments>` forwards arguments to the registered service handler. The generic command does not parse gateway or probe options. The current service handlers are `gateway` and `vpn-probe`. The separator is optional. A short client name is sufficient; an email is optional. Account edits default to all configured public gateway zones; repeat `--zone` or comma-separate zones to restrict access. A new UUID is generated securely once and reused across selected public transports. Existing accounts, unknown configuration fields and private relay permissions are preserved. Labels are opaque account identifiers stored in Xray's `email` field. Email addresses and the `@service-account` suffix are conventions; they have no special privileges or validation rules. No credentials or client labels are included in public branch names, commits or PR descriptions. PR creation requires a clean, current `main` checkout; unrelated changes are never included. Failed publishing preserves prepared work for recovery.
-
-Use `--dry-run` to validate without writes or PRs; `--local-only` writes the encrypted edit for manual review. These flags cannot combine. After merging the account PR, let Flux apply it before distributing the profile. JSON output uses `schema_version: 1` and contains metadata only, never UUIDs or connection URLs. Usage/validation errors exit 2, operational errors exit 1, and interruption exits 130. Success exits 0. Commands are noninteractive and have a configurable `--timeout` (default two minutes).
-
-Export or reissue a client's profile without changing the UUID:
-
-```sh
-bin/hmctl service gateway -- --export-account --label alice --zone ru-spb-1 \
-  --output-dir /secure/path/alice
-bin/hmctl service gateway -- --export-account --label alice --zone ru-spb-1 \
-  --endpoint vpn.example.com --output-dir /secure/path/alice-updated
-```
-
-`--endpoint` changes the exported connection IP/DNS only: it does not create DNS records, provision a server, or change profiles already imported on phones. REALITY SNI and server key settings remain unchanged. `--https-host` selects the HTTPS/XHTTP backup hostname. A stable DNS-only hostname can move to a replacement server without reissuing the profile if its credentials and REALITY settings are preserved. A blocked hostname or old IP-literal profile requires reimporting an updated profile.
-
-Prepare a physical replacement through the same binary:
-
-```sh
-bin/hmctl cluster host replace ru-spb-1/1 --ip NEW_PUBLIC_IPV4 \
-  --ssh-host-key 'ssh-ed25519 VERIFIED_PUBLIC_HOST_KEY'
-```
-
-Verify the new SSH key through the provider console first. The PR updates inventory and pinned SSH trust, preserving the logical host slot, node name, zone and private addresses. `--ipv6` supplies the new public IPv6; otherwise the old public IPv6 is removed. The CLI does not purchase, provision or cut over a host: after review use Cluster Converge, verify the new gateway, then move DNS or reissue profiles. Replacing the sole control plane additionally requires datastore recovery or an explicit cluster rebuild/rejoin; an inventory edit alone cannot recover it. The encrypted client Secret is untouched.
-
-Configure the probe and check connectivity:
-
-```sh
-bin/hmctl service vpn-probe -- --sync-credentials \
-  --client-id-file /secure/path/probe-client.uuid --dry-run
-bin/hmctl service gateway -- --check-profile /secure/path/alice/hm-reality-ipv4-chrome.txt
-```
-
-The check passes configuration to local Xray over stdin, binds SOCKS only to loopback, verifies the expected exit IP, HTTPS and a 1 MB transfer, then stops the process. It writes no temporary plaintext configuration. It never prints the profile or Xray logs. `--expected-exit-ip` overrides the default control-plane inventory address. An external check does not establish reachability from every mobile/home ISP. Probe credentials are derived from the entry discovery names already recorded in the encrypted probe configs, preserving the configured observer/entry mapping as the fleet grows. The probe command accepts an existing UUID from an owned mode-0600 file and validates its gateway access. It never creates accounts, renames labels, or grants permissions. Create its account through the ordinary gateway `--add-account` workflow first. It does not change the live cluster directly.
-
-For future changes, deploy a separate canary Service and ingress route, validate both transports and transfers, then reconcile production and remove the canary. Verify that old credentials fail after rotation. Keep rollback snapshots private and outside Git. Do not restore revoked credentials as a routine rollback; roll back the image while retaining fresh credentials when possible.
-
-Useful read-only server checks:
-
-```sh
-sudo kubectl -n hm get pods,svc
-sudo kubectl -n flux-system get gitrepositories,kustomizations
-sudo kubectl -n hm logs deployment/proxy-service --tail=20
-```
+The CLI embeds native SOPS/age encryption. Shared GitOps helpers live in `internal/hmctl`, host management in `internal/hmctl/cluster`, and Xray implementation in `internal/hmctl/services/xray`. Build with `make build`; package releases with `make dist VERSION=0.1.0`.
 
 Xray runs as a non-root user with all capabilities dropped and a read-only root filesystem.
 
