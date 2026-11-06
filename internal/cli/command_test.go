@@ -28,7 +28,7 @@ func TestDispatchForwardsServiceArgumentsWithoutWorkloadKnowledge(t *testing.T) 
 			return cmd
 		}
 		root := NewCommand("test", &output, &output, map[string]Factory{"unrelated-service": factory}, nil)
-		args := []string{"--cluster", "another-cluster", "--dry-run", "service-cfg", "unrelated-service"}
+		args := []string{"--cluster", "another-cluster", "--dry-run", "service", "unrelated-service"}
 		if separator {
 			args = append(args, "--")
 		}

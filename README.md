@@ -160,27 +160,27 @@ bin/hmctl --help
 bin/hmctl completion zsh          # also bash, fish and PowerShell
 ```
 
-Run from a GitOps checkout, or pass `--repo /path/to/hm-gitops`. Common flags can precede `service-cfg` or follow the service name; place them before `cluster` for cluster operations. `--cluster` selects the cluster inventory (default `hm-cluster`). Supply the existing native age identity through `SOPS_AGE_KEY_FILE` or `--age-key-file`; the owned identity file must have mode 0600. Only native age recipients/identities are supported, with SOPS MAC verification always enabled: no key-command subprocesses, plugins or remote KMS. Plaintext credentials stay in memory, and exported profiles are written only to an owned private directory outside Git, with file mode 0600. Existing files and symlinks are never overwritten.
+Run from a GitOps checkout, or pass `--repo /path/to/hm-gitops`. Common flags can precede `service` or follow the service name; place them before `cluster` for cluster operations. `--cluster` selects the cluster inventory (default `hm-cluster`). Supply the existing native age identity through `SOPS_AGE_KEY_FILE` or `--age-key-file`; the owned identity file must have mode 0600. Only native age recipients/identities are supported, with SOPS MAC verification always enabled: no key-command subprocesses, plugins or remote KMS. Plaintext credentials stay in memory, and exported profiles are written only to an owned private directory outside Git, with file mode 0600. Existing files and symlinks are never overwritten.
 
 Create or revoke access through a PR:
 
 ```sh
 export SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey
-bin/hmctl service-cfg gateway -- --add-account --label alice
-bin/hmctl service-cfg gateway -- --remove-account --label alice --zone ru-spb-1
-bin/hmctl service-cfg gateway -- --list-accounts --json
+bin/hmctl service gateway -- --add-account --label alice
+bin/hmctl service gateway -- --remove-account --label alice --zone ru-spb-1
+bin/hmctl service gateway -- --list-accounts --json
 ```
 
-The source follows the same boundary: shared GitOps helpers in `internal/hmctl`, host management in `internal/hmctl/cluster`, and Xray handlers, profiles and credentials in `internal/hmctl/services/xray`. Cluster operations live under `hmctl cluster`; `hmctl service-cfg <service> -- <arguments>` forwards arguments to the registered service handler. The generic command does not parse gateway or probe options. The current service handlers are `gateway` and `vpn-probe`. The separator is optional. A short client name is sufficient; an email is optional. Account edits default to all configured public gateway zones; repeat `--zone` or comma-separate zones to restrict access. A new UUID is generated securely once and reused across selected public transports. Existing accounts, unknown configuration fields and private relay permissions are preserved. Labels are opaque account identifiers stored in Xray's `email` field. Email addresses and the `@service-account` suffix are conventions; they have no special privileges or validation rules. No credentials or client labels are included in public branch names, commits or PR descriptions. PR creation requires a clean, current `main` checkout; unrelated changes are never included. Failed publishing preserves prepared work for recovery.
+The source follows the same boundary: shared GitOps helpers in `internal/hmctl`, host management in `internal/hmctl/cluster`, and Xray handlers, profiles and credentials in `internal/hmctl/services/xray`. Cluster operations live under `hmctl cluster`; `hmctl service <service> -- <arguments>` forwards arguments to the registered service handler. The generic command does not parse gateway or probe options. The current service handlers are `gateway` and `vpn-probe`. The separator is optional. A short client name is sufficient; an email is optional. Account edits default to all configured public gateway zones; repeat `--zone` or comma-separate zones to restrict access. A new UUID is generated securely once and reused across selected public transports. Existing accounts, unknown configuration fields and private relay permissions are preserved. Labels are opaque account identifiers stored in Xray's `email` field. Email addresses and the `@service-account` suffix are conventions; they have no special privileges or validation rules. No credentials or client labels are included in public branch names, commits or PR descriptions. PR creation requires a clean, current `main` checkout; unrelated changes are never included. Failed publishing preserves prepared work for recovery.
 
 Use `--dry-run` to validate without writes or PRs; `--local-only` writes the encrypted edit for manual review. These flags cannot combine. After merging the account PR, let Flux apply it before distributing the profile. JSON output uses `schema_version: 1` and contains metadata only, never UUIDs or connection URLs. Usage/validation errors exit 2, operational errors exit 1, and interruption exits 130. Success exits 0. Commands are noninteractive and have a configurable `--timeout` (default two minutes).
 
 Export or reissue a client's profile without changing the UUID:
 
 ```sh
-bin/hmctl service-cfg gateway -- --export-account --label alice --zone ru-spb-1 \
+bin/hmctl service gateway -- --export-account --label alice --zone ru-spb-1 \
   --output-dir /secure/path/alice
-bin/hmctl service-cfg gateway -- --export-account --label alice --zone ru-spb-1 \
+bin/hmctl service gateway -- --export-account --label alice --zone ru-spb-1 \
   --endpoint vpn.example.com --output-dir /secure/path/alice-updated
 ```
 
@@ -198,9 +198,9 @@ Verify the new SSH key through the provider console first. The PR updates invent
 Configure the probe and check connectivity:
 
 ```sh
-bin/hmctl service-cfg vpn-probe -- --sync-credentials \
+bin/hmctl service vpn-probe -- --sync-credentials \
   --client-id-file /secure/path/probe-client.uuid --dry-run
-bin/hmctl service-cfg gateway -- --check-profile /secure/path/alice/hm-reality-ipv4-chrome.txt
+bin/hmctl service gateway -- --check-profile /secure/path/alice/hm-reality-ipv4-chrome.txt
 ```
 
 The check passes configuration to local Xray over stdin, binds SOCKS only to loopback, verifies the expected exit IP, HTTPS and a 1 MB transfer, then stops the process. It writes no temporary plaintext configuration. It never prints the profile or Xray logs. `--expected-exit-ip` overrides the default control-plane inventory address. An external check does not establish reachability from every mobile/home ISP. Probe credentials are derived from the entry discovery names already recorded in the encrypted probe configs, preserving the configured observer/entry mapping as the fleet grows. The probe command accepts an existing UUID from an owned mode-0600 file and validates its gateway access. It never creates accounts, renames labels, or grants permissions. Create its account through the ordinary gateway `--add-account` workflow first. It does not change the live cluster directly.
@@ -320,7 +320,7 @@ The Proxy connectivity table has website rows and Direct/VPN sparkline columns o
 
 Probe workloads use `hm.gitops/service: vpn-probe`, so operational metrics retain their independent service identity. Probe accounts use `probe-e2e@service-account` and are included in client traffic metrics. Credentials are distinct from existing user profiles and relay accounts; each observer receives only the credential for the public entry it tests. They are SOPS encrypted. The account grants normal authenticated VPN egress to that dedicated probe client; it does not grant host or Kubernetes administration.
 
-Dedicated probe accounts and their runtime configs are keys in the same canonical Secret as Gateway. The credential maintenance command is `hmctl service-cfg vpn-probe --sync-credentials`. It preserves existing users, adds/reuses one dedicated account on each Gateway, derives the matching public-listener client configuration, updates the canonical encrypted Secret only when the account/config data changes. An unchanged run is a no-op, and existing users are retained. Kustomize derives workload revisions from SOPS metadata. It makes no cluster writes. Before publishing, render the cluster, run tests, inspect only encrypted changes and verify direct and VPN results from SPB. Keep all referenced runtime keys in the canonical Secret before deploying overlays. Notifications still require an Alertmanager receiver.
+Probe runtime configs are keys in the same canonical Secret as Gateway. The command `hmctl service vpn-probe -- --sync-credentials --client-id-file /secure/path/probe-client.uuid` consumes an already authorized account and refreshes the matching public-listener client configuration. It never creates accounts or changes labels. An unchanged run is a no-op, and existing users are retained. Kustomize derives workload revisions from SOPS metadata. It makes no cluster writes. Before publishing, render the cluster, run tests, inspect only encrypted changes and verify direct and VPN results from SPB. Keep all referenced runtime keys in the canonical Secret before deploying overlays. Notifications still require an Alertmanager receiver.
 
 
 Cluster configuration lives in `cluster/clusters/hm-cluster`; Gateway and VPN Probe overlays are named by zone. Bootstrap defaults to `hm-cluster`. Node placement uses `topology.kubernetes.io/zone`, and central services use the `hm.gitops/control-plane` role label. VM or bare-metal machine identity does not change this deployment path. Inventory keeps stable Kubernetes registration IDs explicitly so naming changes do not require draining/rejoining a healthy cluster or regenerating VPN profiles.

@@ -85,7 +85,7 @@ func TestNativeSOPSRoundTripAndIdempotentCLIWithoutExecutables(t *testing.T) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
 		cmd := newTestCommand("test", &stdout, &stderr)
-		cmd.SetArgs(append([]string{"--repo", repo, "--age-key-file", key, "--json", "service-cfg", "gateway", "--add-account", "--label", "alice"}, flags...))
+		cmd.SetArgs(append([]string{"--repo", repo, "--age-key-file", key, "--json", "service", "gateway", "--add-account", "--label", "alice"}, flags...))
 		if err := cmd.Execute(); err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +156,7 @@ func TestSOPSMACAndIdentityPermissionsFailClosed(t *testing.T) {
 	}
 }
 func TestCLIValidationHelpAndJSONNeverRequireSecrets(t *testing.T) {
-	for _, args := range [][]string{{"service-cfg", "unknown", "--list-accounts"}, {"service-cfg", "gateway", "--add-account", "--remove-account", "--label", "alice"}, {"service-cfg", "gateway", "--export-account", "--label", "alice"}, {"service-cfg", "gateway", "--add-account", "--label", "alice", "--dry-run", "--local-only"}, {"--cluster", "../escape", "service-cfg", "gateway", "--list-accounts"}} {
+	for _, args := range [][]string{{"service", "unknown", "--list-accounts"}, {"service", "gateway", "--add-account", "--remove-account", "--label", "alice"}, {"service", "gateway", "--export-account", "--label", "alice"}, {"service", "gateway", "--add-account", "--label", "alice", "--dry-run", "--local-only"}, {"--cluster", "../escape", "service", "gateway", "--list-accounts"}} {
 		var output bytes.Buffer
 		cmd := newTestCommand("v-test", &output, &output)
 		cmd.SetArgs(args)

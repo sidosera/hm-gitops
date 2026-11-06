@@ -75,7 +75,7 @@ func newGatewayCommand(o *options) *cobra.Command {
 	var label, endpoint, output, httpsHost, checkFile, expectedExit string
 	var zones []string
 	cmd := &cobra.Command{Use: "gateway", Short: "Inspect or change a service configuration", Args: noArgs,
-		Example: "  hmctl service-cfg gateway --add-account --label alice\n  hmctl service-cfg gateway --export-account --label alice --zone ru-spb-1 --output-dir /private/alice\n  hmctl service-cfg gateway --list-accounts --json"}
+		Example: "  hmctl service gateway --add-account --label alice\n  hmctl service gateway --export-account --label alice --zone ru-spb-1 --output-dir /private/alice\n  hmctl service gateway --list-accounts --json"}
 	cmd.Flags().BoolVar(&add, "add-account", false, "Generate/reuse a client UUID and open an encrypted account PR")
 	cmd.Flags().BoolVar(&remove, "remove-account", false, "Revoke a client's access in selected zones through a PR")
 	cmd.Flags().BoolVar(&export, "export-account", false, "Write a client's VLESS profiles to a private directory")

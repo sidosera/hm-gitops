@@ -45,7 +45,7 @@ func NewCommand(version string, out, stderr io.Writer, services map[string]Facto
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return &UsageError{err.Error()} })
 	o.BindFlags(root)
 	root.SetVersionTemplate("hmctl {{.Version}}\n")
-	dispatch := &cobra.Command{Use: "service-cfg <service> [-- service arguments]", Short: "Forward configuration arguments to a registered service", DisableFlagParsing: true}
+	dispatch := &cobra.Command{Use: "service <service> [-- service arguments]", Short: "Forward configuration arguments to a registered service", DisableFlagParsing: true}
 	names := make([]string, 0, len(services))
 	for name := range services {
 		names = append(names, name)
