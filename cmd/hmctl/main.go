@@ -10,7 +10,8 @@ import (
 	"syscall"
 
 	"github.com/sidosera/hm-gitops/internal/cli"
-	"github.com/sidosera/hm-gitops/internal/hmctl"
+	"github.com/sidosera/hm-gitops/internal/hmctl/cluster"
+	"github.com/sidosera/hm-gitops/internal/hmctl/services/xray"
 )
 
 var version = "dev"
@@ -18,7 +19,7 @@ var version = "dev"
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	cmd := cli.NewCommand(version, os.Stdout, os.Stderr, map[string]cli.Factory{"gateway": hmctl.GatewayCommand, "vpn-probe": hmctl.ProbeCommand}, hmctl.ClusterCommand)
+	cmd := cli.NewCommand(version, os.Stdout, os.Stderr, map[string]cli.Factory{"gateway": xray.GatewayCommand, "vpn-probe": xray.ProbeCommand}, cluster.NewCommand)
 	if err := cmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "hmctl:", err)
 		code := 1

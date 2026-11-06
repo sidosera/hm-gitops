@@ -1,9 +1,11 @@
-package hmctl
+package cluster
 
 import (
 	"errors"
 	"fmt"
+	core "github.com/sidosera/hm-gitops/internal/hmctl"
 	"net/netip"
+	"regexp"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -167,3 +169,11 @@ func validateInventory(inventory, profile object) error {
 	}
 	return nil
 }
+
+type object = core.Object
+
+var asObject = core.AsObject
+var list = core.List
+var text = core.Text
+var clone = core.Clone
+var dnsLabel = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)

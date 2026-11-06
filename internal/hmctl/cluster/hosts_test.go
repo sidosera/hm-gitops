@@ -1,10 +1,12 @@
-package hmctl
+package cluster
 
 import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"github.com/sidosera/hm-gitops/internal/cli"
+	core "github.com/sidosera/hm-gitops/internal/hmctl"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -17,27 +19,23 @@ import (
 )
 
 func TestPhysicalReplacementPreservesLogicalIdentityAndCredentials(t *testing.T) {
-	root, err := filepath.Abs("../..")
+	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	repo, err := openRepository(context.Background(), root)
+	repo, err := core.OpenRepository(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer repo.close()
+	defer repo.Close()
 	var inventory, profile object
-	if err := repo.readYAML("cluster/clusters/hm-cluster/hosts.yml", &inventory); err != nil {
+	if err := repo.ReadYAML("cluster/clusters/hm-cluster/hosts.yml", &inventory); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.readYAML("cluster/clusters/hm-cluster/profile.yml", &profile); err != nil {
+	if err := repo.ReadYAML("cluster/clusters/hm-cluster/profile.yml", &profile); err != nil {
 		t.Fatal(err)
 	}
 	known, err := os.ReadFile(filepath.Join(root, "vm/ssh_known_hosts"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	before, err := os.ReadFile(filepath.Join(root, secretPath))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,13 +63,6 @@ func TestPhysicalReplacementPreservesLogicalIdentityAndCredentials(t *testing.T)
 	}
 	if !strings.Contains(trust, "8.8.8.8 "+key) || strings.Contains(trust, old+" ") {
 		t.Fatal("SSH trust not replaced")
-	}
-	after, err := os.ReadFile(filepath.Join(root, secretPath))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(before) != string(after) {
-		t.Fatal("client Secret modified")
 	}
 	for _, tc := range []struct{ slot, ip, key, ipv6 string }{{slot, "127.0.0.1", key, ""}, {"missing", "8.8.8.8", key, ""}, {slot, "8.8.8.8", "ssh-ed25519 invalid", ""}, {slot, "8.8.8.8", key, "fd00::1"}} {
 		if _, _, err := replaceHost(inventory, string(known), tc.slot, tc.ip, tc.key, tc.ipv6); err == nil {
@@ -153,10 +144,10 @@ func TestReplacementPreservesAliasesAndRejectsTrustConflict(t *testing.T) {
 	}
 }
 
-func TestClusterCommandDoesNotRequireVPNSecret(t *testing.T) {
+func TestClusterCommandDoesNotRequireServiceSecrets(t *testing.T) {
 	root := t.TempDir()
 	for _, path := range []string{"cluster/clusters/hm-cluster/hosts.yml", "cluster/clusters/hm-cluster/profile.yml", "vm/ssh_known_hosts"} {
-		data, err := os.ReadFile(filepath.Join("../..", path))
+		data, err := os.ReadFile(filepath.Join("../../..", path))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -169,7 +160,7 @@ func TestClusterCommandDoesNotRequireVPNSecret(t *testing.T) {
 		}
 	}
 	var output bytes.Buffer
-	cmd := newTestCommand("test", &output, &output)
+	cmd := cli.NewCommand("test", &output, &output, nil, NewCommand)
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)

@@ -1,4 +1,4 @@
-package hmctl
+package xray
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	core "github.com/sidosera/hm-gitops/internal/hmctl"
 	"os"
 	"time"
 
@@ -66,7 +67,7 @@ func mapping(node *yaml.Node, name string) *yaml.Node {
 	return nil
 }
 func (r *repository) loadSecret() (*secretDocument, error) {
-	path := r.keyFile
+	path := r.KeyFile
 	if path == "" {
 		path = os.Getenv("SOPS_AGE_KEY_FILE")
 	}
@@ -74,7 +75,7 @@ func (r *repository) loadSecret() (*secretDocument, error) {
 		return nil, errors.New("set SOPS_AGE_KEY_FILE to the existing private age identity")
 	}
 	info, statErr := os.Stat(path)
-	if statErr != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 || !ownedByUser(info) {
+	if statErr != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 || !core.OwnedByUser(info) {
 		return nil, errors.New("age identity must be an owned regular file with permissions 0600")
 	}
 	identity, err := os.ReadFile(path)
@@ -91,7 +92,7 @@ func (r *repository) loadSecret() (*secretDocument, error) {
 			return nil, errors.New("only native X25519 age identities are supported")
 		}
 	}
-	raw, err := r.root.ReadFile(secretPath)
+	raw, err := r.Root.ReadFile(secretPath)
 	if err != nil {
 		return nil, errors.New("cannot read encrypted Secret")
 	}
@@ -135,7 +136,7 @@ func (r *repository) loadSecret() (*secretDocument, error) {
 		clear(key)
 		return nil, errors.New("Secret has no data mapping")
 	}
-	d := &secretDocument{ctx: r.ctx, tree: tree, store: store, key: key, document: document, data: data, configs: map[string]object{}, original: map[string][]byte{}}
+	d := &secretDocument{ctx: r.Context, tree: tree, store: store, key: key, document: document, data: data, configs: map[string]object{}, original: map[string][]byte{}}
 	for i := 0; i+1 < len(data.Content); i += 2 {
 		name := data.Content[i].Value
 		value, err := base64.StdEncoding.DecodeString(data.Content[i+1].Value)

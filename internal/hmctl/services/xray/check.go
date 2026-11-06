@@ -1,4 +1,4 @@
-package hmctl
+package xray
 
 import (
 	"bytes"
@@ -87,7 +87,7 @@ func profileClient(raw string, port int) (object, error) {
 func (o *options) check(r *repository, path, expected string) error {
 	if expected == "" {
 		var inventory object
-		if err := r.readYAML("cluster/clusters/"+o.Cluster+"/hosts.yml", &inventory); err != nil {
+		if err := r.ReadYAML("cluster/clusters/"+o.Cluster+"/hosts.yml", &inventory); err != nil {
 			return err
 		}
 		hosts := list(inventory, "vm_hosts")
@@ -104,7 +104,7 @@ func (o *options) check(r *repository, path, expected string) error {
 		return errors.New("cannot read private profile")
 	}
 	defer clear(raw)
-	listener, err := (&net.ListenConfig{}).Listen(r.ctx, "tcp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(r.Context, "tcp", "127.0.0.1:0")
 	if err != nil {
 		return errors.New("cannot allocate local probe port")
 	}
@@ -116,7 +116,7 @@ func (o *options) check(r *repository, path, expected string) error {
 	}
 	data, _ := json.Marshal(config)
 	defer clear(data)
-	ctx, cancel := context.WithCancel(r.ctx)
+	ctx, cancel := context.WithCancel(r.Context)
 	defer cancel()
 	process := exec.CommandContext(ctx, "xray", "run", "-config", "stdin:")
 	process.Stdin = bytes.NewReader(data)

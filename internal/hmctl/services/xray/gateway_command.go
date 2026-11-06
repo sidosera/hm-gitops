@@ -1,11 +1,10 @@
-package hmctl
+package xray
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
+	core "github.com/sidosera/hm-gitops/internal/hmctl"
 	"strings"
 
 	"github.com/sidosera/hm-gitops/internal/cli"
@@ -58,33 +57,16 @@ func (o *options) emit(result Result) error {
 	return nil
 }
 
-var clusterPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
-
 func (o *options) open(cmd *cobra.Command) (*repository, func(), error) {
-	if !clusterPattern.MatchString(o.Cluster) {
-		return nil, nil, usage("invalid --cluster")
-	}
-	if o.Timeout <= 0 {
-		return nil, nil, usage("--timeout must be positive")
-	}
-	ctx, cancel := context.WithTimeout(cmd.Context(), o.Timeout)
-	r, err := openRepository(ctx, o.Repo)
+	r, close, err := core.Open((*cli.Options)(o), cmd)
 	if err != nil {
-		cancel()
 		return nil, nil, err
 	}
-	r.keyFile = o.KeyFile
-	return r, func() { r.close(); cancel() }, nil
+	return &repository{r}, close, nil
 }
 func noArgs(_ *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return usage("unexpected positional arguments")
-	}
-	return nil
-}
-func oneArg(_ *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return usage("exactly one service or host slot is required")
 	}
 	return nil
 }
@@ -168,13 +150,13 @@ func newGatewayCommand(o *options) *cobra.Command {
 			return o.check(r, checkFile, expectedExit)
 		}
 		if !o.DryRun && !export && !listing && !local {
-			if err = r.preparePR(); err != nil {
+			if err = r.PreparePR(); err != nil {
 				return err
 			}
 		}
 		var unlock func()
 		if !o.DryRun && !export && !listing {
-			unlock, err = r.lock()
+			unlock, err = r.Lock()
 			if err != nil {
 				return err
 			}
@@ -213,13 +195,13 @@ func newGatewayCommand(o *options) *cobra.Command {
 				return err
 			}
 			if o.DryRun {
-				files, err := validateExport(r.path, output, profiles)
+				files, err := validateExport(r.Path, output, profiles)
 				if err != nil {
 					return err
 				}
 				return o.emit(Result{Status: "dry-run: private profiles validated; no files written", Files: files})
 			}
-			files, err := exportProfiles(r.path, output, profiles)
+			files, err := exportProfiles(r.Path, output, profiles)
 			if err != nil {
 				return err
 			}
@@ -249,7 +231,7 @@ func newGatewayCommand(o *options) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if err = r.atomicWrite(secretPath, encrypted); err != nil {
+		if err = r.AtomicWrite(secretPath, encrypted); err != nil {
 			return err
 		}
 		result := Result{Status: "encrypted source updated; no direct cluster changes", Files: []string{secretPath}}
@@ -261,7 +243,7 @@ func newGatewayCommand(o *options) *cobra.Command {
 			if remove {
 				title = "Revoke VPN client access"
 			}
-			result.PR, err = r.openPR([]string{secretPath}, title, accountPRBody)
+			result.PR, err = r.OpenPR([]string{secretPath}, title, accountPRBody)
 			if err != nil {
 				return err
 			}

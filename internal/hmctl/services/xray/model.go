@@ -1,20 +1,25 @@
-package hmctl
+package xray
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/google/uuid"
 	"io"
 	"regexp"
-	"sort"
+
+	"github.com/google/uuid"
+	core "github.com/sidosera/hm-gitops/internal/hmctl"
 )
 
-type object = map[string]any
+type object = core.Object
 
-func asObject(v any) object            { m, _ := v.(map[string]any); return m }
-func list(m object, key string) []any  { a, _ := m[key].([]any); return a }
-func text(m object, key string) string { s, _ := m[key].(string); return s }
+var asObject = core.AsObject
+var list = core.List
+var text = core.Text
+var clone = core.Clone
+
+func sortedKeys[V any](m map[string]V) []string { return core.SortedKeys(m) }
+
 func decodeJSON(data []byte) (object, error) {
 	var m object
 	d := json.NewDecoder(bytes.NewReader(data))
@@ -49,38 +54,6 @@ func decodeJSON(data []byte) (object, error) {
 	return m, nil
 }
 
-// Copy YAML/JSON containers without converting unknown YAML numbers to strings.
-func cloneValue(value any) any {
-	switch v := value.(type) {
-	case map[string]any:
-		result := make(map[string]any, len(v))
-		for k, item := range v {
-			result[k] = cloneValue(item)
-		}
-		return result
-	case map[any]any:
-		result := make(map[any]any, len(v))
-		for k, item := range v {
-			result[k] = cloneValue(item)
-		}
-		return result
-	case []any:
-		result := make([]any, len(v))
-		for i, item := range v {
-			result[i] = cloneValue(item)
-		}
-		return result
-	default:
-		return value
-	}
-}
-func clone(m object) object {
-	if m == nil {
-		return nil
-	}
-	return cloneValue(m).(map[string]any)
-}
-
 func inbounds(m object) []object {
 	var out []object
 	for _, v := range list(m, "inbounds") {
@@ -103,14 +76,6 @@ func publicInbounds(m object) []object {
 			out = append(out, i)
 		}
 	}
-	return out
-}
-func sortedKeys[V any](m map[string]V) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
 	return out
 }
 func newUUID() (string, error) {

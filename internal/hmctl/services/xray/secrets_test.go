@@ -1,4 +1,4 @@
-package hmctl
+package xray
 
 import (
 	"bytes"
@@ -20,6 +20,7 @@ import (
 	"github.com/getsops/sops/v3/config"
 	sopsyaml "github.com/getsops/sops/v3/stores/yaml"
 	"github.com/sidosera/hm-gitops/internal/cli"
+	core "github.com/sidosera/hm-gitops/internal/hmctl"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
 )
@@ -67,12 +68,13 @@ func encryptedFixture(t *testing.T) (string, string) {
 }
 func openFixture(t *testing.T, path, key string) *repository {
 	t.Helper()
-	r, err := openRepository(context.Background(), path)
+	base, err := core.OpenRepository(context.Background(), path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	r.keyFile = key
-	t.Cleanup(r.close)
+	r := &repository{base}
+	r.KeyFile = key
+	t.Cleanup(r.Close)
 	return r
 }
 func TestNativeSOPSRoundTripAndIdempotentCLIWithoutExecutables(t *testing.T) {
@@ -173,5 +175,5 @@ func TestCLIValidationHelpAndJSONNeverRequireSecrets(t *testing.T) {
 }
 
 func newTestCommand(version string, out, stderr io.Writer) *cobra.Command {
-	return cli.NewCommand(version, out, stderr, map[string]cli.Factory{"gateway": GatewayCommand, "vpn-probe": ProbeCommand}, ClusterCommand)
+	return cli.NewCommand(version, out, stderr, map[string]cli.Factory{"gateway": GatewayCommand, "vpn-probe": ProbeCommand}, nil)
 }

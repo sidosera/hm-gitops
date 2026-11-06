@@ -10,7 +10,7 @@ import (
 func TestPRBoundaryRejectsDirtyStaleOrUnrelatedChanges(t *testing.T) {
 	for _, scenario := range []string{"dirty", "wrong-branch", "stale"} {
 		var calls [][]string
-		r := &repository{ctx: context.Background()}
+		r := &Repository{Context: context.Background()}
 		r.execCommand = func(_ context.Context, _ string, _ []byte, name string, args ...string) ([]byte, error) {
 			calls = append(calls, append([]string{name}, args...))
 			if name == "git" && args[0] == "status" {
@@ -33,7 +33,7 @@ func TestPRBoundaryRejectsDirtyStaleOrUnrelatedChanges(t *testing.T) {
 			}
 			return nil, nil
 		}
-		if err := r.preparePR(); err == nil {
+		if err := r.PreparePR(); err == nil {
 			t.Fatal("unsafe checkout accepted")
 		}
 		for _, call := range calls {
@@ -42,26 +42,26 @@ func TestPRBoundaryRejectsDirtyStaleOrUnrelatedChanges(t *testing.T) {
 			}
 		}
 	}
-	r := &repository{ctx: context.Background(), execCommand: func(context.Context, string, []byte, string, ...string) ([]byte, error) {
+	r := &Repository{Context: context.Background(), execCommand: func(context.Context, string, []byte, string, ...string) ([]byte, error) {
 		return []byte(" M README.md\x00"), nil
 	}}
-	if _, err := r.openPR([]string{secretPath}, "Add VPN client", "body"); err == nil {
+	if _, err := r.OpenPR([]string{"config.sops.yaml"}, "Add VPN client", "body"); err == nil {
 		t.Fatal("unrelated change committed")
 	}
 }
 func TestPRMetadataNeverContainsAccountIdentityAndFailurePreservesCommit(t *testing.T) {
 	for _, fail := range []bool{false, true} {
 		commits := 0
-		r := &repository{ctx: context.Background()}
+		r := &Repository{Context: context.Background()}
 		r.execCommand = func(_ context.Context, _ string, input []byte, name string, args ...string) ([]byte, error) {
 			if name == "git" && args[0] == "status" {
-				return []byte(" M " + secretPath + "\x00"), nil
+				return []byte(" M " + "config.sops.yaml" + "\x00"), nil
 			}
 			if name == "git" && (args[0] == "switch" || args[0] == "push") {
 				return nil, nil
 			}
 			if name == "git" && args[0] == "add" {
-				if len(args) != 3 || args[1] != "--" || args[2] != secretPath {
+				if len(args) != 3 || args[1] != "--" || args[2] != "config.sops.yaml" {
 					t.Fatal("staged unrelated files")
 				}
 				return nil, nil
@@ -85,7 +85,7 @@ func TestPRMetadataNeverContainsAccountIdentityAndFailurePreservesCommit(t *test
 			t.Fatal("unexpected write operation")
 			return nil, nil
 		}
-		result, err := r.openPR([]string{secretPath}, "Add VPN client", accountPRBody)
+		result, err := r.OpenPR([]string{"config.sops.yaml"}, "Add VPN client", "Update encrypted service configuration")
 		if commits != 1 {
 			t.Fatal("did not create exactly one commit")
 		}

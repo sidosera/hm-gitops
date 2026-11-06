@@ -1,10 +1,11 @@
-package hmctl
+package xray
 
 import (
 	"crypto/ecdh"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	core "github.com/sidosera/hm-gitops/internal/hmctl"
 	"net"
 	"net/netip"
 	"net/url"
@@ -129,7 +130,7 @@ func (r *repository) endpoints(cluster, zone, override string) ([]string, error)
 		return []string{host}, nil
 	}
 	var inventory object
-	if err := r.readYAML("cluster/clusters/"+cluster+"/hosts.yml", &inventory); err != nil {
+	if err := r.ReadYAML("cluster/clusters/"+cluster+"/hosts.yml", &inventory); err != nil {
 		return nil, err
 	}
 	machines := asObject(inventory["vm_node_settings"])
@@ -210,7 +211,7 @@ func privateDirectory(repo, path string, create bool) (string, *os.Root, error) 
 		return "", nil, errors.New("profile exports must be outside the repository")
 	}
 	info, err := os.Stat(absolute)
-	if err != nil || info.Mode().Perm()&0077 != 0 || !ownedByUser(info) {
+	if err != nil || info.Mode().Perm()&0077 != 0 || !core.OwnedByUser(info) {
 		return "", nil, errors.New("output directory must be owned by you with permissions 0700")
 	}
 	root, err := os.OpenRoot(absolute)

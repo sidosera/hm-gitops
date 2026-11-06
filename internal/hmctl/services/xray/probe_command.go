@@ -1,7 +1,8 @@
-package hmctl
+package xray
 
 import (
 	"errors"
+	core "github.com/sidosera/hm-gitops/internal/hmctl"
 	"io"
 	"os"
 	"strings"
@@ -24,7 +25,7 @@ func readClientID(path string) (string, error) {
 	}
 	defer f.Close()
 	actual, err := f.Stat()
-	if err != nil || !os.SameFile(info, actual) || actual.Size() > 128 || actual.Mode().Perm()&0077 != 0 || !ownedByUser(actual) {
+	if err != nil || !os.SameFile(info, actual) || actual.Size() > 128 || actual.Mode().Perm()&0077 != 0 || !core.OwnedByUser(actual) {
 		return "", errors.New("client UUID file must be owned with permissions 0600")
 	}
 	data, err := io.ReadAll(io.LimitReader(f, 128))
@@ -68,13 +69,13 @@ func ProbeCommand(shared *cli.Options) *cobra.Command {
 		}
 		defer close()
 		if !o.DryRun {
-			unlock, err := r.lock()
+			unlock, err := r.Lock()
 			if err != nil {
 				return err
 			}
 			defer unlock()
 			if !local {
-				if err := r.preparePR(); err != nil {
+				if err := r.PreparePR(); err != nil {
 					return err
 				}
 			}
@@ -98,12 +99,12 @@ func ProbeCommand(shared *cli.Options) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if err = r.atomicWrite(secretPath, encrypted); err != nil {
+		if err = r.AtomicWrite(secretPath, encrypted); err != nil {
 			return err
 		}
 		result := Result{Status: "encrypted probe configuration updated; accounts unchanged", Files: []string{secretPath}}
 		if !local {
-			result.PR, err = r.openPR(result.Files, "Update probe configuration", accountPRBody)
+			result.PR, err = r.OpenPR(result.Files, "Update probe configuration", accountPRBody)
 			if err != nil {
 				return err
 			}

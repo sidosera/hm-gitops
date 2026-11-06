@@ -1,4 +1,4 @@
-package hmctl
+package xray
 
 import (
 	"bytes"

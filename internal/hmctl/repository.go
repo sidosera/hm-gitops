@@ -17,13 +17,11 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-const secretPath = "conf/xray/credentials-secret.sops.yaml"
-
-type repository struct {
-	path        string
-	root        *os.Root
-	ctx         context.Context
-	keyFile     string
+type Repository struct {
+	Path        string
+	Root        *os.Root
+	Context     context.Context
+	KeyFile     string
 	execCommand func(context.Context, string, []byte, string, ...string) ([]byte, error)
 }
 
@@ -39,7 +37,7 @@ func command(ctx context.Context, dir string, input []byte, name string, args ..
 	}
 	return out.Bytes(), nil
 }
-func openRepository(ctx context.Context, path string) (*repository, error) {
+func OpenRepository(ctx context.Context, path string) (*Repository, error) {
 	if path == "" {
 		out, err := command(ctx, "", nil, "git", "rev-parse", "--show-toplevel")
 		if err != nil {
@@ -59,15 +57,15 @@ func openRepository(ctx context.Context, path string) (*repository, error) {
 	if err != nil {
 		return nil, errors.New("cannot open repository")
 	}
-	return &repository{path: absolute, root: root, ctx: ctx}, nil
+	return &Repository{Path: absolute, Root: root, Context: ctx}, nil
 }
-func (r *repository) close() { r.root.Close() }
-func (r *repository) run(name string, args ...string) ([]byte, error) {
+func (r *Repository) Close() { r.Root.Close() }
+func (r *Repository) run(name string, args ...string) ([]byte, error) {
 	return r.execute(nil, name, args...)
 }
-func (r *repository) lock() (func(), error) {
-	lockRoot, path := r.root, ".hmctl.lock"
-	info, statErr := r.root.Stat(".git")
+func (r *Repository) Lock() (func(), error) {
+	lockRoot, path := r.Root, ".hmctl.lock"
+	info, statErr := r.Root.Stat(".git")
 	if statErr == nil && info.IsDir() {
 		path = ".git/hmctl.lock"
 	} else if statErr == nil {
@@ -86,7 +84,7 @@ func (r *repository) lock() (func(), error) {
 	}
 	f, err := lockRoot.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
-		if lockRoot != r.root {
+		if lockRoot != r.Root {
 			lockRoot.Close()
 		}
 		return nil, errors.New("repository is locked; another hmctl may be running (review a stale hmctl.lock before removing it)")
@@ -95,14 +93,14 @@ func (r *repository) lock() (func(), error) {
 	f.Close()
 	return func() {
 		_ = lockRoot.Remove(path)
-		if lockRoot != r.root {
+		if lockRoot != r.Root {
 			lockRoot.Close()
 		}
 	}, nil
 }
 
-func (r *repository) readYAML(path string, v any) error {
-	data, err := r.root.ReadFile(path)
+func (r *Repository) ReadYAML(path string, v any) error {
+	data, err := r.Root.ReadFile(path)
 	if err != nil {
 		return errors.New("cannot read repository configuration")
 	}
@@ -111,11 +109,11 @@ func (r *repository) readYAML(path string, v any) error {
 	}
 	return nil
 }
-func (r *repository) atomicWrite(path string, data []byte) error {
-	if r.ctx.Err() != nil {
+func (r *Repository) AtomicWrite(path string, data []byte) error {
+	if r.Context.Err() != nil {
 		return errors.New("operation cancelled before writing configuration")
 	}
-	info, err := r.root.Lstat(path)
+	info, err := r.Root.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() {
 		return errors.New("managed file must be an existing regular file")
 	}
@@ -124,11 +122,11 @@ func (r *repository) atomicWrite(path string, data []byte) error {
 		return err
 	}
 	temp := path + "." + hex.EncodeToString(b[:]) + ".tmp"
-	f, err := r.root.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, err := r.Root.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return errors.New("cannot create encrypted/configuration staging file")
 	}
-	defer r.root.Remove(temp)
+	defer r.Root.Remove(temp)
 	if _, err = f.Write(data); err == nil {
 		err = f.Sync()
 	}
@@ -142,12 +140,12 @@ func (r *repository) atomicWrite(path string, data []byte) error {
 	if err != nil {
 		return errors.New("cannot stage configuration update")
 	}
-	if err = r.root.Rename(temp, path); err != nil {
+	if err = r.Root.Rename(temp, path); err != nil {
 		return errors.New("cannot atomically replace configuration")
 	}
 	return nil
 }
-func (r *repository) preparePR() error {
+func (r *Repository) PreparePR() error {
 	status, err := r.run("git", "status", "--porcelain=v1", "-z")
 	if err != nil {
 		return err
@@ -192,7 +190,7 @@ func changedPaths(status []byte) ([]string, error) {
 
 var prURL = regexp.MustCompile(`https://github\.com/[^\s<>]+/pull/[0-9]+`)
 
-func (r *repository) openPR(paths []string, title, body string) (string, error) {
+func (r *Repository) OpenPR(paths []string, title, body string) (string, error) {
 	raw, err := r.run("git", "status", "--porcelain=v1", "-z")
 	if err != nil {
 		return "", err
@@ -234,9 +232,9 @@ func (r *repository) openPR(paths []string, title, body string) (string, error) 
 	return string(found), nil
 }
 
-func (r *repository) execute(input []byte, name string, args ...string) ([]byte, error) {
+func (r *Repository) execute(input []byte, name string, args ...string) ([]byte, error) {
 	if r.execCommand != nil {
-		return r.execCommand(r.ctx, r.path, input, name, args...)
+		return r.execCommand(r.Context, r.Path, input, name, args...)
 	}
-	return command(r.ctx, r.path, input, name, args...)
+	return command(r.Context, r.Path, input, name, args...)
 }
