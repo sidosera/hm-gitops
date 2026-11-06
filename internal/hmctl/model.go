@@ -2,14 +2,12 @@ package hmctl
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"regexp"
 	"sort"
-	"strings"
 )
 
 type object = map[string]any
@@ -116,24 +114,22 @@ func sortedKeys[V any](m map[string]V) []string {
 	return out
 }
 func newUUID() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
+	id, err := uuid.NewRandom()
+	if err != nil {
 		return "", errors.New("cannot generate secure client identity")
 	}
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
+	return id.String(), nil
 }
 
-var labelPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(?:@local)?$`)
-var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+var labelPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+@-]{0,253}$`)
 
 func validateLabel(label string) error {
-	if (!labelPattern.MatchString(label) && !emailPattern.MatchString(label)) || strings.HasSuffix(label, "@service-account") {
-		return errors.New("use a short client name or email; @service-account is reserved")
+	if !labelPattern.MatchString(label) {
+		return errors.New("use an account label without whitespace or control characters")
 	}
 	return nil
 }
+
 func addClient(configs map[string]object, label string, zones []string) (bool, error) {
 	if err := validateLabel(label); err != nil {
 		return false, err
@@ -193,20 +189,4 @@ func addClient(configs map[string]object, label string, zones []string) (bool, e
 		}
 	}
 	return changed, nil
-}
-func migrateLabels(configs map[string]object) bool {
-	changed := false
-	labels := map[string]string{"probe-e2e@local": "probe-e2e@service-account", "spb-relay@local": "spb-relay@service-account"}
-	for _, c := range configs {
-		for _, i := range inbounds(c) {
-			for _, v := range clients(i) {
-				u := asObject(v)
-				if replacement, ok := labels[text(u, "email")]; ok {
-					u["email"] = replacement
-					changed = true
-				}
-			}
-		}
-	}
-	return changed
 }

@@ -59,10 +59,6 @@ func openRepository(ctx context.Context, path string) (*repository, error) {
 	if err != nil {
 		return nil, errors.New("cannot open repository")
 	}
-	if _, err := root.Stat(secretPath); err != nil {
-		root.Close()
-		return nil, errors.New("repository has no canonical Xray Secret")
-	}
 	return &repository{path: absolute, root: root, ctx: ctx}, nil
 }
 func (r *repository) close() { r.root.Close() }

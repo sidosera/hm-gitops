@@ -4,59 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/google/uuid"
 	"strings"
 )
 
-const probeLabel = "probe-e2e@service-account"
-
-func addProbeAccount(c object) (string, bool, error) {
-	ids := map[string]bool{}
-	for _, i := range inbounds(c) {
-		for _, v := range clients(i) {
-			u := asObject(v)
-			if label := text(u, "email"); label == probeLabel || label == "probe-e2e@local" {
-				ids[text(u, "id")] = true
-			}
-		}
-	}
-	if len(ids) > 1 {
-		return "", false, errors.New("inconsistent existing probe identities; no UUIDs rotated")
-	}
-	id := ""
-	for v := range ids {
-		id = v
-	}
-	if id == "" {
-		var err error
-		id, err = newUUID()
-		if err != nil {
-			return "", false, err
-		}
-	}
-	changed := false
-	for _, i := range inbounds(c) {
-		found := false
-		for _, v := range clients(i) {
-			u := asObject(v)
-			if text(u, "email") == "probe-e2e@local" {
-				u["email"] = probeLabel
-				changed = true
-			}
-			if text(u, "email") == probeLabel {
-				found = true
-			}
-		}
-		if text(stream(i), "security") == "reality" && !found {
-			settings := asObject(i["settings"])
-			if settings == nil {
-				return "", false, errors.New("invalid probe listener")
-			}
-			settings["clients"] = append(clients(i), object{"id": id, "flow": "xtls-rprx-vision", "email": probeLabel})
-			changed = true
-		}
-	}
-	return id, changed, nil
-}
 func probeClient(i object, id, address string) (object, error) {
 	reality := asObject(stream(i)["realitySettings"])
 	key, err := publicKey(text(reality, "privateKey"))
@@ -84,31 +35,14 @@ func probeClient(i object, id, address string) (object, error) {
 	result["routing"] = object{"rules": rules}
 	return result, nil
 }
-func syncProbeCredentials(d *secretDocument) (bool, error) {
-	entries := map[string]object{}
-	changed := false
-	for _, zone := range sortedKeys(d.configs) {
-		c := d.configs[zone]
-		id, modified, err := addProbeAccount(c)
-		if err != nil {
-			return false, err
-		}
-		changed = changed || modified
-		var chosen object
-		for _, i := range publicInbounds(c) {
-			if text(stream(i), "security") == "reality" {
-				chosen = i
-				break
-			}
-		}
-		if chosen == nil {
-			return false, errors.New("gateway has no public REALITY listener")
-		}
-		entries[zone], err = probeClient(chosen, id, "vpn-entry-"+zone+".hm.svc.cluster.local")
-		if err != nil {
-			return false, err
-		}
+
+// syncProbeCredentials updates only existing observers using an authorized UUID.
+// Gateway account lists and labels are read-only inputs.
+func syncProbeCredentials(d *secretDocument, id string) (bool, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return false, errors.New("invalid supplied client UUID")
 	}
+	updates := map[string]object{}
 	observers := 0
 	for _, name := range sortedKeys(d.original) {
 		if !strings.HasSuffix(name, ".probe.json") {
@@ -120,12 +54,12 @@ func syncProbeCredentials(d *secretDocument) (bool, error) {
 			return false, err
 		}
 		zone := ""
-		for _, v := range list(old, "outbounds") {
-			o := asObject(v)
-			if text(o, "tag") != "public-vpn" {
+		for _, value := range list(old, "outbounds") {
+			out := asObject(value)
+			if text(out, "tag") != "public-vpn" {
 				continue
 			}
-			next := list(asObject(o["settings"]), "vnext")
+			next := list(asObject(out["settings"]), "vnext")
 			if len(next) != 1 {
 				continue
 			}
@@ -134,21 +68,54 @@ func syncProbeCredentials(d *secretDocument) (bool, error) {
 				zone = strings.TrimSuffix(strings.TrimPrefix(address, "vpn-entry-"), ".hm.svc.cluster.local")
 			}
 		}
-		updated, ok := entries[zone]
+		c, ok := d.configs[zone]
 		if !ok {
 			return false, errors.New("probe must reference a configured public entry discovery service")
+		}
+		var chosen object
+		for _, inbound := range publicInbounds(c) {
+			if text(stream(inbound), "security") == "reality" {
+				chosen = inbound
+				break
+			}
+		}
+		if chosen == nil {
+			return false, errors.New("gateway has no public REALITY listener")
+		}
+		allowed := false
+		for _, value := range clients(chosen) {
+			if text(asObject(value), "id") == id {
+				allowed = true
+			}
+		}
+		if !allowed {
+			return false, errors.New("supplied client is not authorized on the public gateway; create access through gateway first")
+		}
+		generated, err := probeClient(chosen, id, "vpn-entry-"+zone+".hm.svc.cluster.local")
+		if err != nil {
+			return false, err
+		}
+		// Retain observer routing, SOCKS settings and unknown fields. Only the
+		// selected VPN outbound's credentials and server transport are refreshed.
+		updated := clone(old)
+		for index, value := range list(updated, "outbounds") {
+			if text(asObject(value), "tag") == "public-vpn" {
+				list(updated, "outbounds")[index] = list(generated, "outbounds")[1]
+			}
 		}
 		before, _ := json.Marshal(old)
 		after, _ := json.Marshal(updated)
 		if !bytes.Equal(before, after) {
-			if err = d.setJSON(name, updated); err != nil {
-				return false, err
-			}
-			changed = true
+			updates[name] = updated
 		}
 	}
 	if observers == 0 {
 		return false, errors.New("no probe observers configured in encrypted source")
 	}
-	return changed, nil
+	for _, name := range sortedKeys(updates) {
+		if err := d.setJSON(name, updates[name]); err != nil {
+			return false, err
+		}
+	}
+	return len(updates) > 0, nil
 }

@@ -64,7 +64,7 @@ func TestClientValidationAndAmbiguity(t *testing.T) {
 	for _, tc := range []struct {
 		label string
 		zones []string
-	}{{"alice", []string{"a"}}, {"bad name", []string{"a"}}, {"probe@service-account", []string{"a"}}, {"new", []string{"missing"}}} {
+	}{{"alice", []string{"a"}}, {"bad name", []string{"a"}}, {"new", []string{"missing"}}} {
 		if _, err := addClient(configs, tc.label, tc.zones); err == nil {
 			t.Fatal("invalid request accepted")
 		}
@@ -78,24 +78,6 @@ func TestClientValidationAndAmbiguity(t *testing.T) {
 	}
 	if err := validateLabel("person@example.org"); err != nil {
 		t.Fatalf("email should work: %v", err)
-	}
-}
-func TestLabelsAndProbeMigrationPreserveUUID(t *testing.T) {
-	c := object{"inbounds": []any{fixtureInbound("gateway", "raw", "probe-e2e@local", "probe-id")}}
-	id, changed, err := addProbeAccount(c)
-	if err != nil || id != "probe-id" || !changed {
-		t.Fatal("legacy probe identity not reused")
-	}
-	_, changed, err = addProbeAccount(c)
-	if err != nil || changed {
-		t.Fatal("probe update is not idempotent")
-	}
-	configs := map[string]object{"a": {"inbounds": []any{fixtureInbound("gateway", "raw", "spb-relay@local", "relay-id")}}}
-	if !migrateLabels(configs) || migrateLabels(configs) {
-		t.Fatal("service label migration not idempotent")
-	}
-	if text(asObject(clients(inbounds(configs["a"])[0])[0]), "id") != "relay-id" {
-		t.Fatal("migration rotated relay UUID")
 	}
 }
 func TestProbeUsesRemoteDNSAndFailsClosed(t *testing.T) {

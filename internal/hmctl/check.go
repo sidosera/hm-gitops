@@ -87,7 +87,7 @@ func profileClient(raw string, port int) (object, error) {
 func (o *options) check(r *repository, path, expected string) error {
 	if expected == "" {
 		var inventory object
-		if err := r.readYAML("cluster/clusters/"+o.cluster+"/hosts.yml", &inventory); err != nil {
+		if err := r.readYAML("cluster/clusters/"+o.Cluster+"/hosts.yml", &inventory); err != nil {
 			return err
 		}
 		hosts := list(inventory, "vm_hosts")
@@ -104,7 +104,7 @@ func (o *options) check(r *repository, path, expected string) error {
 		return errors.New("cannot read private profile")
 	}
 	defer clear(raw)
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(r.ctx, "tcp", "127.0.0.1:0")
 	if err != nil {
 		return errors.New("cannot allocate local probe port")
 	}
@@ -134,12 +134,12 @@ func (o *options) check(r *repository, path, expected string) error {
 		select {
 		case err := <-exited:
 			exited <- err
-			return errors.New("Xray could not start; check installed version and profile support")
+			return errors.New("xray could not start; check installed version and profile support")
 		case <-ctx.Done():
 			return errors.New("profile check cancelled")
 		default:
 		}
-		conn, err := net.DialTimeout("tcp", address, 100*time.Millisecond)
+		conn, err := (&net.Dialer{Timeout: 100 * time.Millisecond}).DialContext(ctx, "tcp", address)
 		if err == nil {
 			conn.Close()
 			ready = true

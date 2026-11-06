@@ -13,7 +13,7 @@ vet:
 	$(GO) vet ./...
 
 fmt-check:
-	@test -z "$$(gofmt -l cmd/hmctl internal/hmctl)" || { echo 'Run go fmt ./...' >&2; exit 1; }
+	@test -z "$$(gofmt -l cmd/hmctl internal)" || { echo 'Run go fmt ./...' >&2; exit 1; }
 
 dist:
 	@mkdir -p dist

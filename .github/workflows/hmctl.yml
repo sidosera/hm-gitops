@@ -1,10 +1,10 @@
 name: hmctl
 on:
   pull_request:
-    paths: ['cmd/hmctl/**', 'internal/hmctl/**', 'go.mod', 'go.sum', 'Makefile', '.github/workflows/hmctl.yml']
+    paths: ['cmd/hmctl/**', 'internal/hmctl/**', 'internal/cli/**', 'vm/ssh_known_hosts', 'cluster/clusters/**', 'go.mod', 'go.sum', 'Makefile', '.github/workflows/hmctl.yml']
   push:
     branches: [main]
-    paths: ['cmd/hmctl/**', 'internal/hmctl/**', 'go.mod', 'go.sum', 'Makefile', '.github/workflows/hmctl.yml']
+    paths: ['cmd/hmctl/**', 'internal/hmctl/**', 'internal/cli/**', 'vm/ssh_known_hosts', 'cluster/clusters/**', 'go.mod', 'go.sum', 'Makefile', '.github/workflows/hmctl.yml']
 permissions:
   contents: read
 concurrency:

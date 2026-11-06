@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,8 @@ import (
 	"github.com/getsops/sops/v3/cmd/sops/common"
 	"github.com/getsops/sops/v3/config"
 	sopsyaml "github.com/getsops/sops/v3/stores/yaml"
+	"github.com/sidosera/hm-gitops/internal/cli"
+	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -79,8 +82,8 @@ func TestNativeSOPSRoundTripAndIdempotentCLIWithoutExecutables(t *testing.T) {
 	run := func(flags ...string) string {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		cmd := NewCommand("test", &stdout, &stderr)
-		cmd.SetArgs(append([]string{"--repo", repo, "--age-key-file", key, "--json", "service-cfg", "gateway", "--add-client", "--name", "alice"}, flags...))
+		cmd := newTestCommand("test", &stdout, &stderr)
+		cmd.SetArgs(append([]string{"--repo", repo, "--age-key-file", key, "--json", "service-cfg", "gateway", "--add-account", "--label", "alice"}, flags...))
 		if err := cmd.Execute(); err != nil {
 			t.Fatal(err)
 		}
@@ -151,9 +154,9 @@ func TestSOPSMACAndIdentityPermissionsFailClosed(t *testing.T) {
 	}
 }
 func TestCLIValidationHelpAndJSONNeverRequireSecrets(t *testing.T) {
-	for _, args := range [][]string{{"service-cfg", "unknown", "--list-clients"}, {"service-cfg", "gateway", "--add-client", "--remove-client", "--name", "alice"}, {"service-cfg", "gateway", "--export-client", "--name", "alice"}, {"service-cfg", "gateway", "--add-client", "--name", "alice", "--dry-run", "--local-only"}, {"--cluster", "../escape", "service-cfg", "gateway", "--list-clients"}} {
+	for _, args := range [][]string{{"service-cfg", "unknown", "--list-accounts"}, {"service-cfg", "gateway", "--add-account", "--remove-account", "--label", "alice"}, {"service-cfg", "gateway", "--export-account", "--label", "alice"}, {"service-cfg", "gateway", "--add-account", "--label", "alice", "--dry-run", "--local-only"}, {"--cluster", "../escape", "service-cfg", "gateway", "--list-accounts"}} {
 		var output bytes.Buffer
-		cmd := NewCommand("v-test", &output, &output)
+		cmd := newTestCommand("v-test", &output, &output)
 		cmd.SetArgs(args)
 		if err := cmd.Execute(); err == nil {
 			t.Fatalf("invalid CLI accepted: %v", args)
@@ -161,10 +164,14 @@ func TestCLIValidationHelpAndJSONNeverRequireSecrets(t *testing.T) {
 	}
 	for _, args := range [][]string{{"--help"}, {"version"}, {"completion", "zsh"}} {
 		var output bytes.Buffer
-		cmd := NewCommand("v-test", &output, &output)
+		cmd := newTestCommand("v-test", &output, &output)
 		cmd.SetArgs(args)
 		if err := cmd.Execute(); err != nil || output.Len() == 0 {
 			t.Fatalf("help/version/completion failed: %v", err)
 		}
 	}
+}
+
+func newTestCommand(version string, out, stderr io.Writer) *cobra.Command {
+	return cli.NewCommand(version, out, stderr, map[string]cli.Factory{"gateway": GatewayCommand, "vpn-probe": ProbeCommand}, ClusterCommand)
 }
