@@ -1,6 +1,6 @@
 # Reviewed historical findings only; no credential values or path-wide exemptions.
 # Includes retired Xray values, an invalid example key and a SHA-256 checksum false positive.
-# Active credential comparison and scope are documented in SECURITY.md.
+# Active credential comparison and scope are documented in README.md.
 16a7aa15df7ca2ff8f6aefc70d7387c67e7f8d73:local-env.example.yaml:generic-api-key:22
 a49afb83bcfd230f8b5d7b4bc5ba74b5abf52022:vm/roles/spb/defaults/main.yml:jfrog-identity-token:2
 c1a2b0d02305f12b25e0047c9c54cf7b929d248f:conf/proxy-service/config.sops.yaml:generic-api-key:17

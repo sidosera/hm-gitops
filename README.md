@@ -1,352 +1,248 @@
-# Hackamonth GitOps
+# HM GitOps
 
-Minimal GitOps repo for a small k3s cluster.
+One K3s cluster managed through Ansible, Flux and encrypted Git configuration. Git is the source of truth; merged changes reconcile through Flux.
 
-## Structure
+## Architecture
 
-- `vm/`
-  Bare-metal only.
-- `cluster/base/`
-  Shared cluster-wide Kubernetes resources.
-- `cluster/clusters/<cluster>/`
-  Cluster-wide Kubernetes overlay, Flux objects, referenced node IPs, and service manifests.
-- `conf/<app>/`
-  App-level source configuration.
+- **Cluster:** shared deployment/control-plane boundary (`hm-cluster`).
+- **Zone:** placement and observability boundary (`uk-ldn-1`, `ru-spb-1`). PoP/country describe location; they do not imply independent failure domains.
+- **Host:** stable capacity slot, such as `ru-spb-1/1`. A **machine** occupies that slot and is named by its management IP in inventory.
+- **Service:** application capability independent of hosts. Gateway has deployments in both zones; VPN Probe is a separate service.
 
-## Bare-Metal
+The control-plane host runs central Flux, Prometheus and Grafana. Agents use the same provisioning/deployment pipeline with a smaller resource profile. Applications use Kubernetes Service DNS; replacing a machine preserves its logical slot, private addresses and service configuration.
 
-Bring up or refresh the hosts and k3s:
+| Source | Responsibility |
+| --- | --- |
+| [hosts.yml](cluster/clusters/hm-cluster/hosts.yml) | Machines, roles, placement and private addresses |
+| [profile.yml](cluster/clusters/hm-cluster/profile.yml) | Shared host policy, K3s version and role resource budgets |
+| [vm/](vm/) | Ansible provisioning and OS adapters |
+| [cluster/clusters/](cluster/clusters/) | Cluster overlays and Flux reconciliation |
+| [services/](services/) | Kubernetes service bases and zone overlays |
+| [conf/](conf/) | Application configuration and encrypted Secrets |
+| [cmd/hmctl/](cmd/hmctl/), [internal/](internal/) | CLI entry point, shared GitOps code, cluster and service handlers |
 
-```bash
-./vm/k3s-bootstrap.sh -e vm_hosts_file=cluster/clusters/hm-cluster/hosts.yml -e hm_action=deploy
+## Operations
+
+### Setup
+
+Download the `hmctl` artifact from GitHub Actions and verify `SHA256SUMS`, or build locally with Go 1.27.3+:
+
+```sh
+make build
+export PATH="$PWD/bin:$PATH"
+export SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey
+hmctl --help
 ```
 
-This only:
+Run from the repository, or pass `--repo /path/to/hm-gitops`. The age identity must be owned by you with mode `0600`. PR creation requires Git and authenticated `gh`; only profile checks require Xray in `PATH`.
 
-- configures the VPS hosts
-- installs or updates k3s
-- joins the listed hosts into one k3s cluster
+### Change workflow
 
-It does not apply workloads.
+Start each configuration change from a clean, current `main`:
 
-VM defaults:
+```sh
+git switch main
+git pull --ff-only
+```
 
-- [vm/group_vars/all.yml](/Users/sidosera/dist/hackamonth-gitops/vm/group_vars/all.yml#L1)
+Mutations open a PR; credential changes stay encrypted. Review and merge it, then wait for Flux before using the change. The CLI leaves you on the PR branch; return to `main` before the next change.
 
-The provisioning contract is:
+| Option | Use |
+| --- | --- |
+| `--dry-run` | Validate without writing or publishing. |
+| `--local-only` | Write configuration locally without a commit or PR. |
+| `--zone ru-spb-1` | Restrict gateway account changes; default is all zones. |
+| `--cluster hm-cluster` | Select inventory; place before `cluster` commands. |
+| `--json` | Return metadata without UUIDs or connection URLs. |
 
-- every host is referenced only by IPv4
-- the host must accept SSH on that address
-- the GitHub workflow uses the shared gitops SSH key
-- the SSH user comes from `vm/group_vars/all.yml`
+`--dry-run` and `--local-only` cannot combine. The `--` separator after the service name is optional.
 
-To add a new VM to a cluster, add its address and explicit `control_plane` or `agent` role to `cluster/clusters/<cluster>/hosts.yml` and run `Cluster Converge`. The adjacent [cluster profile](cluster/clusters/hm-cluster/profile.yml) supplies common host policy and role resource settings before K3s starts; new machines inherit that policy.
+### Add, list or revoke an account
 
-Kubernetes API TCP 6443 is not a public port. Ansible permits it only on the private `hm0` transport and the pod network; raw firewall guards reject public-interface API/metrics traffic before kube-proxy. Worker nodes do not expose an API listener. Public TCP defaults are SSH 22, HTTP 80 (server only) and HTTPS/VPN 443. The API port is excluded even if an old public-port profile still lists it.
+```sh
+hmctl service gateway --add-account --label alice
+hmctl service gateway --list-accounts --json
+hmctl service gateway --remove-account --label alice
+```
 
-Apply only this API firewall policy to existing hosts without resetting UFW or restarting K3s:
+Labels may be short names or email addresses. `probe-e2e@service-account` is an ordinary label convention. Adding an existing label reuses its UUID; revocation defaults to all zones.
 
-```bash
-ANSIBLE_CONFIG=vm/ansible.cfg ansible-playbook -i vm/inventory/localhost.yml \
-  vm/playbooks/api-firewall.yml \
+### Issue or update a client profile
+
+After the account PR is deployed:
+
+```sh
+hmctl service gateway --export-account --label alice --zone ru-spb-1 \
+  --output-dir /secure/path/alice
+
+# Reissue for a different connection address; keep the UUID.
+hmctl service gateway --export-account --label alice --zone ru-spb-1 \
+  --endpoint vpn.example.com --output-dir /secure/path/alice-updated
+```
+
+Use a private directory outside the repository. Files are mode `0600` and never overwritten. Send the exported `.txt` profiles privately; the user imports their VLESS URLs into the client.
+
+`--endpoint` changes exported REALITY profiles only; the HTTPS backup hostname uses `--https-host`. It does not provision machines, update DNS or change profiles already imported by users. An IP-literal profile needs reimporting after an address change; a stable DNS-only name can keep working if credentials and server settings remain unchanged.
+
+### Check connectivity or configure the probe
+
+```sh
+hmctl service gateway --check-profile /secure/path/alice/hm-reality-ipv4-chrome.txt
+
+hmctl service vpn-probe --sync-credentials \
+  --client-id-file /secure/path/probe-client.uuid
+```
+
+Profile checks verify exit IP, HTTPS and a transfer from the machine running the command. Use `--expected-exit-ip NEW_EXIT_IP` when the expected exit differs from the control-plane inventory address.
+
+The probe UUID file must contain one existing UUID authorized on each gateway referenced by the probes, and have mode `0600`. Create access through the normal gateway account workflow first. Probe sync updates encrypted runtime configuration through a PR; it never creates accounts or changes labels.
+
+### Replace a machine
+
+Verify its SSH host key independently through the provider console, then prepare the inventory PR:
+
+```sh
+hmctl cluster host replace ru-spb-1/1 --ip NEW_PUBLIC_IPV4 \
+  --ssh-host-key 'ssh-ed25519 VERIFIED_PUBLIC_HOST_KEY'
+```
+
+Logical host identity, private addresses and service credentials stay unchanged. Supply `--ipv6 NEW_PUBLIC_IPV6` to retain IPv6; otherwise the previous public IPv6 is removed.
+
+After merging, run [host convergence](#provisioning) from `main`.
+
+Verify service health before moving DNS or distributing updated profiles. Replacing the sole control plane also requires datastore recovery or an explicit cluster rebuild/rejoin; an inventory PR alone is insufficient.
+
+### Inspect deployment health
+
+Run on the control-plane host over SSH:
+
+```sh
+sudo kubectl -n flux-system get gitrepositories,kustomizations
+sudo kubectl -n hm get pods,svc
+sudo kubectl -n hm logs deployment/proxy-service --tail=20
+```
+
+Keep private identities and exported profiles outside Git. Do not restore revoked credentials when rolling back an application change.
+
+## Provisioning
+
+Add a machine to `hosts.yml` with an explicit `control_plane` or `agent` role. Verify its SSH host key through the provider console and pin it in [vm/ssh_known_hosts](vm/ssh_known_hosts). Configure the administrative SSH user/key before disabling password access.
+
+Converge hosts from the merged configuration:
+
+```sh
+gh workflow run cluster-converge.yml --ref main -f cluster_name=hm-cluster
+```
+
+Or run locally with the Ansible requirements installed:
+
+```sh
+python3 -m pip install ansible-core==2.20.11 PyYAML==6.0.3
+ansible-galaxy collection install -r vm/requirements.yml
+./vm/k3s-bootstrap.sh \
   -e vm_hosts_file="$PWD/cluster/clusters/hm-cluster/hosts.yml" \
-  --private-key ~/.ssh/hm-gitops
+  -e hm_action=deploy --private-key ~/.ssh/hm-gitops
 ```
 
-For administration, run kubectl over SSH on the control-plane host, or forward `127.0.0.1:16443` to its `127.0.0.1:6443`. A local kubeconfig using that tunnel must retain CA verification and set `tls-server-name` to the inventory control-plane IP. The Flux Bootstrap workflow fetches the current kubeconfig over pinned SSH, uses this tunnel, and can recover the age identity from its encrypted Git artifact with the same deploy key. It requires neither a saved machine-specific kubeconfig nor public API access. SSH host keys are pinned in `vm/ssh_known_hosts`. Verify and update pinned SSH host keys when replacing a control-plane machine. Adding a node requires applying the updated inventory firewall policy on existing servers before the node joins.
+Convergence configures hosts and installs/joins K3s; Flux deploys workloads. Bootstrap Flux once with a CA-verified kubeconfig reached through SSH:
 
-## GitOps
-
-Bootstrap Flux once:
-
-```bash
-KUBECONFIG=/path/to/kubeconfig HM_FLUX_AGE_KEY_FILE=/secure/path/flux-age.agekey ./scripts/flux-bootstrap.sh hm-cluster
+```sh
+KUBECONFIG=/path/to/kubeconfig \
+HM_FLUX_AGE_KEY_FILE=/secure/path/flux-age.agekey \
+  ./scripts/flux-bootstrap.sh hm-cluster
 ```
 
-After that, Flux reconciles:
+The Flux Bootstrap workflow retrieves kubeconfig over pinned SSH and uses a localhost tunnel. Manual administration can run kubectl over SSH or tunnel local port 16443 to control-plane `127.0.0.1:6443`; retain CA verification and set kubeconfig `tls-server-name` to the inventory control-plane IP. No public Kubernetes API is required.
 
-- `cluster/clusters/hm-cluster/`
+### Alpine and small hosts
 
-## Secrets
+Alpine/OpenRC and Ubuntu/Debian/systemd share the same inventory, role profile and Flux workloads. Minimal Alpine images get Python through Ansible `raw` before fact gathering. The kernel must support cgroup v2 CPU/memory/pids/cpuset, overlayfs, bridge netfilter and WireGuard. Bootstrap checks prerequisites and starts the private network, firewall and cgroups before K3s.
 
-Runtime secrets are committed as SOPS-encrypted manifests:
+The shared profile controls kubelet reservations/evictions, pod limits, sysctls and required modules. Optional daemons, cron and automatic package updates are disabled; upgrades and reboots are explicit maintenance. Central monitoring stays off small agents. Reimaging is a planned outage: verify replacement SSH trust, reuse logical identity, then check node readiness, services, probes and reboot persistence. Git retains client UUIDs; OS rollback requires rebuilding the machine.
 
-- [.sops.yaml](/Users/sidosera/dist/hackamonth-gitops/.sops.yaml#L1)
-- `conf/xray/credentials-secret.sops.yaml` — the canonical Xray Secret `hm/xray-credentials`
+## Services and networking
 
-Flux decrypts them using the `sops-age` Secret in `flux-system`.
+Gateway's Russian deployment sends `.ru` domains (including subdomains) and configured exceptions through Russian egress. Other destinations use the private relay `proxy-service.hm.svc.cluster.local:10443` for UK egress. Relay failure does not fall back to Russian direct egress. Edit routing in [zone overlays](services/gateway/overlays/), not client profiles.
 
-Git is the source of truth for application credentials. The canonical Xray Secret contains four runtime keys: `uk-ldn-1.gateway.json`, `ru-spb-1.gateway.json`, `ru-spb-1.probe.json`, and the retained standby `uk-ldn-1.probe.json`. It includes the existing user UUIDs, service UUIDs, REALITY private keys and authenticated upstream settings. These are ordinary Kubernetes Secret `data` keys, with their complete values encrypted by SOPS in Git. Base64 alone is not encryption. Gateway/probe volumes project only the selected runtime key; applications have no API token or permission to list the rest.
+Hosts communicate over the bootstrap-managed WireGuard mesh `hm0` (peer-restricted UDP 51822). K3s uses private node addresses; Flannel VXLAN runs inside this encrypted mesh. Public peer addresses belong to transport inventory; applications discover private Services through Kubernetes DNS. Public-entry discovery intentionally resolves to public listener addresses for end-to-end probes.
 
-Public routing and probe targets remain in ConfigMaps. There is no database, custom secret controller, init renderer or key generation during deployment. Flux applies the values already committed to Git. Reapplying the same commit neither replaces nor regenerates UUIDs. Adding access is an explicit encrypted Git edit; revocation is an explicit Git edit removing that account. Never commit decrypted config, profile exports or private age identities.
+| Client transport | Connection |
+| --- | --- |
+| VLESS REALITY / Vision | Direct machine IP or DNS-only hostname, TCP 443 |
+| VLESS XHTTP / HTTPS | Configured HTTPS hostname, TCP 443; supports Cloudflare's HTTP proxy |
 
-Edit credentials with `SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey sops conf/xray/credentials-secret.sops.yaml`, validate the complete cluster, then commit/push. SOPS updates its `lastmodified` metadata. A native Kustomize replacement copies that revision into the three Xray workload pod templates, so Flux rolls them without a manual revision bump. Direct live edits are not the source of truth and are reconciled from Git. The consolidation retained all existing values and client profiles.
+Use the exported profiles for actual addresses, SNI and keys. Keep REALITY connection hostnames DNS-only. HTTPS backup settings use `--https-host`. Grafana is served at `/status/`; unmatched `/` requests return 404. HTTP 80 remains available for ACME HTTP-01 renewal.
 
-The credentials exposed by the previous block-string format were replaced on 2 November 2026; profiles from before that rotation are obsolete. The 3 November consolidation does not rotate credentials.
+Gateway overlays combine public ConfigMap routing with the selected key from `hm/xray-credentials`. Xray merges the projected files natively. ConfigMap hashes and the SOPS revision trigger rollouts; no runtime renderer or credential generation is involved.
 
-## Secrets encryption and recovery
+### Network changes
 
-K3s server provisioning enables `secrets-encryption: true` from first start. Existing single-server clusters use the shared Ansible migration, following [the K3s existing-cluster procedure](https://docs.k3s.io/cli/secrets-encrypt#enable-secrets-encryption-on-an-existing-cluster):
+Before changing an existing cluster's transport, retain SSH/provider-console recovery and an encrypted datastore/config backup. Run bootstrap with `-e hm_prepare_network_only=true`, verify bidirectional private IPv4/IPv6, then run full convergence. K3s restarts may interrupt service. Verify node readiness, private API/metrics, public VPN entry and public management-port denial before reconciling dependent workloads.
 
-```bash
+If private connectivity fails, restore the previous host network/firewall/K3s configuration through SSH or the console, restart server then agents, and restore the previous Flux revision. Retain current authorized credentials when rolling back application code.
+
+## Monitoring
+
+Open [Grafana](https://www.hackamonth.io/status/) with the existing private credentials. The **HM** folder contains:
+
+- **Hosts:** discovered host availability, CPU execution, available RAM and network traffic. Down hosts remain visible while their Node exists; missing resource samples remain gaps. CPU excludes I/O wait/steal; RAM uses `MemAvailable`. RX is positive, TX negative.
+- **Proxy:** direct/VPN connectivity history, gateway and egress traffic, and the top 100 client labels. Gateway and egress are different measurement points; do not sum them as unique traffic. Per-client byte counters include probes and exclude the internal relay. HTTP request/session counts are not measured.
+
+Filters use cluster/zone/host metadata rather than fixed machine addresses. Before scaling gateway replicas, give each exporter a distinct instance target; scraping a load-balanced Service does not aggregate independent counters correctly.
+
+VPN Probe runs in `ru-spb-1`. Each minute it requests configured sites directly and through an authenticated public VPN entry. Targets and response checks live in [targets.json](services/vpn-probe/base/targets.json). The chart uses the minimum result per minute: 0 is failed, 1 is successful, missing/stale samples are gaps. Red direct / green VPN demonstrates restored reachability at that observer; a datacenter probe does not represent every mobile/home ISP.
+
+Prometheus keeps seven days of history with a 750 MB block limit. Monitoring volumes are local and require separate recovery after disk loss. Alerts need an Alertmanager receiver. Metrics and StatsService remain private; node-exporter uses mTLS and read-only Kubernetes node discovery supplies host identity.
+
+## Security and recovery
+
+The repository is public: addresses, topology and encrypted metadata are visible. UUIDs are bearer credentials; anyone with a valid profile can use it until revoked. Git stores credentials only as SOPS ciphertext; Flux decrypts into Kubernetes Secrets and K3s encrypts Secret records at rest. Public age recipients cannot decrypt them. The canonical [Xray Secret](conf/xray/credentials-secret.sops.yaml) holds gateway/probe configuration; routing and probe targets remain public ConfigMaps.
+
+- Protect GitHub write access, deployment workflows, administrative SSH keys and the Flux age identity as cluster-administrator access. Encryption does not protect a compromised running host or an authorized administrator.
+- The shared Xray Secret is not zone isolation. A node serving a consumer can obtain the complete Secret object; investigate and rotate shared credentials after a host-root compromise.
+- Application containers run non-root with capabilities dropped, read-only filesystems and no Kubernetes API tokens. Prometheus has read-only node discovery; node-exporter's host mounts/networking remain a privileged trust boundary.
+- Public exposure is SSH 22 and required ingress/VPN 80/443. API/exporter ports stay private. Ansible's raw public-interface NodePort guard runs before kube-proxy; UFW status alone does not prove closure. Recheck after interface or port-range changes.
+- Private/reserved destinations and host management endpoints are denied through VPN egress, including after DNS resolution. SSH trust is pinned; never disable verification to bypass a reimage mismatch.
+- Keep private identities, profiles and backups outside Git. CI scans reachable history with redacted Gitleaks output; ignore entries apply only to reviewed historical fingerprints. Deleting a leaked credential does not revoke it or remove public copies.
+
+Earlier audits (3–4 November 2026) checked selected active credentials against reachable Git history and targeted external IPv4 TCP endpoints. They did not cover all ports, IPv6/UDP, forks/caches, or prove absence of compromise. Revalidate the deployed revision after provisioning or exposure changes.
+
+### Recover the Flux age identity
+
+[conf/bootstrap/flux-age-identity.age](conf/bootstrap/flux-age-identity.age) is encrypted to the administrative SSH key. A repository clone alone cannot decrypt it. With age installed and the matching private key, restore into a new private file:
+
+```sh
+umask 077
+(set -C; age --decrypt --identity ~/.ssh/hm-gitops \
+  conf/bootstrap/flux-age-identity.age > /secure/path/flux-age.agekey)
+```
+
+Use this file with `SOPS_AGE_KEY_FILE` for `hmctl` or `HM_FLUX_AGE_KEY_FILE` for Flux bootstrap. Back up the administrative SSH key separately. The Kubernetes `flux-system/sops-age` Secret contains the decrypted identity; it is never stored as plaintext in Git.
+
+### Datastore encryption and recovery
+
+New control planes enable K3s Secret encryption from first start. For an existing single-server cluster, use the shared migration:
+
+```sh
 ANSIBLE_CONFIG=vm/ansible.cfg ansible-playbook -i vm/inventory/localhost.yml \
   vm/playbooks/secrets-encryption.yml \
   -e vm_hosts_file="$PWD/cluster/clusters/hm-cluster/hosts.yml" \
   --private-key ~/.ssh/hm-gitops
 ```
 
-The migration takes an age-encrypted SQLite/token/config backup, enables encryption, restarts the single control plane, rewrites existing Secrets, verifies the resulting state and backs it up again. Repeated convergence does not rotate keys or regenerate identities. Existing HA clusters are deliberately rejected by this single-server procedure and need the coordinated procedure in the K3s docs. Existing Gateway processes continue running while the control-plane API restarts.
+This backs up, enables encryption, restarts the control plane, rewrites existing Secrets and verifies stored ciphertext. It rejects HA clusters, which require coordinated migration. Check `sudo k3s secrets-encrypt status` for `Enabled`, `reencrypt_finished` and matching hashes.
 
-Verify with `sudo k3s secrets-encrypt status`; expect `Enabled`, `reencrypt_finished` and matching hashes. `vm/roles/vm/files/verify-secrets-encryption.py` checks ciphertext prefixes in SQLite without printing Secret payloads. The helper targets only current SQLite records with plaintext predecessor values and adds a resourceVersion-guarded operational annotation (`hm.gitops/storage-encrypted-at`). Data, type and object identity are verified unchanged. This metadata is not a new credential source or a rollout trigger. It then waits for native Kine compaction and performs a bounded online SQLite VACUUM/WAL checkpoint, without another control-plane stop. This can take several minutes; failures leave a resumable marker. An Enabled flag alone does not erase historical copies.
+Encrypted archives in `/var/backups/hm-k3s` contain `server/db/state.db`, `server/token`, `config.yaml` and the matching `server/cred/encryption-config.json`. Copy them off-host. Restore these together while K3s is stopped, preserving ownership and permissions. Git reconstructs desired application state, not Kubernetes runtime state or monitoring volumes. A fresh datastore can use a new storage key while recovering the same application UUIDs through Flux.
 
-Encrypted recovery archives live under `/var/backups/hm-k3s`, mode 0600 in a root-only directory. Backups are produced through tmpfs and an age pipe so no plaintext archive is written to disk. Keep the private age identity separately, and copy encrypted backups off the server. A backup contains `server/db/state.db`, `server/token`, `config.yaml`, and, once enabled, `server/cred/encryption-config.json`. Restore them together while K3s is stopped, preserving ownership/permissions; the server token and matching encryption configuration are essential. The pre-migration archive restores the pre-encryption state. The encrypted archive requires its matching encryption configuration. Git can rebuild application desired state, but is not a backup of monitoring volumes or Kubernetes runtime state.
+## Validation
 
-An emergency copy of the existing Flux age identity is committed as `conf/bootstrap/flux-age-identity.age`, encrypted with age to the existing administrative `hm-gitops` SSH public key. Its SSH fingerprint is `SHA256:OqrF/Zavic+jHraIVs8za8nOIxixdw5pt1CqgzWVlJs`. Recovery decryption with the matching local private key was verified without writing the plaintext identity to disk. This recovery artifact is not applied as a workload manifest. Keep that SSH private key backed up separately; a repository clone alone cannot decrypt the identity or application Secrets.
-
-To restore the Flux identity into a **new** private file, install age and run:
-
-```bash
-umask 077
-(set -C; age --decrypt --identity ~/.ssh/hm-gitops \
-  conf/bootstrap/flux-age-identity.age > /secure/path/flux-age.agekey)
-```
-
-Use that file with `HM_FLUX_AGE_KEY_FILE` during Flux bootstrap. After a complete server loss, a fresh K3s datastore can use a new storage encryption key while Flux restores the same application UUIDs from Git using the recovered age identity. Restoring an old SQLite snapshot instead requires its matching K3s storage encryption key and server token.
-
-The K3s encryption key is stored root-only in `/var/lib/rancher/k3s/server/cred/encryption-config.json`. It protects a copied datastore; it does not protect against an attacker with root access to the running control-plane host. SOPS age private keys and K3s bootstrap keys are recovery roots, not application credentials, and must never be committed in plaintext.
-
-## Current Cluster
-
-Referenced node IPs:
-
-- [hosts.yml](/Users/sidosera/dist/hackamonth-gitops/cluster/clusters/hm-cluster/hosts.yml#L1)
-
-Cluster-wide Kubernetes:
-
-- [cluster/clusters/hm-cluster/kustomization.yaml](/Users/sidosera/dist/hackamonth-gitops/cluster/clusters/hm-cluster/kustomization.yaml#L1)
-
-Cluster rollout:
-
-- [cluster/clusters/hm-cluster/kustomization.yaml](/Users/sidosera/dist/hackamonth-gitops/cluster/clusters/hm-cluster/kustomization.yaml#L1)
-
-Current public endpoints:
-
-- `https://www.hackamonth.io`
-- `87.106.74.217:443` (direct REALITY)
-
-
-## Proxy connections and recovery
-
-Two independent transports share the existing VPS:
-
-| Profile | Address | TLS name | Transport |
-| --- | --- | --- | --- |
-| Primary | VPS IPv4 or IPv6, port 443 | `www.google.com` | VLESS RAW / REALITY / Vision |
-| Backup | `www.hackamonth.io:443` | `www.hackamonth.io` | VLESS XHTTP / HTTPS / packet-up |
-
-The primary connects directly to the VPS. Do not enable Cloudflare's HTTP proxy for a hostname used as its connection address. Its SNI is the actual REALITY target hostname, which Traefik passes through without terminating TLS. The HTTPS backup uses a separate random path and credential behind Traefik and can traverse Cloudflare's HTTP proxy. The random path is routing configuration, not a substitute for authentication. Both transports still depend on this VPS; an outage or destination-network block can affect both.
-
-Grafana and the HTTPS VPN backup share the existing HTTPS certificate. No website is served at `/`; unmatched requests return 404. Grafana remains at `/status/` and the XHTTP VPN transport retains its configured path. ACME uses HTTP-01 on port 80, because TLS-ALPN-01 cannot be passed through Cloudflare's ordinary HTTP proxy. Keep the challenge URL reachable through Cloudflare without a challenge page or access policy.
-
-`hmctl` is the single operator CLI, built in Go. It embeds native SOPS/age encryption and needs neither Python nor the `sops` executable. Git and authenticated GitHub CLI (`gh`) are needed only for repository discovery/PR operations; `--repo` plus `--local-only` or `--dry-run` can work without them. Profile connectivity checks additionally need Xray in PATH. The deployed Python probe runtime and internal Ansible helpers are separate from the operator CLI.
-
-Build with Go 1.27.3 or newer, or download the `hmctl` artifact from its GitHub Actions check. The artifact contains Linux/macOS binaries for amd64 and arm64 plus `SHA256SUMS`; verify the checksum before installation.
+Run relevant checks before merging; CI runs without infrastructure credentials:
 
 ```sh
-make build                       # bin/hmctl
-make test vet                    # native lifecycle/security tests, race detection and static checks
-make dist VERSION=0.1.0           # four standalone binaries and checksums
-bin/hmctl --help
-bin/hmctl completion zsh          # also bash, fish and PowerShell
-```
-
-Run from a GitOps checkout, or pass `--repo /path/to/hm-gitops`. Common flags can precede `service` or follow the service name; place them before `cluster` for cluster operations. `--cluster` selects the cluster inventory (default `hm-cluster`). Supply the existing native age identity through `SOPS_AGE_KEY_FILE` or `--age-key-file`; the owned identity file must have mode 0600. Only native age recipients/identities are supported, with SOPS MAC verification always enabled: no key-command subprocesses, plugins or remote KMS. Plaintext credentials stay in memory, and exported profiles are written only to an owned private directory outside Git, with file mode 0600. Existing files and symlinks are never overwritten.
-
-Create or revoke access through a PR:
-
-```sh
-export SOPS_AGE_KEY_FILE=/secure/path/flux-age.agekey
-bin/hmctl service gateway -- --add-account --label alice
-bin/hmctl service gateway -- --remove-account --label alice --zone ru-spb-1
-bin/hmctl service gateway -- --list-accounts --json
-```
-
-The source follows the same boundary: shared GitOps helpers in `internal/hmctl`, host management in `internal/hmctl/cluster`, and Xray handlers, profiles and credentials in `internal/hmctl/services/xray`. Cluster operations live under `hmctl cluster`; `hmctl service <service> -- <arguments>` forwards arguments to the registered service handler. The generic command does not parse gateway or probe options. The current service handlers are `gateway` and `vpn-probe`. The separator is optional. A short client name is sufficient; an email is optional. Account edits default to all configured public gateway zones; repeat `--zone` or comma-separate zones to restrict access. A new UUID is generated securely once and reused across selected public transports. Existing accounts, unknown configuration fields and private relay permissions are preserved. Labels are opaque account identifiers stored in Xray's `email` field. Email addresses and the `@service-account` suffix are conventions; they have no special privileges or validation rules. No credentials or client labels are included in public branch names, commits or PR descriptions. PR creation requires a clean, current `main` checkout; unrelated changes are never included. Failed publishing preserves prepared work for recovery.
-
-Use `--dry-run` to validate without writes or PRs; `--local-only` writes the encrypted edit for manual review. These flags cannot combine. After merging the account PR, let Flux apply it before distributing the profile. JSON output uses `schema_version: 1` and contains metadata only, never UUIDs or connection URLs. Usage/validation errors exit 2, operational errors exit 1, and interruption exits 130. Success exits 0. Commands are noninteractive and have a configurable `--timeout` (default two minutes).
-
-Export or reissue a client's profile without changing the UUID:
-
-```sh
-bin/hmctl service gateway -- --export-account --label alice --zone ru-spb-1 \
-  --output-dir /secure/path/alice
-bin/hmctl service gateway -- --export-account --label alice --zone ru-spb-1 \
-  --endpoint vpn.example.com --output-dir /secure/path/alice-updated
-```
-
-`--endpoint` changes the exported connection IP/DNS only: it does not create DNS records, provision a server, or change profiles already imported on phones. REALITY SNI and server key settings remain unchanged. `--https-host` selects the HTTPS/XHTTP backup hostname. A stable DNS-only hostname can move to a replacement server without reissuing the profile if its credentials and REALITY settings are preserved. A blocked hostname or old IP-literal profile requires reimporting an updated profile.
-
-Prepare a physical replacement through the same binary:
-
-```sh
-bin/hmctl cluster host replace ru-spb-1/1 --ip NEW_PUBLIC_IPV4 \
-  --ssh-host-key 'ssh-ed25519 VERIFIED_PUBLIC_HOST_KEY'
-```
-
-Verify the new SSH key through the provider console first. The PR updates inventory and pinned SSH trust, preserving the logical host slot, node name, zone and private addresses. `--ipv6` supplies the new public IPv6; otherwise the old public IPv6 is removed. The CLI does not purchase, provision or cut over a host: after review use Cluster Converge, verify the new gateway, then move DNS or reissue profiles. Replacing the sole control plane additionally requires datastore recovery or an explicit cluster rebuild/rejoin; an inventory edit alone cannot recover it. The encrypted client Secret is untouched.
-
-Configure the probe and check connectivity:
-
-```sh
-bin/hmctl service vpn-probe -- --sync-credentials \
-  --client-id-file /secure/path/probe-client.uuid --dry-run
-bin/hmctl service gateway -- --check-profile /secure/path/alice/hm-reality-ipv4-chrome.txt
-```
-
-The check passes configuration to local Xray over stdin, binds SOCKS only to loopback, verifies the expected exit IP, HTTPS and a 1 MB transfer, then stops the process. It writes no temporary plaintext configuration. It never prints the profile or Xray logs. `--expected-exit-ip` overrides the default control-plane inventory address. An external check does not establish reachability from every mobile/home ISP. Probe credentials are derived from the entry discovery names already recorded in the encrypted probe configs, preserving the configured observer/entry mapping as the fleet grows. The probe command accepts an existing UUID from an owned mode-0600 file and validates its gateway access. It never creates accounts, renames labels, or grants permissions. Create its account through the ordinary gateway `--add-account` workflow first. It does not change the live cluster directly.
-
-For future changes, deploy a separate canary Service and ingress route, validate both transports and transfers, then reconcile production and remove the canary. Verify that old credentials fail after rotation. Keep rollback snapshots private and outside Git. Do not restore revoked credentials as a routine rollback; roll back the image while retaining fresh credentials when possible.
-
-Useful read-only server checks:
-
-```sh
-sudo kubectl -n hm get pods,svc
-sudo kubectl -n flux-system get gitrepositories,kustomizations
-sudo kubectl -n hm logs deployment/proxy-service --tail=20
-```
-
-Xray runs as a non-root user with all capabilities dropped and a read-only root filesystem.
-
-## Grafana and Prometheus
-
-Open [Grafana](https://www.hackamonth.io/status/) and sign in with the existing dashboard username and password. The provisioned **Proxy** dashboard is the home page. Credentials are stored in a SOPS-encrypted Secret; proxy profiles remain unchanged.
-
-Prometheus scrapes every 30 seconds and stores seven days of history, bounded to 750 MB of blocks on a 2 GiB volume. Grafana has a separate 1 GiB volume for its settings. Both volumes use the VPS disk, so they do not survive loss of the VPS. History starts when Prometheus is deployed; the previous SQLite history volume is retained as an archive and is not imported.
-
-Two dashboards live in the **HM** folder:
-
-- [Hosts](https://www.hackamonth.io/status/d/hm-inventory/hosts): dynamically discovered host tiles grouped by the selected cluster and zones, then CPU execution, available RAM and network traffic. RX is above zero; TX is below zero. Click a tile to select its host; the Host selector includes machine IP, Kubernetes node name and logical host slot. Down hosts remain visible through configured-target identity.
-- [Proxy](https://www.hackamonth.io/status/d/hm-proxy/proxy): Direct/VPN website history, traffic at the Gateway and actual egress components, and the top 100 clients by transferred bytes over the selected range. Cluster/Zone filter traffic; Probe zone independently filters connectivity observations. No host placement, runtime resource panels, connected-IP counts or session/request counters appear here.
-
-Zone and host options come from metrics; adding scrape targets does not require editing either dashboard. Missing observations remain gaps. CPU excludes I/O wait and steal. RAM uses MemAvailable, including reclaimable cache, rather than MemFree. Virtual network devices are excluded to avoid overlay double counting.
-
-Node-exporter supplies host metrics through read-only mounts. Prometheus discovers node InternalIP addresses and identity labels through read-only Kubernetes node discovery. It scrapes node-exporter over the private transport and mTLS, using a stable DNS certificate identity. The redundant kubelet scrape is removed. Internal `hm0` network counters are excluded before storage so the unchanged host traffic chart does not count tunnel bytes again alongside physical NIC bytes. Kube-state-metrics and retired generic-service rules have been removed. Native Xray-exporter user byte counters provide client traffic without access logs, a custom collector or periodic CLI execution. The old online-IP poller, its binary download and textfile collector are removed from both hosts.
-
-Prometheus retains original Xray user labels, including `probe-e2e@service-account`; only the internal `spb-relay@local` account is dropped to avoid counting relay traffic as client traffic. Labels are visible to authenticated monitoring administrators and are not rewritten or hashed. The source exporter remains private to the cluster. Per-user collection is bounded by configured authorized users (5,000 scrape samples); the chart displays a stable top 100, not a changing top 100 at every time step.
-
-Grafana requires authentication. Prometheus and the pod exporters have no public ingress and use NetworkPolicies. Node-exporter uses host networking and is protected by the VPS firewall; port 9100 must remain closed publicly. The Xray API is restricted to its collectors. All monitoring containers have memory limits; Grafana and Prometheus are limited to 320 MiB and 256 MiB respectively.
-
-Validation:
-
-```sh
+make fmt-check test vet build
 python3 -m unittest discover -s tests -v
 kubectl kustomize cluster/clusters/hm-cluster >/dev/null
+promtool test rules tests/fixtures/*.test.yml
 ```
 
-## Operating the dashboard
-
-Use Hosts to investigate machines and Proxy to compare direct/VPN connectivity and traffic. A red Direct / green VPN history shows restored reachability at the observer; both red requires further investigation; both green does not demonstrate bypass. A datacenter observer cannot establish reachability from every mobile/home ISP.
-
-Missing traffic can mean an exporter or gateway failure; queries require fresh successful scrapes and `xray_up`. Newly enabled user counters need two scrapes before rates appear and have no earlier history. Rates handle resets, but are not billing records. Investigate low MemAvailable with PSI and container limits; unused file cache alone is not memory pressure.
-
-## Two-host routing and low-memory deployment
-
-Both hosts use the same Ansible `vm/playbooks/bootstrap.yml` bootstrap and Flux Git/Kustomize deployment. The original `machine` node runs the control plane and central Prometheus/Grafana. `spb-01` (212.116.115.29, 543 MiB) is a tainted K3s worker, without a second control plane or monitoring database. A shared single-container node-exporter DaemonSet runs on both nodes. Application deployments do not use standalone systemd services.
-
-`cluster/clusters/hm-cluster/hosts.yml` declares server and worker inventories; the adjacent `profile.yml` pins their shared K3s version and host/role policy. Bootstrap establishes the kernel WireGuard `hm0` mesh before K3s, using stable private IPv4/IPv6 identities from inventory and public peer endpoints only at this transport boundary. Only inventoried peers may reach UDP 51822. K3s advertises private node addresses; Flannel uses VXLAN over `hm0`, avoiding a second encryption layer. No separate network daemon or timer is added. ServiceLB runs on `machine`, leaving SPB TCP 443 for the gateway. SPB's taint keeps unrelated workloads off its small memory budget. The API server and Git reconciliation are central: a WAN outage interrupts reconciliation, while existing gateway containers continue running. Do not delete/restart healthy pods during a partition.
-
-The SPB gateway runs only Xray. A separate VPN probe service checks each website directly and through an authenticated public VPN connection; no Blackbox exporter or diagnostic SOCKS listeners are deployed. `services/gateway/overlays/ru-spb-1/config.json` routes every `.ru` domain and its subdomains through Russian egress using the case-insensitive suffix regex `(?i)\.ru\.?$`. Existing explicit exceptions outside `.ru` (such as `vk.com` and `yandex.net`) also keep Russian egress. A name such as `example.ru.com` does not match the `.ru` rule. Unknown destinations use the internal Kubernetes Service `proxy-service.hm.svc.cluster.local:10443`, over the private pod network carried by WireGuard. The authenticated REALITY relay credential is retained. There is no public-IP/domain fallback or periodic upstream observatory; failure never switches foreign traffic to Russian direct egress. Public REALITY and HTTPS/XHTTP listeners remain client entry points, and external probes deliberately test those public entry points. Native StatsService is protected by a NetworkPolicy. Node metrics use mTLS. TLS private material and authenticated Xray connection settings are SOPS encrypted; public routing settings are ConfigMaps. Certificates must be renewed before November 2027.
-
-Both zones share the same central Hosts and Proxy dashboards. The independent Russian datacenter probe is described below. Alert notifications still require an Alertmanager receiver.
-
-For client import, use the private `hm-spb-smart-routing.txt` VLESS profile provided outside Git. Existing upstream profiles remain valid. The bootstrap password is unnecessary after key-only SSH is configured.
-
-On small hosts, only source-controller and kustomize-controller are needed by Flux; unused Helm/notification controllers are suspended. Xray and node-exporter have bounded memory. Exporters use native counters without logs or a stats-CLI poller. Optional daemons, cron and unattended package updates are disabled by the shared host role. Package upgrades are explicit maintenance. No swap is enabled on the SPB Kubernetes worker.
-
-
-## Service and placement model
-
-Use [the glossary](GLOSSARY.md) for terminology. `hm-cluster` contains two PoPs, with one zone and one host each:
-
-| PoP | Zone | Host slot | Machine (inventory name / management IP) |
-| --- | --- | --- | --- |
-| uk-ldn | uk-ldn-1 | uk-ldn-1/1 | 87.106.74.217 |
-| ru-spb | ru-spb-1 | ru-spb-1/1 | 212.116.115.29 |
-
-Zone is the scheduling and observability dimension. Country and PoP are descriptive metadata; there is no separate region filter or region scheduling layer. These are logical placement names, not claims of provider-certified AZ isolation or independently verified datacenter geography.
-
-Machine inventory names are IP addresses. Host slots are independent, so replacing a machine does not rename a slot. The existing Kubernetes registration IDs `machine` and `spb-01` remain internal compatibility identifiers for node/pod joins, certificates and volumes; they are not the user-facing machine names. Slash-containing host names are Prometheus labels and Kubernetes annotations; node labels use a label-safe encoded host ID.
-
-Gateway is one service with deployments in both zones. The SPB deployment supplies Russian direct egress and upstream routing; the UK deployment supplies foreign egress. VPN Probe is a separate service. Proxy filters traffic by cluster and zone; Hosts additionally filters by host slot and displays machine IPs. Service dashboards do not depend on host slot identity.
-
-## Gateway configuration with Kustomize
-
-`services/gateway/base` owns the shared Deployment, Service and ingress NetworkPolicy. `services/gateway/overlays/uk-ldn-1` and `services/gateway/overlays/ru-spb-1` reference that base and supply zone placement, resource budgets, exposed ports, authenticated connection settings and routing. The cluster root references both overlays directly; Flux remains the only workload deployment path.
-
-Each zone-specific `config.json` is a public ConfigMap input. It contains routing, private-address blocks, statistics and the private read-only StatsService. The unused native HTTP metrics listener has been removed. `conf/xray/credentials-secret.sops.yaml` contains authenticated VLESS inbounds and, for SPB, its credential-bearing upstream outbounds, as zone-named keys in the shared `xray-credentials` Secret. Those sections stay encrypted together so private keys/client IDs never enter ConfigMaps. Node/metrics TLS Secrets live under shared monitoring configuration; the SPB probe server certificate lives beside its overlay.
-
-The same Xray image starts with `run -confdir /etc/xray` in both zones. A read-only projected volume exposes the selected decrypted Secret key as `00-credentials.json` and the public ConfigMap as `10-config-tail.json`. Xray natively merges the files. The `tail` filename is intentional: direct/blocked outbounds are appended after credential-bearing upstream outbounds, preserving the fail-closed default in SPB. No init renderer or runtime templating process is involved.
-
-Change routing in the zone-specific public JSON and validate with `kubectl kustomize services/gateway/overlays/ZONE` and the routing tests. Kustomize hashes ConfigMaps, so a routing update triggers a rollout. For credential changes, edit the canonical SOPS Secret. The cluster root derives `hm.gitops/credentials-revision` from SOPS metadata and rolls all Xray consumers automatically. Do not override it in individual zone patches. Keep stable Deployment/Service names, client identities, listener ports and Traefik routes during structural refactors. The SPB overlay uses Recreate because its fixed public host port cannot be shared by two pods; UK uses a rolling update.
-
-Validate routing and overlay boundaries with `python -m unittest discover -s tests -v` (Python, PyYAML and kubectl required). The checks cover private-network blocks, fail-closed routing, credential isolation, stable selectors, unchanged source selectors in ingress policies, and shared runtime/image configuration.
-
-
-## Monitoring identity and fleet growth
-
-Host inventory and availability use Kubernetes node discovery and node-exporter scrapes. Node objects remain discoverable when their hosts are unreachable, so failed scrapes produce Down rather than disappearing. Prometheus has only get/list/watch on node metadata, with no Secret or node proxy permissions. The host slot annotation and cluster/zone/machine labels are applied by bootstrap from inventory.
-
-To replace a VM, retain its logical host slot, zone and private addresses, change its physical address in `hosts.yml`, verify its SSH host key in the bootstrap trust inventory, and converge the cluster. For a fresh/reimaged agent with an existing logical node name, bootstrap retires its stale Node registration and lets K3s clear the old node-password hash before joining; existing agents with their password file are preserved. This does not delete application Secrets or volumes. Applications use Service DNS; dashboards are unchanged; node discovery updates the physical machine label automatically. Public VPN entry DNS is a bootstrap-owned headless Service/EndpointSlice generated from inventory nodes marked `gateway_entry: true`. These records intentionally resolve to public addresses so external probes still test public listeners. They are separate from the private gateway relay Service. Adding a public entry requires deploying a listener on that entry host; marking a host does not deploy one.
-
-
-VPN collectors use `service="gateway"` and `zone` for the measurement location; `target` identifies an inbound/outbound route or an original Xray user label. Only the internal relay user is dropped before metric storage. Probes use `source_zone`, `target_zone` and `check` independently of exporter location. Adding an exporter with these labels adds its measurements without editing dashboards. Each exporter still needs a distinct gateway instance target before scaling replicas.
-
-The two dashboards add no database or controller. Regression checks cover host outages, missing data and connectivity history. `GitOps validation` runs tests, Kustomize, Prometheus fixtures and a redacted full-history Gitleaks scan on pushes/PRs; it has read-only GitHub permissions and uses no infrastructure credentials.
-
-
-## Independent VPN Probe service
-
-`services/vpn-probe/base` defines a Deployment, private ClusterIP Service and ingress NetworkPolicy. Only `ru-spb-1` deploys the VPN Probe service. Its pod runs an Xray client and a small Python standard-library probe independently of Gateway. The probe itself schedules both requests, validates responses and exposes `/metrics`; Prometheus only scrapes results. Blackbox Exporter is not used by this service. It has no Kubernetes API token, public metrics port or public SOCKS listener. Prometheus alone can reach its metrics Service; cross-zone pod traffic uses Flannel over the WireGuard private transport. Each container is capped at 40 MiB (80 MiB combined), with a 24 MiB combined memory request. The direct baseline uses the same probe process, adding no container or monitoring database.
-
-The process reads `services/vpn-probe/base/targets.json` (targets, content markers, interval, timeout, loopback SOCKS endpoint and expected exit) from its ConfigMap. Configuration changes roll the pod automatically. It uses a pinned official Python Alpine image, without package installation or a separate build pipeline.
-
-Every minute the SPB observer checks `myanimelist.net`, `youtube.com`, `facebook.com`, `instagram.com` and `x.com` twice: directly through the SPB network (`access="direct"`) and through the UK public TCP 443 VLESS/REALITY listener (`access="vpn"`). There is no UK observer. The SPB pod uses its provider DNS resolvers directly rather than routing DNS through UK CoreDNS. VPN requests use SOCKS5 domain-address requests, leaving destination DNS resolution to Xray, so Russian DNS filtering cannot falsely fail that path. The VPN path tests Russian datacenter access to UK public ingress; it does not test the SPB public listener or represent every residential/mobile ISP.
-
-When the observer is unreachable, the Proxy connectivity panel retains target metadata from the last 24 hours. Probe-zone discovery uses configured scrape targets. Metadata supplies labels only: missing observations become NaN/gaps, never synthetic failures or successes. Removed targets can remain as empty rows until this metadata window expires.
-
-Both modes require certificate-verified HTTPS, final HTTP 200 and the same recognizable page marker. Known challenge-page titles fail; 403 is a failure. These are landing-page checks, not video playback, login or API tests. Redirects are followed. A separate VPN check verifies the expected UK exit IP through `api.ipify.org`.
-
-The Proxy connectivity table has website rows and Direct/VPN sparkline columns over the selected dashboard time range. Each point uses `min_over_time(probe_success[1m])`: any failed check is red (0), all successful checks green (1). Missing samples, failed scrapes or observations older than 60 seconds are gaps. Original completion timestamps prevent repeated scrapes from extending observation freshness. All sparklines share the selected dashboard time range; hover shows the binary reachability value. No HTTP failure is automatically classified as government blocking.
-
-Probe workloads use `hm.gitops/service: vpn-probe`, so operational metrics retain their independent service identity. Probe accounts use `probe-e2e@service-account` and are included in client traffic metrics. Credentials are distinct from existing user profiles and relay accounts; each observer receives only the credential for the public entry it tests. They are SOPS encrypted. The account grants normal authenticated VPN egress to that dedicated probe client; it does not grant host or Kubernetes administration.
-
-Probe runtime configs are keys in the same canonical Secret as Gateway. The command `hmctl service vpn-probe -- --sync-credentials --client-id-file /secure/path/probe-client.uuid` consumes an already authorized account and refreshes the matching public-listener client configuration. It never creates accounts or changes labels. An unchanged run is a no-op, and existing users are retained. Kustomize derives workload revisions from SOPS metadata. It makes no cluster writes. Before publishing, render the cluster, run tests, inspect only encrypted changes and verify direct and VPN results from SPB. Keep all referenced runtime keys in the canonical Secret before deploying overlays. Notifications still require an Alertmanager receiver.
-
-
-Cluster configuration lives in `cluster/clusters/hm-cluster`; Gateway and VPN Probe overlays are named by zone. Bootstrap defaults to `hm-cluster`. Node placement uses `topology.kubernetes.io/zone`, and central services use the `hm.gitops/control-plane` role label. VM or bare-metal machine identity does not change this deployment path. Inventory keeps stable Kubernetes registration IDs explicitly so naming changes do not require draining/rejoining a healthy cluster or regenerating VPN profiles.
-
-## Proxy service dashboard
-
-`Proxy` (`hm-proxy`) uses native per-user and outbound byte counters. Gateway traffic counts end-user accounts on the client-facing entry, including probe accounts and excluding the internal relay account. Egress traffic counts freedom outbound routes (`direct` and `ru-direct`), including synthetic probe traffic. These are distinct measurement points: do not sum gateway and egress as unique fleet traffic. Per-client series aggregate entry traffic across selected zones and retain the original labels exported by Xray.
-
-Both zone collectors share `services/xray-metrics/base`: digest-pinned image, no Kubernetes API token, no secret volumes and no access logs. Both run on the control plane, adding no exporter process to the small worker. StatsService is private. Scrape and gateway health gate traffic queries, leaving gaps on failure. HTTP requests inside HTTPS and VPN session counts are not measured or invented.
-
-The current exporter overlays each target a single gateway instance through its zone Service. Before scaling that Service to multiple replicas, give each gateway instance a stable collector target (or an exporter sidecar with pod discovery); do not repeatedly scrape a load-balanced endpoint for independent monotonic counters. Additional collectors use the same base and zone labels, and dashboard queries discover new zones without edits. Provisioning new metric targets and private network access is still explicit configuration.
-
-Validate with `python -m unittest discover -s tests -v` and `promtool test rules tests/fixtures/proxy-dashboard.test.yml`. The PromQL fixtures check counter rates, host outages and missing connectivity observations.
-
-
-Host availability is anchored to discovered node-exporter targets (`hm:node:info`). Unreachable registered nodes remain in Hosts and filters with **Down** status. A failed or older-than-90-second scrape is unavailable. Resource graphs retain gaps when measurements are missing. Deleting a Node explicitly retires it from discovery; this is current fleet membership rather than a historical archive.
-
-Management access through VPN is denied by both freedom outbounds at the final destination stage, including after DNS resolution. The rule covers all inventoried public IPv4/IPv6 addresses on every port except public web/VPN ingress 80/443 (TCP and UDP, including future management ports). Update this destination set when onboarding a host; security tests require it to match inventory. Historical monitoring PVCs are retained with Flux pruning disabled; removing unused code must not erase historical data.
-
-## Private-network provisioning and recovery
-
-Host transport and K3s node addresses are bootstrapped before application reconciliation. For an existing cluster, apply host transport changes before publishing dependent monitoring/credential changes to the live Flux branch.
-
-1. Keep an independent administrative SSH session to each host and confirm provider-console recovery. Save an encrypted backup of current K3s/UFW configuration and the control-plane datastore using the existing recovery procedure; retain the previous Git revision for rollback. Never publish that backup or credentials.
-2. Run the common bootstrap with `-e hm_prepare_network_only=true`. This installs/starts the kernel WireGuard interface and opens its peer-restricted UDP port, without changing K3s configuration or replacing existing firewall policy. Check bidirectional private IPv4 and IPv6 reachability; confirm no long-running userspace network process is added.
-3. Run full convergence. K3s server and agent switch to their stable private identities; Flannel switches from public WireGuard endpoints to VXLAN on the private interface. API and host metrics are denied on public interfaces. This entails K3s restarts and may interrupt VPN connectivity while the pod network converges. Verify node readiness and private routes, recreate affected pods if needed, then reconcile the prepared application/monitoring commit through Flux.
-4. Verify: both VPN transports, public-entry probes, private StatsService, discovered host metrics, host Down behavior, Grafana authentication, public management-port denial on both IP families, unchanged client UUIDs and unchanged dashboard JSON. Confirm fresh boots start the private network before K3s before declaring migration complete.
-
-Rollback on loss of private API/pod connectivity: use the retained SSH sessions or provider console, restore the previous host K3s and UFW configuration and previous Flannel backend, restart server then agent, and restore the previous Flux revision. Keep the newly prepared application revision out of main until host transport works. Prepare-only does not migrate or back up monitoring volumes; replacing a control-plane disk still needs data restoration if history must be retained.
+For provisioning changes, also run `bash tests/provisioning/run-alpine-smoke.sh`. It checks the Alpine adapter in a container; validate VM reboot, private networking and service health separately before reimaging a live host.
