@@ -20,7 +20,7 @@ jobs:
       - name: Install validation tools
         run: |
           python3 -m venv "$RUNNER_TEMP/gitops-venv"
-          "$RUNNER_TEMP/gitops-venv/bin/pip" install PyYAML==6.0.3 cryptography==50.0.2 ansible-core==2.20.11
+          "$RUNNER_TEMP/gitops-venv/bin/pip" install PyYAML==6.0.3 ansible-core==2.20.11
           echo "$RUNNER_TEMP/gitops-venv/bin" >> "$GITHUB_PATH"
           curl -fsSL -o "$RUNNER_TEMP/kubectl" https://dl.k8s.io/release/v1.34.1/bin/linux/amd64/kubectl
           echo "7721f265e18709862655affba5343e85e1980639395d5754473dafaadcaa69e3  $RUNNER_TEMP/kubectl" | sha256sum --check --strict

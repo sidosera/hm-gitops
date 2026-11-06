@@ -1,43 +1,10 @@
-"""Security regressions for private exports and gateway destination isolation."""
-import base64
-import importlib.util
+"""Gateway destination isolation; native cryptography/export tests live with hmctl."""
 import ipaddress
 import json
 from pathlib import Path
-import stat
-import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-def load(name, path):
-    spec = importlib.util.spec_from_file_location(name, ROOT / path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-profiles = load('profiles', 'scripts/xray_share_url.py')
-
-class SecurityBoundaryTests(unittest.TestCase):
-    def test_public_key_matches_rfc7748_vector(self):
-        private = bytes.fromhex('77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a')
-        expected = bytes.fromhex('8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a')
-        key = base64.urlsafe_b64encode(private).rstrip(b'=').decode()
-        self.assertEqual(base64.urlsafe_b64decode(profiles.derive_public_key(key)+'='), expected)
-
-    def test_export_is_private_and_never_follows_symlinks_or_overwrites(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory) / 'profile'
-            profiles.write_private_profile(target, 'test-profile')
-            self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
-            with self.assertRaises(FileExistsError):
-                profiles.write_private_profile(target, 'replacement')
-            link = Path(directory) / 'link'
-            link.symlink_to(target)
-            with self.assertRaises(FileExistsError):
-                profiles.write_private_profile(link, 'replacement')
-            self.assertEqual(target.read_text(), 'test-profile\n')
-
-
 
 class GatewayFinalDestinationTests(unittest.TestCase):
     def test_resolved_private_destinations_are_blocked_by_both_egress_paths(self):

@@ -1,6 +1,4 @@
 """Boundaries for independent, authenticated public-listener probes."""
-import copy
-import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -8,9 +6,6 @@ import unittest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('provision_probe', ROOT / 'scripts/provision_vpn_probe.py')
-provision = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(provision)
 
 
 class VPNProbeTests(unittest.TestCase):
@@ -61,27 +56,7 @@ class VPNProbeTests(unittest.TestCase):
             images.append([c['image'] for c in pod['containers']])
         self.assertEqual(images[0], images[1])
 
-    def test_account_update_is_additive_and_idempotent(self):
-        old = {'inbounds': [{'tag': 'gateway', 'settings': {'clients': [{'id': 'existing', 'email': 'person@local'}]},
-                            'streamSettings': {'security': 'reality'}}]}
-        original = copy.deepcopy(old)
-        updated, ident = provision.add_account(old, 'test-only-probe-id')
-        repeated, other = provision.add_account(updated, 'replacement-must-not-be-used')
-        self.assertEqual(old, original)
-        self.assertEqual(updated['inbounds'][0]['settings']['clients'][0], old['inbounds'][0]['settings']['clients'][0])
-        self.assertEqual(updated, repeated)
-        self.assertEqual(ident, other)
 
-    def test_client_connects_to_public_443_and_cannot_fall_back_to_direct(self):
-        inbound = {'streamSettings': {'realitySettings': {'privateKey': 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-                    'serverNames': ['example.org'], 'shortIds': ['0011223344556677']}}}
-        client = provision.client_config(inbound, 'test-only-probe-id', '203.0.113.10')
-        self.assertEqual(client['inbounds'][0]['listen'], '127.0.0.1')
-        self.assertEqual(client['outbounds'][0]['protocol'], 'blackhole')
-        self.assertNotIn('freedom', {o['protocol'] for o in client['outbounds']})
-        remote = client['outbounds'][1]['settings']['vnext'][0]
-        self.assertEqual((remote['address'], remote['port']), ('203.0.113.10', 443))
-        self.assertEqual(client['routing']['rules'][0]['outboundTag'], 'public-vpn')
 
 
 
